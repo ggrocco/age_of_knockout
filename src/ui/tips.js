@@ -4,6 +4,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageLabel } from '../data/ages.js';
 import { WONDER_TICKS } from '../rounds/index.js';
+import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
@@ -70,8 +71,7 @@ export function tipHtml({ kind, id, next, short = [], notes = [] }) {
     if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
   } else {
     const a = AGE_COST[next]; title = `Advance to ${ageLabel(next)} Age`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
-    // Mirrors ageUpProblem (src/sim/commands.js): a Town Center plus min(2, buildings of the current Age, excluding extras like the Farm).
-    const need = Math.min(2, Object.entries(BUILDINGS).filter(([bid, d]) => d.age === AGES[AGES.indexOf(next) - 1] && bid !== 'town_center' && !d.extra).length);
+    const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);
     desc += need ? ` Needs a Town Center and ${need} finished building${need > 1 ? 's' : ''} from your current Age.` : ' Needs a Town Center.';
     const unlocks = [...Object.values(BUILDINGS), ...Object.values(UNITS).filter(u => u.trainable !== false)].filter(d => d.age === next).map(d => d.name);
     stats = unlocks.length ? row('Unlocks', unlocks.join(', '), true) : '';

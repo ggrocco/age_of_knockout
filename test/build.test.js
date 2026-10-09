@@ -1,6 +1,6 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
-import { canPlace } from '../src/sim/commands.js';
+import { canPlace, ageUpNeed } from '../src/sim/commands.js';
 const freeSpot = (g, p, type, skip = []) => { const t = tc(g, p); for (let r = 3; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(t.x) + dx, y = Math.floor(t.y) + dy; if (skip.some(k => Math.abs(k.x - x) < 4 && Math.abs(k.y - y) < 4)) continue; if (canPlace(g, p, type, x, y)) return { x, y }; } };
 const mine = (g, p, type) => [...g.units.values()].filter(u => u.owner === p && u.type === type);
 const tc = (g, p) => [...g.buildings.values()].find(b => b.owner === p && b.type === 'town_center');
@@ -58,6 +58,17 @@ test('construct: villagers can help finish an existing foundation', () => {
   assert.equal(g.command(0, { type: 'construct', ids: [vs[1].id, vs[2].id], targetId: b.id }).ok, true);
   assert.equal(g.command(1, { type: 'construct', ids: [], targetId: b.id }).ok, false, 'enemy cannot');
   for (let i = 0; i < 300; i++) g.tick(); assert.equal(b.constructed, true, 'three builders finish a house fast');
+});
+test('ageUpNeed: two buildings of the current Age, fewer when the Age has fewer (Wonder and Farm excluded)', () => {
+  assert.deepEqual(['stone', 'tool', 'bronze', 'iron'].map(ageUpNeed), [2, 2, 1, 0]);
+});
+test('bronze age advances to iron with a Government Center; no Wonder required', () => {
+  const g = createGame({ seed: 1 }); const p = g.players[0]; p.age = 'bronze'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
+  assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', 'needs a bronze building first');
+  const t = tc(g, 0); g.addBuilding('government_center', 0, t.x, t.y + 8, true);
+  const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, r.reason);
+  for (let i = 0; i < 1100; i++) g.tick();
+  assert.equal(p.age, 'iron');
 });
 test('iron age can advance to AI Future; then max age', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.age = 'iron'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
