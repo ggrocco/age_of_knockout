@@ -70,12 +70,12 @@ test('bronze age advances to iron with a Government Center; no Wonder required',
   for (let i = 0; i < 1100; i++) g.tick();
   assert.equal(p.age, 'iron');
 });
-test('iron age can advance to AI Future; then max age', () => {
+test('iron advances to medieval; AI Future is the max age', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.age = 'iron'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
   const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, r.reason);
-  for (let i = 0; i < 1300; i++) g.tick();
-  assert.equal(p.age, 'future');
-  const again = g.command(0, { type: 'age' }); assert.equal(again.ok, false); assert.equal(again.reason, 'max age');
+  for (let i = 0; i < 1100; i++) g.tick();
+  assert.equal(p.age, 'medieval');
+  p.age = 'future'; const again = g.command(0, { type: 'age' }); assert.equal(again.ok, false); assert.equal(again.reason, 'max age');
 });
 test('future units are age-gated and trainable at their buildings', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };

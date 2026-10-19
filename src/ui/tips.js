@@ -2,7 +2,7 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageLabel } from '../data/ages.js';
+import { AGES, AGE_COST, ageTitle } from '../data/ages.js';
 import { WONDER_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
@@ -54,23 +54,23 @@ const names = ids => ids.map(i => (UNITS[i] || BUILDINGS[i]).name).join(', ');
 export function tipHtml({ kind, id, next, short = [], notes = [] }) {
   let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
   if (kind === 'unit') {
-    const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageLabel(u.age)} Age`; cost = u.cost;
+    const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageTitle(u.age)}`; cost = u.cost;
     const atkLabel = `${u.atk} ${u.atkType === 'pierce' ? 'pierce' : 'melee'}`;
     stats = row('HP', u.hp) + row('Attack', atkLabel) + row('Armor', `${u.marmor} melee / ${u.parmor} pierce`) + row('Range', u.range <= 1 ? 'Melee' : `${u.range} tiles`) + row('Speed', `${u.speed} tiles/s`) + row('Trains in', `${u.trainTime}s`);
     if (u.bonus) stats += row('Bonus', Object.entries(u.bonus).map(([k, v]) => `+${v} vs ${CLASS_LABEL[k] || k}`).join(', '), true);
   } else if (kind === 'building') {
-    const b = BUILDINGS[id]; title = b.name; sub = `Building, ${ageLabel(b.age)} Age`; cost = b.cost;
+    const b = BUILDINGS[id]; title = b.name; sub = `Building, ${ageTitle(b.age)}`; cost = b.cost;
     stats = row('HP', b.hp) + row('Build time', `${b.buildTime}s`);
     if (b.trains) stats += row('Trains', names(b.trains), true);
     if (b.pop) stats += row('Adds', `+${b.pop} population`, true);
     if (b.drops) stats += row('Drop-off', b.drops.map(cap).join(', '), true);
     if (b.gatherType) stats += row('Holds', `${b.amount} ${b.gatherType}`, true);
   } else if (kind === 'tech') {
-    const t = TECHS[id]; title = t.name; sub = `Research, ${ageLabel(t.age)} Age`; cost = t.cost; desc = t.desc;
+    const t = TECHS[id]; title = t.name; sub = `Research, ${ageTitle(t.age)}`; cost = t.cost; desc = t.desc;
     stats = row('Research time', `${t.time}s`, true);
     if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
   } else {
-    const a = AGE_COST[next]; title = `Advance to ${ageLabel(next)} Age`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
+    const a = AGE_COST[next]; title = `Advance to ${ageTitle(next)}`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
     const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);
     desc += need ? ` Needs a Town Center and ${need} finished building${need > 1 ? 's' : ''} from your current Age.` : ' Needs a Town Center.';
     const unlocks = [...Object.values(BUILDINGS), ...Object.values(UNITS).filter(u => u.trainable !== false)].filter(d => d.age === next).map(d => d.name);

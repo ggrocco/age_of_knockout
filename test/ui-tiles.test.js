@@ -48,11 +48,18 @@ test('age tip names the next age and what it unlocks', () => {
 });
 test('age tip states the same building requirement as ageUpProblem', () => {
   const need = a => Math.min(2, Object.entries(BUILDINGS).filter(([id, d]) => d.age === AGES[AGES.indexOf(a) - 1] && id !== 'town_center' && !d.extra).length);
-  assert.equal(need('future'), 0, 'iron age has no buildings of its own to require');
+  assert.equal(need('future'), 0, 'modern has no buildings of its own to require');
   assert.doesNotMatch(tipHtml({ kind: 'age', id: 'age', next: 'future' }), /finished building/);
   for (const a of ['tool', 'bronze']) { assert.equal(need(a), 2, a); assert.match(tipHtml({ kind: 'age', id: 'age', next: a }), /2 finished buildings/, a); }
   // The Wonder is a victory building, not an age-up requirement: leaving Bronze needs only the Government Center.
   assert.equal(need('iron'), 1); assert.match(tipHtml({ kind: 'age', id: 'age', next: 'iron' }), /1 finished building from/);
+});
+test('tips name eras by their full title and never say "Sail Age"', () => {
+  const all = [...Object.keys(UNITS).map(id => tipHtml({ kind: 'unit', id })), ...Object.keys(BUILDINGS).map(id => tipHtml({ kind: 'building', id })),
+    ...Object.keys(TECHS).map(id => tipHtml({ kind: 'tech', id })), ...AGES.slice(1).map(next => tipHtml({ kind: 'age', id: 'age', next }))].join('');
+  assert.doesNotMatch(all, /Sail Age|Age of Sail Age|Future Age Age/);
+  assert.match(tipHtml({ kind: 'age', id: 'age', next: 'sail' }), /Advance to Age of Sail/);
+  assert.match(tipHtml({ kind: 'unit', id: 'swordsman' }), /Iron Age/);
 });
 test('tech tip: name, description, cost, research time and prerequisite', () => {
   const h = tipHtml({ kind: 'tech', id: 'iron_weapons', short: ['gold'], notes: ['Needs Bronze Weapons'] });
