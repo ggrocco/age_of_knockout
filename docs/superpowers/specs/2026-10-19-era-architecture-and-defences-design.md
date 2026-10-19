@@ -22,7 +22,9 @@ neither lets a player stall a match.
 ## Goals
 
 1. **Every building has its own silhouette per era**, following the prototype's concept, not only a new palette.
-   - Tool and Iron keep today's timber and masonry looks.
+   - Tool keeps today's timber look on every building.
+   - Iron keeps today's masonry look for the Town Center, House, Government Center and Wonder. Every other Iron
+     building gets its own Greek/Roman design, because today it matches Tool.
    - Every other era where the building exists gets a new design.
 2. **Each building stays readable in every era**: a barracks looks military, a market looks like trade.
 3. **Animated era signatures** where the era calls for them:
@@ -66,7 +68,8 @@ neither lets a player stall a match.
 | Same concept as the prototype on every building | user |
 | Towers and walls designed in this pass | user |
 | Tower and wall rules as below (shoot nearest in range; walls block everyone, no gates; tougher each era; bot builds towers and breaks through walls) | user, accepting my proposal |
-| Tool and Iron keep today's looks | user, by liking the prototype |
+| Tool keeps today's looks; Iron keeps today's Town Center, House, Government Center and Wonder | user, by liking the prototype |
+| Iron gets its own Greek/Roman design for every other building, since today's Iron version matches Tool | user (after the builder check showed Granary, Storage Pit, Farm, Archery Range and Market identical, and Barracks and Stable colour-only) |
 | Per-building, per-era designs in the table below | my call; the builder may refine the details as long as the era signature and the building's job stay readable |
 | Stats and costs for towers and walls | my call; invented, recorded in `src/data/README.md` |
 
@@ -93,11 +96,20 @@ unlock-era design. "Today" means the current timber (Tool) or masonry (Iron) mod
 | Tower (new) | — | mud-brick tower | stone castle tower | cannon bastion | machine-gun nest on a brick tower | missile turret | laser turret |
 | Wall (new) | — | mud-brick wall | castle wall with battlements | star-fort earthwork | sandbags and barbed wire | concrete barrier | energy barrier |
 
-Tool and Iron, the "today" columns, keep their current models. The Tower and Wall have no Tool or Iron model yet, so
-they get new ones:
+**Tool** keeps today's timber model for every building that exists in Tool.
 
-| | Tool | Iron |
+**Iron** keeps today's masonry Town Center, House, Government Center and Wonder. Everything else gets a new
+Greek/Roman design, as do the Tower and Wall, which have no model yet:
+
+| Building | Tool | Iron |
 |---|---|---|
+| Granary | today | columned granary (horreum) with a tiled roof |
+| Storage Pit | today | stone storehouse with amphorae |
+| Farm | today | olive and grain terraces |
+| Barracks | today | Roman camp: palisaded square, tents, standards |
+| Archery Range | today | stone archery yard with marble targets |
+| Stable | today | stone stable with arched stalls |
+| Market | today | colonnaded agora with stalls |
 | Tower | wooden lookout platform | stone tower with ballista |
 | Wall | wooden palisade | stone wall |
 
@@ -177,8 +189,9 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
   dispatches by era and type and falls back to the building's unlock-era design.
   - The merge-geometry class `B` and the shared helpers move to a small module both sides import, so no kit has to be
     passed around.
-  - Today's timber and masonry models move into `arch/tool.js` and `arch/iron.js` unchanged. Their geometry must stay
-    byte-identical; it was hash-checked in the era-chain work.
+  - Today's timber models move into `arch/tool.js`, and the kept masonry models (Town Center, House, Government
+    Center, Wonder) into `arch/iron.js`, unchanged. Their geometry must stay byte-identical; it was hash-checked in
+    the era-chain work.
   - `styles.js` stays only if the builder still needs it for palettes; otherwise it is retired.
 - **Animated parts** (`spinners`, `floaters`, `smoke`) become a supported model feature with tests.
 - **Gallery:** the buildings page picks up the Tower and Wall rows and every new design automatically, because it is
@@ -205,9 +218,10 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
 **Headless (Node), render:**
 
 - Every building in every era builds valid geometry (the existing loop).
-- Every building with a design in an era differs from its previous era's design. Measure it by bounding-box or vertex
-  differences, not only colour.
-- Tool and Iron geometry is byte-identical to today's.
+- Within each building, every era's design differs from every other era's design, not just the previous one, so
+  Tool and Iron are caught too. Measure it by bounding-box or vertex differences, not only colour.
+- Today's geometry stays byte-identical for the designs kept: every Tool building, plus the Iron Town Center, House,
+  Government Center and Wonder.
 - Animated parts exist where designed and are hidden during construction.
 - Building bodies stay at or below 3.6 (excluding flagpoles, antennas, thin spire tips and animated parts), and the
   Wonder at or below 5.5.
@@ -222,8 +236,8 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
 
 ## Delivery order (for the plan)
 
-1. Architecture: per-era modules and the shared builder. Port Tool and Iron unchanged, with the hash check, and the
-   prototype's Town Center and House.
+1. Architecture: per-era modules and the shared builder. Port the kept Tool and Iron designs unchanged, with the hash
+   check, and the prototype's Town Center and House.
 2. The remaining buildings, era by era, each checked in the gallery.
 3. Defences in the sim: tower shooting, walls, breaching, upgrade on advance, wall-line command. Then the bot, then
    HUD and input (wall drag, phone flow).
