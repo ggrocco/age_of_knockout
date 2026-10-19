@@ -2,13 +2,13 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel } from '../data/ages.js';
-import { canAfford, ageUpProblem } from '../sim/commands.js';
+import { canAfford, ageUpProblem, ageUpNeed } from '../sim/commands.js';
 import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml } from './tips.js';
 import { QUALITY } from '../render/quality.js';
 
-const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs 2 buildings of your current Age',
+const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
   'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center' };
 export const reasonText = r => REASONS[r] || r;
 const fmtTime = t => { const s = Math.floor(t / 20); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -108,7 +108,7 @@ export function createHud(ui) {
           const notes = inProg ? [`Researching (${Math.ceil(bld.research.remaining / 20)}s)`] : locked ? ['Requires ' + ageLabel(t.age) + ' Age'] : needReq ? ['Needs ' + TECHS[t.requires].name] : busy ? ['Building is busy'] : short.length ? [reasonText('resources')] : [];
           btns.push(tile(`data-research="${id}" data-b="${bld.id}"`, { kind: 'tech', id, name: t.name, cost: t.cost, tint: 't-age', ok, lockedAge: locked ? t.age : '', short, notes })); }
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
-          btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? '<span class="c">+2 bldgs</span>' : '', cx: ' age' })); } }
+          btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }
       }
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }

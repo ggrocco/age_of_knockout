@@ -11,6 +11,8 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
 - Wonder requires Bronze Age (spec's round setup starts players rich; original needs Iron).
 - Catapult trains at the Government Center (no Siege Workshop in the subset).
 - King exists only for Regicide (not trainable).
+- The Wonder does not count toward the age-up building requirement (flagged `extra`, like the Farm): it is a
+  victory building, so leaving Bronze needs only the Government Center.
 
 ## Deviations from the verified AoE1 unit stats
 

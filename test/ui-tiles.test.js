@@ -50,7 +50,9 @@ test('age tip states the same building requirement as ageUpProblem', () => {
   const need = a => Math.min(2, Object.entries(BUILDINGS).filter(([id, d]) => d.age === AGES[AGES.indexOf(a) - 1] && id !== 'town_center' && !d.extra).length);
   assert.equal(need('future'), 0, 'iron age has no buildings of its own to require');
   assert.doesNotMatch(tipHtml({ kind: 'age', id: 'age', next: 'future' }), /finished building/);
-  for (const a of ['tool', 'bronze', 'iron']) { assert.equal(need(a), 2, a); assert.match(tipHtml({ kind: 'age', id: 'age', next: a }), /2 finished buildings/, a); }
+  for (const a of ['tool', 'bronze']) { assert.equal(need(a), 2, a); assert.match(tipHtml({ kind: 'age', id: 'age', next: a }), /2 finished buildings/, a); }
+  // The Wonder is a victory building, not an age-up requirement: leaving Bronze needs only the Government Center.
+  assert.equal(need('iron'), 1); assert.match(tipHtml({ kind: 'age', id: 'age', next: 'iron' }), /1 finished building from/);
 });
 test('tech tip: name, description, cost, research time and prerequisite', () => {
   const h = tipHtml({ kind: 'tech', id: 'iron_weapons', short: ['gold'], notes: ['Needs Bronze Weapons'] });
