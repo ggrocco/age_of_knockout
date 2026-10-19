@@ -1,6 +1,6 @@
 // Buildings-by-era gallery layout, derived only from the data tables so new ages and
 // buildings show up without touching the page. DOM- and three-free so tests can check it.
-import { AGES, ageIndex, ageLabel } from '../data/ages.js';
+import { AGES, ageIndex, ageTitle } from '../data/ages.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { UNITS } from '../data/units.js';
 
@@ -22,7 +22,7 @@ export function galleryRows(buildings = BUILDINGS, ages = AGES) {
 // Plain-text facts for the row header, all read from the tables.
 export function buildingFacts(spec) {
   const cost = RES.filter(r => spec.cost[r]).map(r => `${spec.cost[r]} ${r}`).join(', ') || 'free';
-  const facts = [`${ageLabel(spec.age)} age`, `${spec.size}×${spec.size}`, `${spec.hp} hp`, cost, `${spec.buildTime}s`];
+  const facts = [ageTitle(spec.age), `${spec.size}×${spec.size}`, `${spec.hp} hp`, cost, `${spec.buildTime}s`];
   if (spec.pop) facts.push(`+${spec.pop} pop`);
   if (spec.drops) facts.push(`drop: ${spec.drops.join('/')}`);
   if (spec.extra) facts.push('extra');

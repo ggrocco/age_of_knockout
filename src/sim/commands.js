@@ -23,7 +23,7 @@ export function canPlace(game, pid, type, x, y) {
 }
 
 // Advancing out of `age` needs this many distinct finished buildings of that age (extras like the Farm and Wonder don't count).
-const ageBuildings = age => Object.entries(BUILDINGS).filter(([id, d]) => d.age === age && id !== 'town_center' && !d.extra).map(([id]) => id);
+export const ageBuildings = age => Object.entries(BUILDINGS).filter(([id, d]) => d.age === age && id !== 'town_center' && !d.extra).map(([id]) => id);
 export const ageUpNeed = age => Math.min(2, ageBuildings(age).length);
 
 export function ageUpProblem(game, pid) {

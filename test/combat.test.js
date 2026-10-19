@@ -55,6 +55,7 @@ test('attack cooldown depends on unit class', () => {
   const g = createGame({ seed: 1 });
   assert.equal(g.spawnUnit('railgun', 0, 20, 20).cooldown, 80); assert.equal(g.spawnUnit('drone', 0, 20, 21).cooldown, 40);
   assert.equal(g.spawnUnit('mech', 0, 20, 22).cooldown, 30);
+  assert.equal(g.spawnUnit('machine_gunner', 0, 20, 23).cooldown, 12); assert.equal(g.spawnUnit('tank', 0, 20, 24).cooldown, 40); assert.equal(g.spawnUnit('musketeer', 0, 20, 25).cooldown, 40);
 });
 test('attack type reads the matching armor class (AoE1 damage model)', () => {
   const g = createGame({ seed: 1 });
@@ -87,4 +88,9 @@ test('dead relic carrier drops relic', () => {
   const g = createGame({ seed: 1 }); const r = g.spawnRelic(20.5, 20.5), u = g.spawnUnit('villager', 0, 20.5, 20.5);
   g.command(0, { type: 'relic', ids: [u.id], relicId: r.id }); for (let i = 0; i < 5; i++) g.tick();
   assert.equal(r.holder, u.id); g.damage(u, 999, null); assert.equal(r.holder, null); assert.equal(u.dead, true);
+});
+test('spearman bonus hits the knight, not the tank', () => {
+  const g = createGame({ seed: 1 }), s = g.spawnUnit('spearman', 0, 20, 20), k = g.spawnUnit('knight', 1, 21, 20), t = g.spawnUnit('tank', 1, 21, 21);
+  assert.equal(damageTo(s, k), Math.max(1, s.atk - k.marmor + 8));
+  assert.equal(damageTo(s, t), Math.max(1, Math.max(0, s.atk - t.marmor)));
 });

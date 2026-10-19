@@ -2,7 +2,7 @@
 // the game's own models and lighting. Rows/columns come from the data tables (rows.js).
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { AGES, ageLabel } from '../data/ages.js';
+import { AGES, ageTitle } from '../data/ages.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { buildModel, animate, buildingStyle } from '../render/models.js';
 import { createSkyLighting } from '../render/lighting.js';
@@ -73,7 +73,7 @@ function buildTable() {
   const head = el('tr', {}, el('th', { scope: 'col' }, el('span', { className: 'age', textContent: 'Building' })));
   AGES.forEach((age, i) => {
     const style = buildingStyle(age), changed = i > 0 && style !== buildingStyle(AGES[i - 1]);
-    head.append(el('th', { scope: 'col' }, el('span', { className: 'age', textContent: `${ageLabel(age)} Age` }),
+    head.append(el('th', { scope: 'col' }, el('span', { className: 'age', textContent: ageTitle(age) }),
       el('span', { className: `style${changed ? ' changed' : ''}`, textContent: `${style}${changed ? ' — new look' : ''}` })));
   });
   const body = el('tbody');
@@ -81,10 +81,10 @@ function buildTable() {
     const tr = el('tr', {}, el('th', { scope: 'row' }, el('span', { className: 'name', textContent: row.name }), el('code', { textContent: row.type }),
       el('ul', {}, ...buildingFacts(row.spec).map(f => el('li', { textContent: f })))));
     for (const cell of row.cells) {
-      if (!cell.available) { tr.append(el('td', { className: 'off' }, el('div', { className: 'locked', textContent: `Unlocks in ${ageLabel(row.unlock)} Age` }))); continue; }
+      if (!cell.available) { tr.append(el('td', { className: 'off' }, el('div', { className: 'locked', textContent: `Unlocks in ${ageTitle(row.unlock)}` }))); continue; }
       const canvas = el('canvas', { width: CELL_W, height: CELL_H });
-      const btn = el('button', { className: 'cell', title: `${row.name} — ${ageLabel(cell.age)} Age` }, canvas);
-      btn.setAttribute('aria-label', `Open ${row.name} in the ${ageLabel(cell.age)} Age`);
+      const btn = el('button', { className: 'cell', title: `${row.name} — ${ageTitle(cell.age)}` }, canvas);
+      btn.setAttribute('aria-label', `Open ${row.name} in the ${ageTitle(cell.age)}`);
       btn.dataset.type = row.type; btn.dataset.age = cell.age;
       if (cell.unlocks) btn.append(el('span', { className: 'badge', textContent: 'NEW' }));
       const td = el('td', {}, btn), trains = trainsBy(row.spec, cell.age);
@@ -136,7 +136,7 @@ function openDetail(type, age) {
     controls = new OrbitControls(stage.camera, stageCanvas); controls.enableDamping = true;
   }
   detail = { type, age, t: 0 };
-  document.getElementById('detail-title').textContent = `${BUILDINGS[type].name} — ${ageLabel(age)} Age (${buildingStyle(age)})`;
+  document.getElementById('detail-title').textContent = `${BUILDINGS[type].name} — ${ageTitle(age)} (${buildingStyle(age)})`;
   if (!dialog.open) dialog.showModal();
   refreshDetail(true);
   cancelAnimationFrame(raf); let last = performance.now();

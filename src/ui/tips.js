@@ -2,14 +2,14 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageLabel } from '../data/ages.js';
+import { AGES, AGE_COST, ageTitle } from '../data/ages.js';
 import { WONDER_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
 export const COLORS = { food: '#e0554d', wood: '#a06a35', gold: '#facc15', stone: '#9ca3af' };
-const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege' };
+const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored' };
 
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
@@ -18,12 +18,14 @@ export const DESC = {
   granary: 'Drop-off point for food. Place it beside berries and farms to shorten trips.',
   storage_pit: 'Drop-off point for wood, gold and stone. Also researches weapon and armor upgrades.',
   farm: 'A field that holds 400 food. Villagers work it for a steady food supply.',
-  barracks: 'Trains infantry and Slingers. The Future Age adds the Mech Walker.',
-  archery_range: 'Trains ranged units: Bowmen, then Combat Drones in the Future Age.',
-  stable: 'Trains fast cavalry: Scouts for exploring and Horse Archers for raids.',
+  barracks: 'Trains infantry and Slingers, later Musketeers, Riflemen and Machine Gunners. The Future Age adds the Mech Walker.',
+  archery_range: 'Trains ranged units: Bowmen, Crossbowmen in the Medieval Age, then Combat Drones in the Future Age.',
+  stable: 'Trains fast cavalry: Scouts for exploring, Horse Archers for raids and armoured Knights in the Medieval Age.',
   market: 'Researches economy upgrades that speed up gathering, and counts toward leaving the Tool Age.',
-  government_center: 'Trains siege: Catapults and Railguns, researches Ballistics (+range), and accepts every resource.',
+  government_center: 'Trains Catapults and Railguns, researches Ballistics (+range) and accepts every resource. Later siege comes from the Castle and Factory.',
   wonder: `In the Wonder Race, keeping one standing for ${Math.round(WONDER_TICKS / 1200)} minutes wins the round.`,
+  castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age.',
+  factory: 'Industrial Age works that builds Field Artillery and Tanks. You need one to advance out of the Industrial Age.',
   villager: 'Gathers food, wood, gold and stone and builds every structure. Weak in a fight.',
   clubman: 'Cheap melee infantry that fights well early and falls behind in later Ages.',
   axeman: 'Melee infantry with a heavier swing than the Clubman.',
@@ -35,6 +37,15 @@ export const DESC = {
   scout: 'Fast cavalry with wide sight and bonus damage against infantry. Explore and pick off stray Villagers.',
   horse_archer: 'Fast pierce cavalry with 2 pierce armour, so it beats other archers. Strike and retreat.',
   catapult: 'Slow siege engine. Its shots also hurt nearby units, but it is fragile up close.',
+  knight: 'Heavy Medieval cavalry with plate armour (3 melee, 2 pierce). Fast and hard-hitting, but Spearmen still punish it.',
+  crossbowman: 'Medieval ranged infantry that out-ranges the Bowman and hits harder. Fragile up close; keep a front line ahead of it.',
+  trebuchet: 'Medieval siege engine from the Castle. Hurls stones from long range that also hurt nearby units; very slow to move.',
+  musketeer: 'Age of Sail gunpowder infantry from the Barracks. Fires musket shots from range and hits harder than any bow.',
+  cannon: 'Age of Sail siege gun from the Castle. Sturdier than a Trebuchet, and its shots splash nearby units.',
+  rifleman: 'Industrial Age infantry with long-range rifles and light armour. Out-ranges the Musketeer.',
+  field_artillery: 'Industrial Age gun from the Factory. Long range, heavy splash damage and more health than older siege.',
+  machine_gunner: 'Modern infantry that fires very rapidly. Each bullet is weak, so armour blunts it, but it shreds unarmoured troops.',
+  tank: 'Modern armoured vehicle from the Factory. Heavy armour and a long-range gun; spear bonuses and old weapon upgrades do not apply to it.',
   drone: 'Fast Future Age skirmisher that fires from long range.',
   mech: 'Future Age walker with 200 health and heavy armor. Slow, tough and hard-hitting.',
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
@@ -54,23 +65,23 @@ const names = ids => ids.map(i => (UNITS[i] || BUILDINGS[i]).name).join(', ');
 export function tipHtml({ kind, id, next, short = [], notes = [] }) {
   let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
   if (kind === 'unit') {
-    const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageLabel(u.age)} Age`; cost = u.cost;
+    const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageTitle(u.age)}`; cost = u.cost;
     const atkLabel = `${u.atk} ${u.atkType === 'pierce' ? 'pierce' : 'melee'}`;
     stats = row('HP', u.hp) + row('Attack', atkLabel) + row('Armor', `${u.marmor} melee / ${u.parmor} pierce`) + row('Range', u.range <= 1 ? 'Melee' : `${u.range} tiles`) + row('Speed', `${u.speed} tiles/s`) + row('Trains in', `${u.trainTime}s`);
     if (u.bonus) stats += row('Bonus', Object.entries(u.bonus).map(([k, v]) => `+${v} vs ${CLASS_LABEL[k] || k}`).join(', '), true);
   } else if (kind === 'building') {
-    const b = BUILDINGS[id]; title = b.name; sub = `Building, ${ageLabel(b.age)} Age`; cost = b.cost;
+    const b = BUILDINGS[id]; title = b.name; sub = `Building, ${ageTitle(b.age)}`; cost = b.cost;
     stats = row('HP', b.hp) + row('Build time', `${b.buildTime}s`);
     if (b.trains) stats += row('Trains', names(b.trains), true);
     if (b.pop) stats += row('Adds', `+${b.pop} population`, true);
     if (b.drops) stats += row('Drop-off', b.drops.map(cap).join(', '), true);
     if (b.gatherType) stats += row('Holds', `${b.amount} ${b.gatherType}`, true);
   } else if (kind === 'tech') {
-    const t = TECHS[id]; title = t.name; sub = `Research, ${ageLabel(t.age)} Age`; cost = t.cost; desc = t.desc;
+    const t = TECHS[id]; title = t.name; sub = `Research, ${ageTitle(t.age)}`; cost = t.cost; desc = t.desc;
     stats = row('Research time', `${t.time}s`, true);
     if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
   } else {
-    const a = AGE_COST[next]; title = `Advance to ${ageLabel(next)} Age`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
+    const a = AGE_COST[next]; title = `Advance to ${ageTitle(next)}`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
     const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);
     desc += need ? ` Needs a Town Center and ${need} finished building${need > 1 ? 's' : ''} from your current Age.` : ' Needs a Town Center.';
     const unlocks = [...Object.values(BUILDINGS), ...Object.values(UNITS).filter(u => u.trainable !== false)].filter(d => d.age === next).map(d => d.name);

@@ -1,7 +1,7 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageIndex, ageLabel } from '../data/ages.js';
+import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle } from '../data/ages.js';
 import { canAfford, ageUpProblem, ageUpNeed } from '../sim/commands.js';
 import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { icon } from './icons.js';
@@ -25,7 +25,7 @@ export function createHud(ui) {
   const tips = new Map();
   const tile = (attrs, { kind, id, name, cost, tint, cls, ok, lockedAge, short = [], notes = [], next, extra = '', cx = '' }) => {
     tips.set(`${kind}:${id}`, tipHtml({ kind, id, next, short, notes }));
-    const lock = lockedAge ? `<span class="lock">${icon('lock')}</span>` : '', small = lockedAge ? ageLabel(lockedAge) + ' age' : costHtml(cost, short, true) + extra;
+    const lock = lockedAge ? `<span class="lock">${icon('lock')}</span>` : '', small = lockedAge ? ageTitle(lockedAge) : costHtml(cost, short, true) + extra;
     return { key: `${attrs}|${name}|${lockedAge ? 'L' : ''}`, off: !ok, small,
       html: `<button class="btn tile ${tint}${ok ? '' : ' off'}${lockedAge ? ' locked' : ''}${cx}" ${attrs} data-tip="${kind}:${id}" aria-describedby="tip" aria-disabled="${!ok}"><span class="orb">${icon(id, cls)}${lock}</span><span class="lbl"><b>${name}</b><small>${small}</small></span></button>` };
   };
@@ -59,7 +59,7 @@ export function createHud(ui) {
     let html;
     if (ui.touch) html = resHtml + `<span class="res" title="Population">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span><span class="res">${fmtTime(g.time)}</span><button data-menu="open" aria-label="Menu">&#9776;</button>`;
     else html = resHtml
-      + `<span class="res" title="Population">Pop ${p.pop}/${p.popCap}</span><span class="res">${p.ageUp ? 'Advancing... ' : ''}${ageName} Age</span>`
+      + `<span class="res" title="Population">Pop ${p.pop}/${p.popCap}</span><span class="res">${p.ageUp ? 'Advancing... ' : ''}${ageTitle(p.age)}</span>`
       + `<span class="grow"><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span><span class="res">${fmtTime(g.time)}</span>`
       + [1, 2, 4].map(s => `<button data-speed="${s}" class="${ui.speed === s ? 'on' : ''}">${s}x</button>`).join('') + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button><button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
     if (!ui.touch) html += '<button data-menu="open" aria-label="Game settings">Settings</button>';
@@ -80,6 +80,9 @@ export function createHud(ui) {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
       if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${e.queue.map(q => UNITS[q.unit].name).join(', ')} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>Food left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
+      const next = AGES[ageIndex(p.age) + 1];
+      if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;
       return s;
     };
     if (one) ih = describe(one);
@@ -93,7 +96,7 @@ export function createHud(ui) {
     let key = `${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`;
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
-      const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageLabel(d.age) + ' Age'] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText('pop cap')] : [])];
+      const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText('pop cap')] : [])];
       if (vills.length) for (const [id, d] of Object.entries(BUILDINGS)) {
         const locked = ageIndex(d.age) > ageIndex(p.age), short = shortOf(p, d.cost), ok = !locked && canAfford(p, d.cost);
         btns.push(tile(`data-build="${id}"`, { kind: 'building', id, name: d.name, cost: d.cost, tint: tintOf(d), ok, lockedAge: locked ? d.age : '', short, notes: notesFor(locked, d, short) }));
@@ -105,7 +108,7 @@ export function createHud(ui) {
           if (t.building !== bld.type || p.techs.has(id)) continue;
           const inProg = bld.research?.tech === id, locked = ageIndex(p.age) < ageIndex(t.age), needReq = t.requires && !p.techs.has(t.requires);
           const short = shortOf(p, t.cost), busy = bld.research && !inProg, ok = !inProg && !locked && !needReq && !busy && canAfford(p, t.cost);
-          const notes = inProg ? [`Researching (${Math.ceil(bld.research.remaining / 20)}s)`] : locked ? ['Requires ' + ageLabel(t.age) + ' Age'] : needReq ? ['Needs ' + TECHS[t.requires].name] : busy ? ['Building is busy'] : short.length ? [reasonText('resources')] : [];
+          const notes = inProg ? [`Researching (${Math.ceil(bld.research.remaining / 20)}s)`] : locked ? ['Requires ' + ageTitle(t.age)] : needReq ? ['Needs ' + TECHS[t.requires].name] : busy ? ['Building is busy'] : short.length ? [reasonText('resources')] : [];
           btns.push(tile(`data-research="${id}" data-b="${bld.id}"`, { kind: 'tech', id, name: t.name, cost: t.cost, tint: 't-age', ok, lockedAge: locked ? t.age : '', short, notes })); }
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }

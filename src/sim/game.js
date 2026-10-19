@@ -35,7 +35,7 @@ export function createGame({ seed = 1, rules = null, size = 64, workRate = [1, 1
   game.spawnUnit = (type, owner, x, y) => {
     const d = UNITS[type];
     const u = { id: game.nextId++, kind: 'unit', type, owner, x, y, hp: d.hp, maxHp: d.hp, atk: d.atk, atkType: d.atkType || 'melee', marmor: d.marmor || 0, parmor: d.parmor || 0, bonus: d.bonus || null, range: d.range, speed: d.speed, sight: d.sight,
-      cls: d.cls, splash: d.splash || 0, cooldown: d.cls === 'archer' ? 40 : d.cls === 'siege' ? 80 : 30, cd: 0, order: { type: 'idle' }, path: null, retry: 0,
+      cls: d.cls, splash: d.splash || 0, cooldown: d.cooldown ?? (d.cls === 'archer' ? 40 : d.cls === 'siege' ? 80 : 30), cd: 0, order: { type: 'idle' }, path: null, retry: 0,
       carry: { type: null, amount: 0 }, relic: null, dead: false };
     for (const id of game.players[owner].techs) applyUnitEffect(u, TECHS[id].effect); // inherit researched upgrades
     game.entities.set(u.id, u); game.units.set(u.id, u); return u;

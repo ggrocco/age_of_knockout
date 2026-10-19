@@ -40,3 +40,9 @@ test('buildings.html uses the same three.js import map as the game', () => {
   const importMap = file => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').match(/<script type="importmap">(.*?)<\/script>/s)[1];
   assert.equal(importMap('buildings.html'), importMap('index.html'));
 });
+
+test('buildings gallery names eras by their title, never "Sail Age"', () => {
+  const facts = buildingFacts({ ...BUILDINGS.market, age: 'sail' }).join(' ');
+  assert.match(facts, /Age of Sail/); assert.doesNotMatch(facts, /Sail age|Sail Age|Age of Sail age/i);
+  assert.match(buildingFacts(BUILDINGS.castle).join(' '), /Medieval Age/);
+});
