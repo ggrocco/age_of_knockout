@@ -16,6 +16,13 @@ test('opponent difficulty ramps up', () => {
   const t = createTournament(1), d = []; while (!t.over) { d.push(t.opponent.difficulty); t.resolve(true, stub([])); }
   assert.deepEqual(d, ['easy', 'easy', 'medium', 'medium', 'hard']);
 });
+test('chosen level sets the opponent ramp', () => {
+  const ramp = level => { const t = createTournament(1, level), d = []; while (!t.over) { d.push(t.opponent.difficulty); t.resolve(true, stub([])); } return d; };
+  assert.deepEqual(ramp('relaxed'), ['relaxed', 'relaxed', 'easy', 'easy', 'medium']);
+  assert.deepEqual(ramp('normal'), ['easy', 'easy', 'medium', 'medium', 'hard']);
+  assert.deepEqual(ramp('hard'), ['medium', 'medium', 'hard', 'hard', 'hard']);
+  assert.deepEqual(ramp('bogus'), ramp('normal'));
+});
 test('real off-screen simulation resolves round 1', () => {
   const t = createTournament(2); t.resolve(true); assert.equal(t.alive.length, 16); assert.equal(t.history[0].results.length, 16);
 });

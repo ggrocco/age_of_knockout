@@ -1,12 +1,12 @@
 // Headless bot-vs-bot match runner. Used by the test harness and for off-screen bracket matches.
 import { createGame } from '../sim/game.js';
-import { createBot } from '../ai/bot.js';
+import { createBot, THINK_EVERY as every } from '../ai/bot.js';
 import { roundById } from '../rounds/index.js';
 
 export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts = {}) {
   const rules = roundById(roundId), out = { ended: false, winner: null, reason: null, ticks: 0, errors: [], maxRejects: 0, cap: rules.capTicks };
   const g = createGame({ seed, rules }), bots = [createBot(g, 0, diffs[0]), createBot(g, 1, diffs[1])];
-  const every = { easy: 30, medium: 15, hard: 10 }, limit = opts.limit || rules.capTicks + 50;
+  const limit = opts.limit || rules.capTicks + 50;
   try {
     while (!g.result && g.time < limit) {
       g.tick();

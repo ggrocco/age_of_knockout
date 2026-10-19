@@ -1,7 +1,7 @@
 import { createGame } from './sim/game.js';
-import { createBot } from './ai/bot.js';
+import { createBot, THINK_EVERY } from './ai/bot.js';
 import { ROUNDS, roundById, scoreOf } from './rounds/index.js';
-import { createTournament } from './tournament/bracket.js';
+import { createTournament, LEVELS, LEVEL_NAME } from './tournament/bracket.js';
 import { createView } from './render/view.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud, reasonText } from './ui/hud.js';
@@ -14,8 +14,12 @@ const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').mat
 document.body.classList.toggle('touch', TOUCH);
 const screenEl = document.getElementById('screen'), app = { tournament: null, match: null, ui: null };
 window.__app = app;
-const EVERY = { easy: 30, medium: 15, hard: 10 };
 let gpuWarned = false;
+// Tournament difficulty level: ?level= wins, else the last pick (browser storage may be unavailable), else Normal.
+const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents wait until Bronze Age, about 15 minutes, before attacking.', normal: 'The standard ramp, from easy to hard opponents.', hard: 'Tough opponents from the first round.' };
+const storedLevel = () => { try { return localStorage.getItem('level'); } catch { return null; } };
+let level = [params.get('level'), storedLevel()].find(l => Object.hasOwn(LEVELS, l ?? '')) || 'normal';
+function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catch {} }
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
 const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
 
@@ -66,7 +70,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
     const dt = Math.min(0.1, (now - m.last) / 1000); m.last = now; m.frames++;
     if (!ui.paused && !game.result) {
       m.acc += dt * ui.speed * 20; let steps = Math.min(Math.floor(m.acc), 300); m.acc -= Math.floor(m.acc);
-      for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
+      for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = THINK_EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
     input.update(dt); view.sync(); view.frame(dt, now / 1000); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
     if (game.result && !m.ended) { m.ended = true; setTimeout(() => { if (app.match === m) showResult(m); }, AUTO ? 300 : 1200); }
@@ -98,7 +102,7 @@ function bracketHtml(t) {
 }
 function bracketScreen() {
   const t = app.tournament, r = t.round, o = t.opponent;
-  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty})</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
+  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
   document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
@@ -110,7 +114,7 @@ async function afterMatch(won) {
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);
   document.getElementById('again').onclick = menu;
 }
-function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1)); bracketScreen(); }
+function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1), level); bracketScreen(); }
 
 function menu() {
   document.body.classList.remove('ingame');
@@ -118,10 +122,16 @@ function menu() {
   <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
   ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, or pick up relics</span>
   <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager, jump to Town Center</span><b>Space, Esc</b><span>pause, cancel</span></div>`}
+  <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
   <button class="btn" data-auto id="start">Begin Tournament</button><br>
   ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" style="font-size:14px;padding:5px 12px">Quick: ${r.name}</button>`).join('')}</div>`);
   document.getElementById('start').onclick = startTournament;
-  for (const b of document.querySelectorAll('.quick')) b.onclick = () => startMatch({ roundId: ROUNDS[+b.dataset.i].id, seed: 1, oppDiff: 'medium' });
+  for (const b of document.querySelectorAll('.level .btn')) b.onclick = () => {
+    setLevel(b.dataset.level); document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
+    for (const x of document.querySelectorAll('.level .btn')) x.classList.toggle('on', x === b);
+  };
+  // A quick match faces the opponent that round would have in a tournament at the chosen level.
+  for (const b of document.querySelectorAll('.quick')) b.onclick = () => startMatch({ roundId: ROUNDS[+b.dataset.i].id, seed: 1, oppDiff: LEVELS[level][+b.dataset.i] });
 }
 
 if (params.get('round')) startMatch({ roundId: ROUNDS[+params.get('round') - 1].id, seed: +(params.get('seed') || 1), oppDiff: params.get('opp') || 'medium' });
