@@ -104,8 +104,11 @@ they get new ones:
 **Look rules for the builder:**
 
 - **Team colour:** every design carries it (flag, banner, stripe or trim).
-- **Height:** later eras may be taller, but no building may exceed about **3.6 world units** (today's tallest are
-  around 3), so units stay visible.
+- **Height:** later eras may be taller, so long as units behind stay visible.
+  - The solid building body may reach at most **3.6 world units**. That excludes flagpoles, antennas, thin spire tips
+    and animated parts.
+  - The Wonder is a monument and may reach **5.5**.
+  - Today's heights, for reference: Town Center 3.2, Castle 3.46, Wonder 5.06. *(my call, after the builder check)*
 - **Animation:** only through the spinner, floater and smoke parts the prototype introduced. All are hidden while the
   building is under construction.
 - **Scaffolding** shows during construction, as today, and is sized to the new heights.
@@ -143,14 +146,23 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
 - **Walls block every unit, the owner's included.** There are no gates.
 - **Durability comes from the owner's era**, upgrading in place like towers: HP Tool 120, Bronze 200, Iron 300,
   Medieval 400, Age of Sail 450, Industrial 500, Modern 650, AI Future 800. Armor: melee 4 / pierce 10.
-- **Breaching:** when a unit cannot find a path to its target because enemy walls are in the way, it attacks the
-  first enemy wall segment on the path it would take if walls were open. Once the breach is open it resumes its
-  order. This applies to every unit, the player's and the bot's.
+- **Breaching:** when a unit cannot find a path to its target because enemy buildings are in the way, it attacks the
+  first enemy building on the path it would take if enemy buildings were open. That covers walls, towers, or any
+  building used as a fence. Once the breach is open it resumes its order. This applies to every unit, the player's and
+  the bot's. *(Extended from walls to all enemy buildings after the builder check: my call.)*
+- **No tower limit**, as in the original. A heavily defended player can still win on the time-cap score tiebreak. That
+  counts as defending, not stalling, because the bot can always breach. *(my call)*
+- **Deleting your own buildings:** a misplaced wall would otherwise cut off your own villagers for good, so players
+  can delete their own buildings, as in the original. No refund. *(my call)*
+  - Desktop: the Delete key, or a Delete button in the selected building's panel.
+  - Phone: the button, with a confirm step.
+  - A wall line must never trap its own builders; how to guarantee that is left to the builder.
 
 ### Bot
 - From the Tool Age on, it keeps easy 1 / medium 2 / hard 3 towers near its Town Center. It rebuilds them when
   destroyed, if it can afford to.
-- It never builds walls. It breaks through the player's walls with the breaching rule.
+- It never builds walls. It breaks through the player's walls and towers with the breaching rule.
+- Its siege units target enemy towers first when a wave reaches a defended base. *(my call)*
 
 ### Scoring, elimination and age-up
 - Walls do **not** count toward the score's building term, so they can't be used to farm score. Towers do count.
@@ -184,8 +196,11 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
 - A wall line command places and pays per segment and stops when resources run out.
 - Walls are excluded from the score's building term.
 - Towers and walls don't count toward age-up or keep a player alive.
-- The bot keeps its tower count and breaks into a walled base within a time limit. `test/bot-sim.js` stays clean:
-  every match ends.
+- The bot keeps its tower count.
+- A hard bot's Death Match army breaks into a Town Center enclosed by one closed wall ring with three towers, within
+  3000 ticks.
+- Deleting your own building works, and deleting an enemy's is refused.
+- `test/bot-sim.js` stays clean: every match ends.
 
 **Headless (Node), render:**
 
@@ -194,7 +209,8 @@ Armor: melee 3 / pierce 8 (the building default), so archers barely scratch it a
   differences, not only colour.
 - Tool and Iron geometry is byte-identical to today's.
 - Animated parts exist where designed and are hidden during construction.
-- Heights stay at or below 3.6.
+- Building bodies stay at or below 3.6 (excluding flagpoles, antennas, thin spire tips and animated parts), and the
+  Wonder at or below 5.5.
 
 **Browser (required by CLAUDE.md):**
 
