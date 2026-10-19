@@ -28,6 +28,7 @@ A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI; five rounds, e
 - `src/ai/bot.js` — the bot (easy/medium/hard); it is given the enemy start location. Also drives `?autoplay`.
 - `src/tournament` — bracket and a headless match runner (`sim.js`), used by tests and `test/bot-sim.js`.
 - `src/render`, `src/ui`, `src/main.js` — Three.js view (procedural, vertex-colour-baked models in `render/models.js`), HUD, desktop + touch input, tournament flow. Reads sim state; never mutates it except via commands.
+  Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`); the per-entity meshes stay in the scene graph on layer 1 as unrendered proxies that `animate()` and picking use, and blob shadows are one `InstancedMesh`. A new model part only needs that material to be batched.
 - `src/data` — unit/building/age tables. Values are **unverified approximations** of AoE1 (see `src/data/README.md`); deviations from the original (Farm added, Wonder needs Bronze, Catapult at Government Center, no Temple/Priest) are recorded there and in `progress.md`.
 
 Tests cover the sim, rounds, bot and bracket headlessly (Node test runner); the renderer/UI has no automated tests and was only checked via screenshots/emulation.
