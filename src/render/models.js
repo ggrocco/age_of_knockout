@@ -91,6 +91,10 @@ function limbs(o, team) {
   if (o.helmet === 'leather') body.sph(0.145, C.leather, 0, 0.9, 0, 1, 0.8, 1);
   if (o.helmet === 'bronze') { body.sph(0.155, C.bronze, 0, 0.9, 0, 1, 0.9, 1).box(0.05, 0.14, 0.26, td, 0, 0.98, 0).box(0.03, 0.12, 0.03, C.bronze, 0, 0.84, 0.15); }
   if (o.helmet === 'iron') { body.sph(0.155, C.iron, 0, 0.9, 0, 1, 0.9, 1).box(0.03, 0.14, 0.03, C.iron, 0, 0.84, 0.15).cone(0.05, 0.2, t, 0, 1.0, -0.02, 6); }
+  if (o.helmet === 'great') body.cylT(0.135, 0.155, 0.24, C.iron, 0, 0.77, 0, 10).box(0.2, 0.025, 0.03, C.dark, 0, 0.9, 0.14).cone(0.05, 0.12, t, 0, 1.01, 0, 6);
+  if (o.helmet === 'tricorn') body.sph(0.13, 0x1f1a16, 0, 0.95, 0, 1, 0.55, 1).cylT(0.21, 0.21, 0.05, 0x1f1a16, 0, 0.95, 0, 3);
+  if (o.helmet === 'kepi') body.cylT(0.12, 0.145, 0.13, td, 0, 0.92, 0, 10).box(0.17, 0.02, 0.09, C.dark, 0, 0.93, 0.12);
+  if (o.helmet === 'steel') body.sph(0.16, 0x55603a, 0, 0.92, 0, 1, 0.62, 1).cyl(0.2, 0.018, 0x4a5034, 0, 0.9, 0);
   if (o.hat === 'straw') body.cylT(0.05, 0.1, 0.07, C.hay, 0, 0.99, 0, 8).cyl(0.22, 0.02, C.hay, 0, 0.98, 0).box(0.02, 0.03, 0.3, t, 0, 1.0, 0, 0, 0, 0);
   if (o.quiver) body.cyl(0.05, 0.3, C.leather, -0.08, 0.42, -0.14, 0.3).box(0.02, 0.1, 0.02, C.hay, -0.08, 0.72, -0.18);
   if (o.cape) body.box(0.3, 0.55, 0.03, o.cape, 0, 0.2, -0.12, 0.08);
@@ -103,6 +107,10 @@ function limbs(o, team) {
   if (w === 'axe') { armR.cyl(0.02, 0.5, C.wood, 0, -0.42, 0.14, 1.3); armR.box(0.03, 0.18, 0.14, C.iron, 0, -0.16, 0.42, 1.3); }
   if (w === 'spear') { armR.cyl(0.018, 1.25, C.wood, 0, -0.6, 0.06, 0.15); armR.cone(0.045, 0.16, C.iron, 0, 0.56, 0.14, 6, 0); }
   if (w === 'sword') { armR.box(0.04, 0.05, 0.4, C.iron, 0, -0.31, 0.3, 0.2).box(0.14, 0.03, 0.03, C.gold, 0, -0.32, 0.1); }
+  if (w === 'crossbow') armR.box(0.04, 0.045, 0.44, C.wood, 0, -0.38, 0.22).box(0.5, 0.03, 0.04, C.woodD, 0, -0.36, 0.42).box(0.46, 0.01, 0.01, C.hay, 0, -0.35, 0.36);
+  if (w === 'musket') armR.box(0.05, 0.055, 0.3, C.wood, 0, -0.39, 0.05).box(0.026, 0.026, 0.78, C.iron, 0, -0.36, 0.48);
+  if (w === 'rifle') armR.box(0.045, 0.055, 0.28, C.woodD, 0, -0.39, 0.05).box(0.03, 0.03, 0.56, 0x3a3f44, 0, -0.36, 0.38).box(0.012, 0.03, 0.2, C.iron, 0, -0.36, 0.76);
+  if (w === 'mg') armR.box(0.08, 0.09, 0.36, 0x2f3437, 0, -0.42, 0.12).box(0.045, 0.045, 0.62, 0x2f3437, 0, -0.38, 0.5).box(0.1, 0.1, 0.12, 0x55603a, -0.08, -0.47, 0.06);
   if (w === 'sling') { armR.cyl(0.008, 0.36, C.leather, 0, -0.35, 0.04, 0.2).sph(0.04, C.stoneD, 0, -0.72, 0.06); }
   // left-hand equipment
   const sh = o.shield;
@@ -121,6 +129,10 @@ const HUMAN = {
   spearman: { helmet: 'leather', weapon: 'spear', shield: 'round' },
   hoplite: { scale: 1.05, helmet: 'bronze', weapon: 'spear', shield: 'big', armor: C.bronze, cape: null },
   swordsman: { scale: 1.08, helmet: 'iron', weapon: 'sword', shield: 'rect', armor: C.iron, cape: 'team' },
+  crossbowman: { helmet: 'iron', tunic: 0x5a6b3a, weapon: 'crossbow', quiver: true, sash: true },
+  musketeer: { helmet: 'tricorn', weapon: 'musket', belt: C.leather, sash: true, pants: 0xd8cfb4 },
+  rifleman: { helmet: 'kepi', weapon: 'rifle', pants: 0x3a3f4a },
+  machine_gunner: { scale: 1.04, helmet: 'steel', tunic: 0x5d6640, sleeve: 0x5d6640, pants: 0x4a5034, weapon: 'mg', sash: true },
   king: { scale: 1.12, tunic: 0x7a2a8a, sleeve: 0x7a2a8a, pants: 0x4a1a5a, helmet: null, cape: 'team', weapon: null, sash: true },
 };
 function villagerTools() {
@@ -132,8 +144,9 @@ function villagerTools() {
     basket: mk(b => { b.cylT(0.13, 0.09, 0.14, C.leather, 0, -0.5, 0.16, 8).sph(0.09, 0xc026d3, 0, -0.34, 0.16, 1, 0.6, 1); }),
   };
 }
-function horse(team) {
+function horse(team, barded = false) {
   const t = TEAM[team], body = new B(), leg = new B();
+  if (barded) body.box(0.6, 0.36, 1.02, t, 0, 0.42, -0.04).box(0.62, 0.05, 1.04, C.gold, 0, 0.42, -0.04).box(0.14, 0.12, 0.3, C.iron, 0, 0.92, 0.66, 0.5);
   const coat = 0x8a5a33, dark = 0x4a2f1a;
   body.sph(0.4, coat, 0, 0.61, 0, 0.56, 0.6, 1.28).box(0.36, 0.05, 0.4, t, 0, 0.78, -0.02).box(0.26, 0.34, 0.16, coat, 0, 0.66, 0.42, -0.6);
   body.box(0.22, 0.24, 0.32, coat, 0, 0.9, 0.62, 0.5).box(0.1, 0.06, 0.1, dark, 0, 0.95, 0.78).box(0.05, 0.16, 0.08, dark, 0, 0.98, 0.5, 0.2).box(0.03, 0.05, 0.03, dark, -0.06, 1.12, 0.6).box(0.03, 0.05, 0.03, dark, 0.06, 1.12, 0.6);
@@ -150,9 +163,51 @@ function catapult(team) {
   return { base: b.geometry(), arm: arm.geometry() };
 }
 
+// Medieval to Modern siege and armour: tall-armed Trebuchet, wheeled guns and the Tank.
+function trebuchet(team) {
+  const t = TEAM[team], b = new B(), arm = new B();
+  for (const x of [-0.32, 0.32]) b.box(0.14, 0.12, 1.2, C.wood, x, 0.12, 0).box(0.08, 1.08, 0.08, C.woodD, x, 0.2, -0.22, 0.3).box(0.08, 1.08, 0.08, C.woodD, x, 0.2, 0.22, -0.3);
+  b.box(0.76, 0.06, 0.06, C.woodD, 0, 1.12, 0).box(0.6, 0.06, 0.5, t, 0, 0.24, 0);
+  for (const [x, z] of [[-0.42, 0.45], [0.42, 0.45], [-0.42, -0.45], [0.42, -0.45]]) b.add(unit.cyl, C.woodD, x, 0.2, z, 0.2, 0.06, 0.2, 0, 0, Math.PI / 2);
+  arm.box(0.07, 0.07, 1.7, C.wood, 0, -0.035, 0.35).box(0.32, 0.3, 0.3, C.stoneD, 0, -0.42, -0.5).cyl(0.01, 0.4, C.leather, 0, -0.4, 1.18).sph(0.08, C.stoneD, 0, -0.42, 1.18);
+  return { base: b.geometry(), arm: arm.geometry() };
+}
+function cannon(team, kind) {
+  const t = TEAM[team], art = kind === 'artillery', b = new B(), barrel = new B(), metal = art ? 0x4a5034 : C.bronze;
+  b.box(0.36, 0.14, 0.62, art ? 0x55603a : C.wood, 0, 0.26, -0.05).box(0.12, 0.08, 0.8, art ? 0x4a5034 : C.woodD, 0, 0.12, -0.55, -0.25).box(0.38, 0.06, 0.2, t, 0, 0.4, -0.2);
+  for (const x of [-0.3, 0.3]) {
+    b.add(unit.cyl, art ? 0x2f3437 : C.woodD, x, 0.28, 0, 0.28, 0.06, 0.28, 0, 0, Math.PI / 2).add(unit.cyl, C.iron, x, 0.28, 0, 0.06, 0.09, 0.06, 0, 0, Math.PI / 2);
+    if (art) for (let k = 0; k < 4; k++) b.box(0.03, 0.5, 0.04, C.iron, x * 1.02, 0.03, 0, k * Math.PI / 4, 0, 0);
+  }
+  if (art) b.box(0.66, 0.42, 0.04, 0x55603a, 0, 0.32, 0.22).box(0.68, 0.04, 0.05, t, 0, 0.7, 0.22);
+  barrel.add(unit.cyl, metal, 0, 0, 0.2, art ? 0.06 : 0.09, art ? 1.0 : 0.8, art ? 0.06 : 0.09, Math.PI / 2, 0, 0).add(unit.cyl, metal, 0, 0, -0.2, 0.12, 0.18, 0.12, Math.PI / 2, 0, 0);
+  return { base: b.geometry(), barrel: barrel.geometry() };
+}
+function tank(team) {
+  const t = TEAM[team], hull = new B(), turret = new B(), olive = 0x5d6640, dark = 0x2f3437;
+  for (const x of [-0.44, 0.44]) { hull.box(0.22, 0.3, 1.36, dark, x, 0.04, 0); for (let z = -0.5; z <= 0.5; z += 0.25) hull.add(unit.cyl, 0x4a4f52, x * 1.02, 0.17, z, 0.12, 0.24, 0.12, 0, 0, Math.PI / 2); }
+  hull.box(0.7, 0.3, 1.26, olive, 0, 0.18, 0).box(0.72, 0.06, 0.32, t, 0, 0.48, -0.38).box(0.66, 0.08, 0.2, 0x4a5034, 0, 0.36, 0.62, -0.5);
+  turret.box(0.5, 0.22, 0.56, olive, 0, 0, -0.04).add(unit.cyl, 0x3a3f33, 0, 0.11, 0.6, 0.045, 0.8, 0.045, Math.PI / 2, 0, 0).cyl(0.09, 0.06, 0x4a5034, 0.1, 0.22, -0.12).box(0.18, 0.05, 0.05, t, -0.14, 0.23, -0.24);
+  return { hull: hull.geometry(), turret: turret.geometry() };
+}
+function eraSiegeModel(e) {
+  const root = new THREE.Group(), team = e.owner;
+  if (e.type === 'tank') {
+    const p = cached('tank' + team, () => tank(team)), hull = new THREE.Group(); hull.add(mesh(p.hull)); const turret = pivot(0, 0.5, 0, p.turret); hull.add(turret); root.add(hull);
+    root.scale.setScalar(1.1); return { root, anim: { type: 'tank', hull, turret }, shadow: 0.75 };
+  }
+  if (e.type === 'trebuchet') {
+    const p = cached('treb' + team, () => trebuchet(team)), arm = pivot(0, 1.12, 0, p.arm); arm.rotation.x = -0.6;
+    root.add(mesh(p.base), arm); root.scale.setScalar(1.15); return { root, anim: { type: 'treb', arm }, shadow: 0.7 };
+  }
+  const kind = e.type === 'field_artillery' ? 'artillery' : 'cannon', p = cached(`gun:${kind}:${team}`, () => cannon(team, kind)), barrel = pivot(0, 0.48, 0.05, p.barrel);
+  barrel.rotation.x = -0.12; root.add(mesh(p.base), barrel); root.scale.setScalar(1.1); return { root, anim: { type: 'gun', barrel }, shadow: 0.6 };
+}
+
 function unitModel(e) {
   const root = new THREE.Group(), team = e.owner;
   if (['drone', 'mech', 'railgun'].includes(e.type)) return futureModel(e);
+  if (['tank', 'trebuchet', 'cannon', 'field_artillery'].includes(e.type)) return eraSiegeModel(e);
   if (e.cls === 'siege') {
     const p = cached('cat' + team, () => catapult(team)), armP = pivot(0, 0.5, -0.05, p.arm); armP.rotation.x = -0.5;
     root.add(mesh(p.base), armP); root.scale.setScalar(1.15); return { root, anim: { type: 'cat', arm: armP }, shadow: 0.6 };
@@ -161,10 +216,10 @@ function unitModel(e) {
   const h = cached(`h:${e.type}:${team}`, () => limbs(spec, team));
   const anim = { type: 'human' };
   if (e.cls === 'cav') {
-    const hs = cached('horse' + team, () => horse(team)), hr = new THREE.Group(); hr.add(mesh(hs.body));
+    const barded = e.type === 'knight', hs = cached((barded ? 'horse:barded' : 'horse') + team, () => horse(team, barded)), hr = new THREE.Group(); hr.add(mesh(hs.body));
     anim.type = 'horse'; anim.legs = [[-0.11, 0.42, 0.3], [0.11, 0.42, 0.3], [-0.11, 0.42, -0.3], [0.11, 0.42, -0.3]].map(([x, y, z]) => { const p = pivot(x, y, z, hs.leg); hr.add(p); return p; });
     const rider = new THREE.Group(); rider.position.y = 0.72; rider.scale.setScalar(0.9);
-    const spec2 = { tunic: TEAM[team], bow: e.type === 'horse_archer', weapon: e.type === 'scout' ? 'spear' : null, helmet: 'leather' };
+    const spec2 = barded ? { tunic: TEAM[team], weapon: 'spear', helmet: 'great', armor: C.iron, shield: 'rect' } : { tunic: TEAM[team], bow: e.type === 'horse_archer', weapon: e.type === 'scout' ? 'spear' : null, helmet: 'leather' };
     const r = cached(`rider:${e.type}:${team}`, () => limbs(spec2, team)); rider.add(mesh(r.body)); anim.armR = pivot(0.22, 0.7, 0, r.armR); anim.armL = pivot(-0.22, 0.7, 0, r.armL); rider.add(anim.armR, anim.armL);
     root.add(hr, rider); root.scale.setScalar(1.1); return { root, anim, shadow: 0.55 };
   }
@@ -444,6 +499,13 @@ export function animate(g, e, t, moving) {
     }
   } else if (a.type === 'cat') {
     const p = Math.max(0, (e.cd - (e.cooldown - 14)) / 14); a.arm.rotation.x = e.order.type === 'attack' && p > 0 ? 1.1 - p * 1.6 : -0.5;
+  } else if (a.type === 'treb') {
+    const p = Math.max(0, (e.cd - (e.cooldown - 16)) / 16); a.arm.rotation.x = e.order.type === 'attack' && p > 0 ? 1.5 - p * 2.3 : -0.6;
+  } else if (a.type === 'gun') {
+    a.barrel.position.z = 0.05 - (e.order.type === 'attack' ? Math.max(0, (e.cd - e.cooldown + 10) / 10) * 0.14 : 0);
+  } else if (a.type === 'tank') {
+    a.turret.position.z = e.order.type === 'attack' ? -Math.max(0, (e.cd - e.cooldown + 8) / 8) * 0.1 : 0;
+    a.hull.position.y = moving ? Math.abs(Math.sin(t * 12 + e.id)) * 0.02 : 0;
   } else if (a.type === 'drone') {
     a.body.position.y = 1.1 + Math.sin(t * 3 + e.id) * 0.055;
     a.body.rotation.x = moving ? 0.12 : 0;

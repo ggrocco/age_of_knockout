@@ -77,3 +77,14 @@ test('resources and relics have finite geometry and independent animations', () 
   }
   checkGeometry(buildModel({ kind: 'relic' }), 'relic');
 });
+
+test('era units get their own models, not catapult or horse fallbacks', () => {
+  const kinds = { tank: 'tank', trebuchet: 'treb', cannon: 'gun', field_artillery: 'gun', knight: 'horse', catapult: 'cat' };
+  for (const [type, kind] of Object.entries(kinds)) assert.equal(buildModel({ ...UNITS[type], kind: 'unit', type, owner: 0, id: 1 }).anim.type, kind, type);
+});
+test('a fast-firing unit still alternates its attack pose', () => {
+  const e = { ...UNITS.machine_gunner, kind: 'unit', type: 'machine_gunner', owner: 0, id: 1, cooldown: 12, carry: { amount: 0 }, order: { type: 'attack' } };
+  const m = buildModel(e), g = new THREE.Group(); g.add(m.root); g.userData.anim = m.anim;
+  e.cd = 11; animate(g, e, 1, false); const fired = m.anim.armR.rotation.x;
+  e.cd = 2; animate(g, e, 1, false); assert.notEqual(m.anim.armR.rotation.x, fired);
+});
