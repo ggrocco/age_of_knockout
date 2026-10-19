@@ -13,6 +13,8 @@ npm test                         # simulation, UI-data, and render-model tests
 node test/bot-sim.js 12          # bot-vs-bot termination check, 12 seeds x 5 rounds
 ```
 
+To review the building designs, open `http://localhost:8000/buildings.html`. It shows every building in every age, rendered with the game's own models (Fit/True scale, Blue/Red team; click a building to orbit it or see it under construction). The page reads `src/data`, so new ages and buildings appear on reload.
+
 ## Deploy (Docker)
 
 ```

@@ -7,6 +7,14 @@ export function createMinimap(canvas, game, view) {
   const hex = c => '#' + c.toString(16).padStart(6, '0');
   const terrain = document.createElement('canvas'); terrain.width = W; terrain.height = H; const tctx = terrain.getContext('2d');
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const p = toCanvas(x + 0.5, y + 0.5); tctx.fillStyle = game.map.tiles[y * N + x] === 1 ? '#2b5f8c' : '#4a7a35'; tctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2 + 0.5, sc + 0.5); }
+  // Fog shading is redrawn only when vision changes (every 4 ticks), not on every minimap draw.
+  const fogLayer = document.createElement('canvas'); fogLayer.width = W; fogLayer.height = H; const fctx = fogLayer.getContext('2d');
+  let fogStamp = -1;
+  const updateFog = pl => {
+    if (game.time === fogStamp || game.time % 4 !== 0 && fogStamp >= 0) return; fogStamp = game.time;
+    fctx.clearRect(0, 0, W, H);
+    for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { const i = y * N + x; if (pl.visible[i]) continue; const p = toCanvas(x + 0.5, y + 0.5); fctx.fillStyle = pl.explored[i] ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.88)'; fctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2, sc); }
+  };
   const RC = { tree: '#1f4d1f', berry: '#b0208f', gold: '#facc15', stone: '#9ca3af' };
   const mm = { draw() {
     ctx.fillStyle = '#0a0d09'; ctx.fillRect(0, 0, W, H); ctx.drawImage(terrain, 0, 0);
@@ -17,9 +25,7 @@ export function createMinimap(canvas, game, view) {
       const c = e.kind === 'building' ? { x: e.x + e.size / 2, y: e.y + e.size / 2 } : e, p = toCanvas(c.x, c.y), s = e.kind === 'building' ? 4 : 2.5;
       ctx.fillStyle = hex(OWNER_COLOR[e.owner]); ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
     }
-    // fog shading
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { const i = y * N + x; if (pl.visible[i]) continue; const p = toCanvas(x + 0.5, y + 0.5); ctx.fillStyle = pl.explored[i] ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.88)'; ctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2, sc); }
+    updateFog(pl); ctx.drawImage(fogLayer, 0, 0);
     const f = view.focus, [a, b] = view.halfExtents();
     const c = toCanvas(f.x, f.z), w = a * sc * 0.7, h = b * sc * 0.75;
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(c.x - w, c.y - h, w * 2, h * 2);

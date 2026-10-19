@@ -17,7 +17,9 @@ docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
 ```
 
-Useful URL params: `?round=1..5&opp=easy|medium|hard&seed=N&speed=N`, `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?touch=1` (force phone layout). `window.__app` exposes the live game.
+Buildings-by-era design page: `http://localhost:8000/buildings.html` (`?team=1`, `?scale=true`). It renders every building in every age with the game's own models, and its rows and columns come straight from `src/data`, so new ages and buildings show up on reload with no page edits.
+
+Useful URL params: `?round=1..5&opp=easy|medium|hard&seed=N&speed=N`, `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
 
 ## Architecture
 
@@ -28,6 +30,8 @@ A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI; five rounds, e
 - `src/ai/bot.js` — the bot (easy/medium/hard); it is given the enemy start location. Also drives `?autoplay`.
 - `src/tournament` — bracket and a headless match runner (`sim.js`), used by tests and `test/bot-sim.js`.
 - `src/render`, `src/ui`, `src/main.js` — Three.js view (procedural, vertex-colour-baked models in `render/models.js`), HUD, desktop + touch input, tournament flow. Reads sim state; never mutates it except via commands.
+  Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`); the per-entity meshes stay in the scene graph on layer 1 as unrendered proxies that `animate()` and picking use, and blob shadows are one `InstancedMesh`. A new model part only needs that material to be batched.
+- `src/gallery` — the `buildings.html` design page. `rows.js` (DOM-free, tested) builds the building × age grid from the data tables. `main.js` renders each cell with `render/models.js` under the game's light rig. Building looks come from `buildingStyle` in `models.js`: Stone/Tool are timber, Bronze and every later age (new ones included) masonry. A new age only gets its own look if you add a style there, which changes the game and this page alike.
 - `src/data` — unit/building/age tables. Values are **unverified approximations** of AoE1 (see `src/data/README.md`); deviations from the original (Farm added, Wonder needs Bronze, Catapult at Government Center, no Temple/Priest) are recorded there and in `progress.md`.
 
 Tests cover the sim, rounds, bot and bracket headlessly (Node test runner); the renderer/UI has no automated tests and was only checked via screenshots/emulation.
@@ -52,7 +56,7 @@ Shortcuts (URL params are listed under Commands; `window.__app.match.game` is th
 
 ## Deployment
 
-`Dockerfile` copies only `index.html`, `styles.css`, `src/` and the two three.js folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. If `index.html`'s import map or static assets change, update the Dockerfile `COPY` lines, and the smoke-test paths in `Jenkinsfile`. The Dockerfile's `test` stage (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
+`Dockerfile` copies only `index.html`, `styles.css`, `src/` and the two three.js folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. If `index.html`'s (or `buildings.html`'s) import map or static assets change, update the Dockerfile `COPY` lines, and the smoke-test paths in `Jenkinsfile`. The Dockerfile's `test` stage (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
 
 `Jenkinsfile` builds the `test` target, runs the unit tests (JUnit to `reports/junit.xml`) and `bot-sim.js 12` in it, then builds the nginx image and smoke-tests it from inside the container. It only needs the docker CLI on the agent; it never pushes or deploys.
 
