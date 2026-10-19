@@ -3,7 +3,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { AGES, ageIndex } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
-import { canPlace, canAfford, ageUpProblem } from '../sim/commands.js';
+import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
 
 const DIFF = {
@@ -93,6 +93,8 @@ export function createBot(game, pid, difficulty = 'medium') {
       const why = ageUpProblem(game, pid);
       if (!why) cmd({ type: 'age' }); else if (why === 'resources' && ageIndex(me.age) === 0) bot.saving = true;
     }
+    // From Iron on, build what the current era's gate needs (Castle in Medieval, Factory in Industrial); count() includes foundations, so no duplicates.
+    if (ageIndex(me.age) >= ageIndex('iron')) { const req = ageBuildings(me.age), missing = req.filter(t => count(t) < 1); if (missing.length && req.length - missing.length < ageUpNeed(me.age)) tryBuild(missing[0], free, home); }
     if (ageIndex(me.age) >= 1) {
       if (count('archery_range') < 1) tryBuild('archery_range', free, home);
       if (count('stable') < 1) tryBuild('stable', free, home);
@@ -139,17 +141,19 @@ export function createBot(game, pid, difficulty = 'medium') {
     orderArmy(army, enemies, home, roundId, vis);
   }
 
-  const SIEGE = ['railgun', 'catapult'];
+  const SIEGE = ['railgun', 'field_artillery', 'cannon', 'trebuchet', 'catapult'];
   const RESEARCH_PREF = ['woodworking', 'gold_mining', 'bronze_weapons', 'bronze_shields', 'iron_weapons', 'ballistics'];
-  // Counter-pick preference lists (openage damage.md classes). Same 12 units, reordered:
+  // Counter-pick preference lists (openage damage.md classes). Same units, reordered; the era units sit right after the
+  // AI Future ones (newest first at each building), and armor (Tanks) is answered with siege and Tanks:
   // vs archers -> tanky melee / pierce-armoured closers; vs cavalry -> spearman (bonus) first;
   // vs infantry -> pierce archers (infantry has no pierce armour); vs siege -> fast closers.
   const PREF = {
-    default: ['mech', 'railgun', 'swordsman', 'hoplite', 'catapult', 'drone', 'horse_archer', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
-    archer:  ['mech', 'railgun', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'drone', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
-    cav:     ['mech', 'railgun', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'bowman', 'horse_archer', 'axeman', 'clubman', 'slinger'],
-    inf:     ['mech', 'railgun', 'catapult', 'drone', 'bowman', 'horse_archer', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
-    siege:   ['mech', 'railgun', 'catapult', 'horse_archer', 'drone', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    default: ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'swordsman', 'hoplite', 'catapult', 'drone', 'crossbowman', 'horse_archer', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    archer:  ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'drone', 'crossbowman', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
+    cav:     ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'axeman', 'clubman', 'slinger'],
+    inf:     ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
+    siege:   ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'horse_archer', 'drone', 'crossbowman', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    armor:   ['railgun', 'mech', 'field_artillery', 'tank', 'cannon', 'trebuchet', 'machine_gunner', 'rifleman', 'knight', 'musketeer', 'catapult', 'drone', 'crossbowman', 'swordsman', 'hoplite', 'horse_archer', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
   };
   function dominantEnemyClass(enemies) {
     const n = {};
