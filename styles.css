@@ -96,6 +96,8 @@ body.touch #tip { display:none; }
 .card h2 { font-weight:normal; color:var(--bronze); margin:.2em 0; }
 .card p { margin:.5em auto; max-width:720px; line-height:1.5; }
 .card .btn { font-size:18px; padding:9px 24px; margin:10px 6px 0; }
+.card .level { margin-top:12px; } .card .level .btn { font-size:15px; padding:5px 14px; margin:4px 3px 0; }
+.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em 0 0; font-size:14px; opacity:.85; }
 .win { color:var(--ok); } .lose { color:var(--red); }
 .bracket { display:flex; gap:14px; justify-content:center; text-align:left; margin:12px 0; font-size:12.5px; }
 .bracket .col { min-width:130px; } .bracket h4 { margin:0 0 6px; color:var(--bronze); font-weight:normal; text-align:center; }

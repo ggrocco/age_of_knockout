@@ -5,17 +5,23 @@ import { simulateMatch } from './sim.js';
 export const NAMES = ['You', 'Ramses', 'Hammurabi', 'Sargon', 'Nebuchadnezzar', 'Darius', 'Xerxes', 'Cyrus', 'Leonidas', 'Pericles', 'Alexander', 'Ptolemy',
   'Hannibal', 'Scipio', 'Caesar', 'Augustus', 'Attila', 'Boudica', 'Shalmaneser', 'Tiglath', 'Ashurbanipal', 'Thutmose', 'Akhenaten', 'Minos',
   'Agamemnon', 'Themistocles', 'Philip', 'Seleucus', 'Antiochus', 'Mithridates', 'Vercingetorix', 'Arminius'];
-// Difficulty of the opponent the human faces in each round.
-export const HUMAN_OPPONENT = ['easy', 'easy', 'medium', 'medium', 'hard'];
+// Difficulty of the opponent the human faces in each round, per chosen level. 'normal' is the original ramp.
+export const LEVELS = {
+  relaxed: ['relaxed', 'relaxed', 'easy', 'easy', 'medium'],
+  normal: ['easy', 'easy', 'medium', 'medium', 'hard'],
+  hard: ['medium', 'medium', 'hard', 'hard', 'hard'],
+};
+export const LEVEL_NAME = { relaxed: 'Relaxed', normal: 'Normal', hard: 'Hard' };
 
-export function createTournament(seed = 1) {
+export function createTournament(seed = 1, level = 'normal') {
+  const ramp = LEVELS[level] || LEVELS.normal;
   const rng = makeRng(seed);
   const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : ['easy', 'medium', 'hard'][rng.int(3)] }));
   const t = {
-    seed, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
+    seed, level, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
-    get opponent() { const o = this.alive[1]; return { ...o, difficulty: HUMAN_OPPONENT[this.roundIndex] }; },
+    get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },
     // Same as resolve() but simulates one off-screen match per macrotask so a UI stays responsive.
     async resolveAsync(humanWon, { onProgress, simulate = simulateMatch } = {}) {
       if (!humanWon) return this.resolve(false);

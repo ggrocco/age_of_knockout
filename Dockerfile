@@ -19,7 +19,7 @@ CMD ["node", "--test", "test/*.test.js"]
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 WORKDIR /usr/share/nginx/html
-COPY index.html buildings.html styles.css ./
+COPY index.html buildings.html styles.css favicon.svg ./
 COPY src ./src
 # index.html's (and buildings.html's) import map points at these two three.js paths
 COPY --from=deps /app/node_modules/three/build ./node_modules/three/build
