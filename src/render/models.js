@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createModelMaterial, surfaceKind } from './materials.js';
+import { ageIndex } from '../data/ages.js';
 
 export const TEAM = [0x356bb0, 0xb84532], TEAM_DARK = [0x234779, 0x7c3027];
 const C = { skin: 0xe8b98a, hair: 0x4a3222, wood: 0x7a5230, woodD: 0x4e3320, plaster: 0xe6d8b4, stone: 0x9a9a92, stoneD: 0x6f6f68, thatch: 0xc9a24a, thatchD: 0xa8822f, dark: 0x2a2018, gold: 0xf2c230, iron: 0xb9c0c8, bronze: 0xb5803a, leather: 0x8a5a2b, cloth: 0xc9b58a, hay: 0xe0c060, marble: 0xefe9dc, green: 0x3f7f3a, red: 0xc0392b, glass: 0x6fa8c8 };
@@ -230,9 +231,12 @@ function futureModel(e) {
 }
 
 // ---------- buildings ----------
+// Building geometry is cached per style, not per age: ages sharing a style look identical.
+// Bronze and every later age (including ones added after 'future') use masonry.
+export const buildingStyle = age => ageIndex(age) >= ageIndex('bronze') ? 'masonry' : 'timber';
 function buildingGeos(type, team, size, age) {
   const t = TEAM[team], td = TEAM_DARK[team], s = size - 0.22, h = s / 2, b = new B(), extra = {};
-  const masonry = ['bronze', 'iron', 'future'].includes(age), roofColor = masonry ? 0xa96342 : C.thatch;
+  const masonry = buildingStyle(age) === 'masonry', roofColor = masonry ? 0xa96342 : C.thatch;
   const wallColor = masonry ? 0xd7c7a4 : 0xbda77f;
   const door = (w, hh, z, x = 0) => { b.box(w, hh, 0.06, C.dark, x, 0.16, z).box(w + 0.1, 0.06, 0.08, C.woodD, x, 0.16 + hh, z); };
   const win = (x, y, z, ry = 0) => { b.box(0.22, 0.22, 0.05, C.glass, x, y, z, 0, ry).box(0.28, 0.04, 0.07, C.woodD, x, y + 0.22, z, 0, ry); };
@@ -351,7 +355,7 @@ function buildingGeos(type, team, size, age) {
   return { body: b.geometry(), extra };
 }
 function buildingModel(e, age = 'stone') {
-  const style = ['bronze', 'iron', 'future'].includes(age) ? 'masonry' : 'timber';
+  const style = buildingStyle(age);
   const root = new THREE.Group(), g = cached(`b:${e.type}:${e.owner}:${style}`, () => buildingGeos(e.type, e.owner, e.size, age));
   const body = new THREE.Group(); body.add(mesh(g.body)); root.add(body);
   const anim = { type: 'building', body };

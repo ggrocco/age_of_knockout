@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#231a11">
+<title>Buildings by Era</title>
+<link rel="icon" href="data:,">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<style>
+  :root { --stone:#2a2118; --stone2:#3b2e20; --bronze:#c8a052; --parch:#e8d9b0; --dim:#9c8c6c; --ink:#14100a; --new:#4ade80; --cell-w:168px; --cell-h:136px; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--ink); color:var(--parch); font-family:Georgia,'Palatino Linotype',serif; }
+  /* The table wrapper is the only scroller, so the age row and building column both stay pinned. */
+  body { display:flex; flex-direction:column; height:100dvh; }
+  header { flex:none; display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:10px 16px; background:linear-gradient(#3b2e20,#231a11); border-bottom:2px solid var(--bronze); }
+  header h1 { margin:0; font-size:20px; font-weight:normal; color:var(--bronze); letter-spacing:.03em; }
+  header p { margin:0; flex:1 1 260px; font-size:13px; color:var(--dim); }
+  header a { color:var(--parch); }
+  .seg { display:inline-flex; border:1px solid var(--bronze); border-radius:3px; overflow:hidden; }
+  .seg span { padding:4px 8px; font-size:12px; color:var(--dim); }
+  .seg button { background:#2a1f13; color:var(--parch); border:0; border-left:1px solid #5a4327; padding:4px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:linear-gradient(#7a5a33,#4a3620); }
+  main { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 16px; }
+  .wrap { flex:0 1 auto; min-height:0; overflow:auto; border:1px solid #4a3a26; border-radius:4px; }
+  table { border-collapse:separate; border-spacing:0; }
+  th, td { border-right:1px solid #33281b; border-bottom:1px solid #33281b; vertical-align:top; }
+  thead th { position:sticky; top:0; background:var(--stone2); padding:8px; text-align:left; font-weight:normal; z-index:2; }
+  thead th .age { display:block; font-size:16px; color:var(--bronze); }
+  thead th .style { font-size:12px; color:var(--dim); }
+  thead th .style.changed { color:var(--new); }
+  tbody th { position:sticky; left:0; z-index:1; background:var(--stone); width:200px; min-width:150px; padding:8px 10px; text-align:left; font-weight:normal; }
+  thead th:first-child { left:0; z-index:3; }
+  tbody th .name { display:block; font-size:16px; color:var(--parch); }
+  tbody th code { font-size:11px; color:var(--dim); }
+  tbody th ul { margin:6px 0 0; padding:0; list-style:none; font-size:12px; line-height:1.45; color:#cdbd97; }
+  td { padding:6px; background:#1b150e; }
+  td.off { background:repeating-linear-gradient(135deg,#17120c 0 8px,#1b150e 8px 16px); }
+  .cell { position:relative; display:block; width:var(--cell-w); padding:0; border:1px solid #3e301f; border-radius:3px; background:#20271b; color:inherit; font:inherit; cursor:zoom-in; }
+  .cell:hover, .cell:focus-visible { border-color:var(--bronze); outline:none; }
+  .cell canvas { display:block; width:var(--cell-w); height:var(--cell-h); }
+  .cell .badge { position:absolute; top:4px; left:4px; padding:1px 6px; border-radius:2px; background:#14532d; color:#dcfce7; font-size:11px; letter-spacing:.06em; }
+  .trains { width:var(--cell-w); margin-top:4px; font-size:11px; line-height:1.35; color:#bfae88; }
+  .locked { width:var(--cell-w); height:var(--cell-h); display:flex; align-items:center; justify-content:center; text-align:center; font-size:12px; color:#6f6250; }
+  dialog { width:min(920px,calc(100vw - 32px)); padding:0; border:2px solid var(--bronze); border-radius:4px; background:var(--stone); color:var(--parch); }
+  dialog::backdrop { background:#000a; }
+  dialog .bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:8px 12px; border-bottom:1px solid #5a4327; }
+  dialog .bar h2 { margin:0; flex:1; font-size:17px; font-weight:normal; color:var(--bronze); }
+  dialog label { font-size:13px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+  dialog .close { background:none; border:1px solid var(--bronze); border-radius:3px; color:var(--parch); font:inherit; padding:2px 10px; cursor:pointer; }
+  #stage { display:block; width:100%; height:min(560px,62vh); touch-action:none; }
+  #status { margin:10px 0 0; font-size:12px; color:var(--dim); }
+  @media (max-width:640px) {
+    :root { --cell-w:128px; --cell-h:104px; }
+    header h1 { font-size:17px; }
+    tbody th { width:128px; min-width:128px; padding:6px; }
+    tbody th ul { font-size:11px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Buildings by Era</h1>
+  <p>Built live from <code>src/data</code> and the game's own models, so new ages and buildings appear here on reload. <a href="./">Play the game</a></p>
+  <div class="seg" role="group" aria-label="Team colour"><span>Team</span><button data-team="0">Blue</button><button data-team="1">Red</button></div>
+  <div class="seg" role="group" aria-label="Scale"><span>Scale</span><button data-scale="fit" title="Each building zoomed to fill its cell">Fit</button><button data-scale="true" title="Every building at the same zoom, so sizes compare">True</button></div>
+</header>
+<main>
+  <div class="wrap"><table id="grid"></table></div>
+  <p id="status">Rendering…</p>
+</main>
+<dialog id="detail">
+  <div class="bar">
+    <h2 id="detail-title"></h2>
+    <label><input type="checkbox" id="detail-build"> Under construction</label>
+    <label><input type="checkbox" id="detail-spin" checked> Spin</label>
+    <button class="close" id="detail-close" aria-label="Close">&#10005;</button>
+  </div>
+  <canvas id="stage"></canvas>
+</dialog>
+<script type="module" src="src/gallery/main.js"></script>
+</body>
+</html>

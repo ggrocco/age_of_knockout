@@ -58,6 +58,8 @@ pipeline {
           check / text/html
           check /styles.css text/css
           check /src/main.js javascript
+          check /buildings.html text/html
+          check /src/gallery/main.js javascript
           # the import map's two three.js paths: catches a Dockerfile COPY that no longer matches index.html
           check /node_modules/three/build/three.module.js javascript
           check /node_modules/three/examples/jsm/utils/BufferGeometryUtils.js javascript
