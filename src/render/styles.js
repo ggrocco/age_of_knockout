@@ -8,6 +8,6 @@ export const ERA_STYLE = {
   sail: { key: 'colonial', wall: 0xeee8dc, roof: 0xb0442e, trim: 0x4e3320, roofForm: 'gable', detail: 'bands' },
   industrial: { key: 'brick', wall: 0x9a4a35, roof: 0x5d6468, trim: 0x6b3426, roofForm: 'gable', detail: 'chimney' },
   modern: { key: 'concrete', wall: 0xc4c2bc, roof: 0x8d8f91, trim: 0x6fa8c8, roofForm: 'flat', detail: 'window' },
-  future: { key: 'glass', wall: 0xe4ecef, roof: 0xb8c4c8, trim: 0x8ddbe7, roofForm: 'flat', detail: 'glow' },
+  future: { key: 'glass', wall: 0xe4ecef, roof: 0x46606b, trim: 0x8ddbe7, roofForm: 'flat', detail: 'glow' },
 };
 export const styleOf = age => ERA_STYLE[age] ?? ERA_STYLE.stone;
