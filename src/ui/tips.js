@@ -9,7 +9,7 @@ import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
 export const COLORS = { food: '#e0554d', wood: '#a06a35', gold: '#facc15', stone: '#9ca3af' };
-const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege' };
+const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored' };
 
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
@@ -18,12 +18,14 @@ export const DESC = {
   granary: 'Drop-off point for food. Place it beside berries and farms to shorten trips.',
   storage_pit: 'Drop-off point for wood, gold and stone. Also researches weapon and armor upgrades.',
   farm: 'A field that holds 400 food. Villagers work it for a steady food supply.',
-  barracks: 'Trains infantry and Slingers. The Future Age adds the Mech Walker.',
-  archery_range: 'Trains ranged units: Bowmen, then Combat Drones in the Future Age.',
-  stable: 'Trains fast cavalry: Scouts for exploring and Horse Archers for raids.',
+  barracks: 'Trains infantry and Slingers, later Musketeers, Riflemen and Machine Gunners. The Future Age adds the Mech Walker.',
+  archery_range: 'Trains ranged units: Bowmen, Crossbowmen in the Medieval Age, then Combat Drones in the Future Age.',
+  stable: 'Trains fast cavalry: Scouts for exploring, Horse Archers for raids and armoured Knights in the Medieval Age.',
   market: 'Researches economy upgrades that speed up gathering, and counts toward leaving the Tool Age.',
-  government_center: 'Trains siege: Catapults and Railguns, researches Ballistics (+range), and accepts every resource.',
+  government_center: 'Trains Catapults and Railguns, researches Ballistics (+range) and accepts every resource. Later siege comes from the Castle and Factory.',
   wonder: `In the Wonder Race, keeping one standing for ${Math.round(WONDER_TICKS / 1200)} minutes wins the round.`,
+  castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age.',
+  factory: 'Industrial Age works that builds Field Artillery and Tanks. You need one to advance out of the Industrial Age.',
   villager: 'Gathers food, wood, gold and stone and builds every structure. Weak in a fight.',
   clubman: 'Cheap melee infantry that fights well early and falls behind in later Ages.',
   axeman: 'Melee infantry with a heavier swing than the Clubman.',
@@ -35,6 +37,15 @@ export const DESC = {
   scout: 'Fast cavalry with wide sight and bonus damage against infantry. Explore and pick off stray Villagers.',
   horse_archer: 'Fast pierce cavalry with 2 pierce armour, so it beats other archers. Strike and retreat.',
   catapult: 'Slow siege engine. Its shots also hurt nearby units, but it is fragile up close.',
+  knight: 'Heavy Medieval cavalry with plate armour (3 melee, 2 pierce). Fast and hard-hitting, but Spearmen still punish it.',
+  crossbowman: 'Medieval ranged infantry that out-ranges the Bowman and hits harder. Fragile up close; keep a front line ahead of it.',
+  trebuchet: 'Medieval siege engine from the Castle. Hurls stones from long range that also hurt nearby units; very slow to move.',
+  musketeer: 'Age of Sail gunpowder infantry from the Barracks. Fires musket shots from range and hits harder than any bow.',
+  cannon: 'Age of Sail siege gun from the Castle. Sturdier than a Trebuchet, and its shots splash nearby units.',
+  rifleman: 'Industrial Age infantry with long-range rifles and light armour. Out-ranges the Musketeer.',
+  field_artillery: 'Industrial Age gun from the Factory. Long range, heavy splash damage and more health than older siege.',
+  machine_gunner: 'Modern infantry that fires very rapidly. Each bullet is weak, so armour blunts it, but it shreds unarmoured troops.',
+  tank: 'Modern armoured vehicle from the Factory. Heavy armour and a long-range gun; spear bonuses and old weapon upgrades do not apply to it.',
   drone: 'Fast Future Age skirmisher that fires from long range.',
   mech: 'Future Age walker with 200 health and heavy armor. Slow, tough and hard-hitting.',
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
