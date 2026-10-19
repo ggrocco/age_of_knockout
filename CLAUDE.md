@@ -17,7 +17,7 @@ docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
 ```
 
-Useful URL params: `?round=1..5&opp=easy|medium|hard&seed=N&speed=N`, `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?touch=1` (force phone layout). `window.__app` exposes the live game.
+Useful URL params: `?round=1..5&opp=easy|medium|hard&seed=N&speed=N`, `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
 
 ## Architecture
 

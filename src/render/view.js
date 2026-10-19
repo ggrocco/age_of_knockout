@@ -6,6 +6,7 @@ import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } fro
 import { createSkyLighting, createLightingEffects } from './lighting.js';
 
 let sessionQuality = null;
+const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
 
 export const OWNER_COLOR = TEAM;
 const geo = { box: new THREE.BoxGeometry(1, 1, 1), ring: new THREE.RingGeometry(0.55, 0.7, 24), plane: new THREE.PlaneGeometry(1, 1) };
@@ -26,8 +27,16 @@ function disposeObject(root) {
 export function createView(container, game) {
   let storage; try { storage = window.localStorage; } catch { /* Storage is optional. */ }
   let qualityName = sessionQuality ?? readQuality(location.search, storage), preset = QUALITY[qualityName];
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // Prefer the discrete GPU on dual-GPU laptops (a hint the browser may ignore).
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.info.autoReset = false;
+  // With hardware acceleration off (or the GPU blocklisted) the browser rasterises on the CPU; drop to the cheapest preset.
+  const gl = renderer.getContext(), gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
+  const gpu = String(gl.getParameter(gpuInfo ? gpuInfo.UNMASKED_RENDERER_WEBGL : gl.RENDERER)), softwareGpu = SOFTWARE_GPU.test(gpu);
+  if (softwareGpu) {
+    console.warn(`WebGL is using a software renderer (${gpu}); hardware acceleration looks disabled.`);
+    if (sessionQuality === null && !new URLSearchParams(location.search).has('quality')) { qualityName = 'balanced'; preset = QUALITY.balanced; }
+  }
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -45,7 +54,7 @@ export function createView(container, game) {
   scene.add(sun, sun.target);
   const N = game.map.size;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 250);
-  const view = { renderer, scene, camera, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
+  const view = { renderer, scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
   let effects = createLightingEffects(renderer, scene, camera, preset);
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();
   function placeCamera() {
@@ -121,8 +130,10 @@ export function createView(container, game) {
     return g;
   }
   const seen = new Set();
+  let syncStamp = -1;
   view.selection = new Set();
   view.sync = () => {
+    if (game.time === syncStamp) return; syncStamp = game.time; // entity set only changes on a sim tick (20/s); frames run faster
     updateFog();
     seen.clear();
     const list = [...game.visibleEntities(0), ...game.knownResources(0)];
