@@ -38,14 +38,15 @@ function conquest(game) {
   if (d[1]) return { winner: 0, reason: 'conquest' };
   return null;
 }
-const capCheck = (game, cap) => game.time >= cap ? tiebreak(game, 'time cap') : null;
+// The cap is the game's (createGame defaults it to the round's capTicks; an easier opponent may lengthen it).
+const capCheck = game => game.time >= game.capTicks ? tiebreak(game, 'time cap') : null;
 const setAll = (game, v) => { for (const p of game.players) p.res = { food: v, wood: v, gold: v, stone: v }; };
 
 export const ROUNDS = [
   { id: 'conquest', name: 'Standard Game', desc: 'Destroy all enemy units and buildings.', capTicks: 30000,
-    setup() {}, check(game) { return conquest(game) || capCheck(game, 30000); } },
+    setup() {}, check(game) { return conquest(game) || capCheck(game); } },
   { id: 'deathmatch', name: 'Death Match', desc: 'Start with 20000 of every resource. Destroy the enemy.', capTicks: 24000,
-    setup(game) { setAll(game, 20000); }, check(game) { return conquest(game) || capCheck(game, 24000); } },
+    setup(game) { setAll(game, 20000); }, check(game) { return conquest(game) || capCheck(game); } },
   { id: 'regicide', name: 'Regicide', desc: 'Kill the enemy king. Protect yours.', capTicks: 30000,
     setup(game) {
       game.roundState = { kings: [] };
@@ -58,7 +59,7 @@ export const ROUNDS = [
       const dead = game.roundState.kings.map(id => !game.entities.has(id));
       if (dead[0] && dead[1]) return tiebreak(game, 'both kings fell');
       if (dead[0]) return { winner: 1, reason: 'regicide' }; if (dead[1]) return { winner: 0, reason: 'regicide' };
-      return conquest(game) || capCheck(game, 30000);
+      return conquest(game) || capCheck(game);
     } },
   { id: 'wonder', name: 'Wonder Race', desc: 'Build a Wonder (Bronze Age) and keep it standing for 3 minutes.', capTicks: 30000,
     setup(game) { setAll(game, 3000); game.roundState = { hold: [0, 0], need: WONDER_TICKS }; },
@@ -68,7 +69,7 @@ export const ROUNDS = [
       for (const i of [0, 1]) st.hold[i] = has[i] ? st.hold[i] + 1 : 0;
       const w = st.hold.map(h => h >= st.need);
       if (w[0] || w[1]) return w[0] && w[1] ? tiebreak(game, 'wonder') : { winner: w[0] ? 0 : 1, reason: 'wonder' };
-      return conquest(game) || capCheck(game, 30000);
+      return conquest(game) || capCheck(game);
     } },
   { id: 'relics', name: 'Capture the Relics', desc: 'Hold all 5 relics in your Town Center for 3 minutes.', capTicks: 30000,
     setup(game) { game.roundState = { hold: [0, 0], need: RELIC_TICKS }; for (const s of game.map.relicSpots) game.spawnRelic(s.x, s.y); },
@@ -80,7 +81,7 @@ export const ROUNDS = [
       st.count = count;
       const w = st.hold.map(h => h >= st.need);
       if (w[0] || w[1]) return { winner: w[0] ? 0 : 1, reason: 'relics' };
-      return conquest(game) || capCheck(game, 30000);
+      return conquest(game) || capCheck(game);
     } },
 ];
 export const roundById = id => ROUNDS.find(r => r.id === id);

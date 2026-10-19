@@ -8,14 +8,18 @@ import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
+// work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
-  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 18000, army: 12, attackAge: 'bronze', grace: 18000, dmWave: 20, dmArmy: 24 },
+  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000 },
   easy:    { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44 },
   medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44 },
   hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44 },
 };
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
+// createGame options for a match between these bot difficulties (null = a human player): each bot's handicap,
+// and the longest time limit any of them asks for (undefined keeps the round's own).
+export const matchOptions = diffs => ({ workRate: diffs.map(d => DIFF[d]?.work ?? 1), capTicks: Math.max(0, ...diffs.map(d => DIFF[d]?.cap ?? 0)) || undefined });
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 

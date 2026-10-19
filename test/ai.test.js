@@ -4,21 +4,27 @@ import { createBot } from '../src/ai/bot.js';
 import { roundById } from '../src/rounds/index.js';
 import { ageIndex } from '../src/data/ages.js';
 import { UNITS } from '../src/data/units.js';
-import { THINK_EVERY } from '../src/ai/bot.js';
+import { THINK_EVERY, matchOptions } from '../src/ai/bot.js';
 // Runs one bot against an idle opponent; returns the tick of its first attack wave and the tick it reached each age.
 function firstWave(roundId, diff, seed = 1) {
-  const rules = roundById(roundId), g = createGame({ seed, rules }), b = createBot(g, 1, diff), ev = THINK_EVERY[diff], ages = {};
+  const rules = roundById(roundId), g = createGame({ seed, rules, ...matchOptions([null, diff]) }), b = createBot(g, 1, diff), ev = THINK_EVERY[diff], ages = {};
   let wave = null;
-  while (!g.result && g.time < rules.capTicks && wave === null) { g.tick(); if (g.time % ev === 3 % ev) b.think(); ages[g.players[1].age] ??= g.time; if (b.waveActive) wave = g.time; }
+  while (!g.result && g.time < g.capTicks && wave === null) { g.tick(); if (g.time % ev === 3 % ev) b.think(); ages[g.players[1].age] ??= g.time; if (b.waveActive) wave = g.time; }
   return { wave, ages, age: g.players[1].age };
 }
-test('relaxed bot leaves a long peaceful start: no wave before ~15 min or before Bronze Age', () => {
+test('relaxed bot leaves a long peaceful start: no wave before 30 min or before Bronze Age', () => {
   for (const id of ['conquest', 'deathmatch', 'regicide', 'wonder']) {
     const r = firstWave(id, 'relaxed');
-    if (r.wave !== null) { assert.ok(r.wave >= 18000, `${id}: wave at ${r.wave}`); assert.ok(ageIndex(r.age) >= ageIndex('bronze'), `${id}: attacked in ${r.age}`); }
+    if (r.wave !== null) { assert.ok(r.wave >= 36000, `${id}: wave at ${r.wave}`); assert.ok(ageIndex(r.age) >= ageIndex('bronze'), `${id}: attacked in ${r.age}`); }
   }
   const c = firstWave('conquest', 'relaxed');
-  assert.ok(c.wave !== null && c.wave < 24000, 'relaxed bot still attacks eventually in conquest, wave at ' + c.wave);
+  assert.ok(c.wave !== null && c.wave < 42000, 'relaxed bot still attacks well before the 40 min cap in conquest, wave at ' + c.wave);
+});
+test('a relaxed opponent works at half speed and lengthens the match to 40 min', () => {
+  assert.deepEqual(matchOptions([null, 'relaxed']), { workRate: [1, 0.5], capTicks: 48000 });
+  assert.deepEqual(matchOptions(['hard', 'easy']), { workRate: [1, 1], capTicks: undefined });
+  const g = createGame({ seed: 1, rules: roundById('conquest'), ...matchOptions([null, 'relaxed']) });
+  assert.equal(g.capTicks, 48000); assert.equal(createGame({ seed: 1, rules: roundById('conquest') }).capTicks, 30000);
 });
 test('easy bot waits for Tool Age before its first wave', () => {
   const r = firstWave('conquest', 'easy'); assert.ok(r.wave !== null); assert.ok(r.wave >= r.ages.tool, `wave ${r.wave} before tool ${r.ages.tool}`);
