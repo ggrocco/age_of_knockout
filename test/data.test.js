@@ -41,4 +41,12 @@ test('future units: class, age and training building', () => {
   }
   assert.ok(UNITS.railgun.splash > 0 && UNITS.railgun.range > UNITS.catapult.range);
 });
+test('era units: era, class and training building', () => {
+  const want = { knight: ['medieval', 'cav', 'stable'], crossbowman: ['medieval', 'archer', 'archery_range'], trebuchet: ['medieval', 'siege', 'castle'],
+    musketeer: ['sail', 'archer', 'barracks'], cannon: ['sail', 'siege', 'castle'], rifleman: ['industrial', 'archer', 'barracks'],
+    field_artillery: ['industrial', 'siege', 'factory'], machine_gunner: ['modern', 'archer', 'barracks'], tank: ['modern', 'armor', 'factory'] };
+  for (const [id, [age, cls, bld]] of Object.entries(want)) { assert.equal(UNITS[id].age, age, id); assert.equal(UNITS[id].cls, cls, id); assert.ok(BUILDINGS[bld].trains.includes(id), `${bld} trains ${id}`); }
+  assert.equal(BUILDINGS.castle.age, 'medieval'); assert.equal(BUILDINGS.factory.age, 'industrial');
+  for (const [id, u] of Object.entries(UNITS)) if (u.cls === 'siege' && id !== 'railgun') assert.ok(u.range < UNITS.railgun.range, id);
+});
 test('ageLabel returns display names', () => { assert.equal(ageLabel('future'), 'AI Future'); assert.equal(ageLabel('iron'), 'Iron'); });
