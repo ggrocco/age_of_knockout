@@ -5,6 +5,7 @@ import { UNITS } from '../src/data/units.js';
 import { BUILDINGS } from '../src/data/buildings.js';
 import { AGES } from '../src/data/ages.js';
 import { buildModel, animate } from '../src/render/models.js';
+import { ERA_STYLE } from '../src/render/styles.js';
 
 function checkGeometry(model, label) {
   let meshes = 0;
@@ -87,4 +88,19 @@ test('a fast-firing unit still alternates its attack pose', () => {
   const m = buildModel(e), g = new THREE.Group(); g.add(m.root); g.userData.anim = m.anim;
   e.cd = 11; animate(g, e, 1, false); const fired = m.anim.armR.rotation.x;
   e.cd = 2; animate(g, e, 1, false); assert.notEqual(m.anim.armR.rotation.x, fired);
+});
+
+const colorsOf = (type, age) => { const m = buildModel({ kind: 'building', type, owner: 0, size: BUILDINGS[type].size, constructed: true, progress: 1, amount: 0 }, age); const out = []; m.root.traverse(o => { if (o.isMesh && o.geometry.attributes.color) out.push(...o.geometry.attributes.color.array); }); return out.join(); };
+test('every era has a building style; the new eras look distinct', () => {
+  for (const a of AGES) assert.ok(ERA_STYLE[a], a);
+  assert.deepEqual(['stone', 'tool', 'bronze', 'iron'].map(a => ERA_STYLE[a].key), ['timber', 'timber', 'masonry', 'masonry']);
+  const keys = ['medieval', 'sail', 'industrial', 'modern', 'future'].map(a => ERA_STYLE[a].key);
+  assert.equal(new Set([...keys, 'timber', 'masonry']).size, 7);
+});
+test('buildings re-skin in every new era', () => {
+  const chain = ['iron', 'medieval', 'sail', 'industrial', 'modern', 'future'];
+  for (const type of ['town_center', 'barracks', 'house', 'castle', 'factory']) for (let i = 1; i < chain.length; i++) assert.notEqual(colorsOf(type, chain[i]), colorsOf(type, chain[i - 1]), `${type} ${chain[i]}`);
+});
+test('Castle and Factory have their own geometry, not the placeholder box', () => {
+  for (const type of ['castle', 'factory']) { const m = buildModel({ kind: 'building', type, owner: 0, size: BUILDINGS[type].size, constructed: true, progress: 1, amount: 0 }, 'modern'); assert.ok(m.anim.body.children[0].geometry.attributes.position.count > 100, type); }
 });
