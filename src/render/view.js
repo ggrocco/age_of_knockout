@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
-import { buildModel, animate, TEAM } from './models.js';
+import { buildModel, animate, TEAM, MODEL_MATERIAL } from './models.js';
+import { createModelBatch, PROXY_LAYER } from './batch.js';
 import { createTerrain } from './terrain.js';
 import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } from './quality.js';
 import { createSkyLighting, createLightingEffects } from './lighting.js';
@@ -9,8 +10,16 @@ let sessionQuality = null;
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
 
 export const OWNER_COLOR = TEAM;
-const geo = { box: new THREE.BoxGeometry(1, 1, 1), ring: new THREE.RingGeometry(0.55, 0.7, 24), plane: new THREE.PlaneGeometry(1, 1) };
+const geo = { box: new THREE.BoxGeometry(1, 1, 1), ring: new THREE.RingGeometry(0.55, 0.7, 24), plane: new THREE.PlaneGeometry(1, 1), selection: new THREE.RingGeometry(0.94, 1, 48) };
 for (const geometry of Object.values(geo)) geometry.userData.shared = true;
+// Selection rings and HP bars are created on first use and share these.
+const overlay = {
+  ring: new THREE.MeshBasicMaterial({ color: 0xf3df93, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }),
+  barBg: new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false }),
+  barFg: [0x22c55e, 0xeab308, 0xef4444].map(color => new THREE.MeshBasicMaterial({ color, depthTest: false })),
+};
+for (const material of [overlay.ring, overlay.barBg, ...overlay.barFg]) material.userData.shared = true;
+const noRaycast = () => {};
 
 // Cached model geometry/materials belong to the module; everything else to this view.
 function disposeObject(root) {
@@ -43,6 +52,7 @@ export function createView(container, game) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x20271b);
+  scene.matrixWorldAutoUpdate = false; // view.frame updates world matrices once, not once per render pass
   scene.add(new THREE.HemisphereLight(0xc9deeb, 0x776342, 1.55));
   const skyLighting = renderer.extensions.has('EXT_color_buffer_float') ? createSkyLighting(renderer) : null;
   scene.environment = skyLighting?.texture ?? null; scene.environmentIntensity = 0.4;
@@ -107,7 +117,8 @@ export function createView(container, game) {
   view.fogEnabled = true;
 
   // entity meshes
-  const _wq = new THREE.Quaternion();
+  const _wq = new THREE.Quaternion(), _blob = new THREE.Matrix4(), _x = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  const batch = createModelBatch(MODEL_MATERIAL); scene.add(batch.mesh);
   const shadowCanvas = document.createElement('canvas'); shadowCanvas.width = shadowCanvas.height = 64;
   const shadowContext = shadowCanvas.getContext('2d'), gradient = shadowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, 'rgba(20,14,6,0.38)'); gradient.addColorStop(0.45, 'rgba(20,14,6,0.18)'); gradient.addColorStop(1, 'rgba(20,14,6,0)');
@@ -115,20 +126,40 @@ export function createView(container, game) {
   const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
   const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false });
   shadowMat.userData.shared = true;
+  // Soft contact shadows for every entity, as one instanced draw; matrices are rebuilt each frame.
+  let blobs = null;
+  function blobMesh(count) {
+    if (blobs && blobs.instanceMatrix.count >= count) return blobs;
+    if (blobs) { scene.remove(blobs); blobs.dispose(); }
+    blobs = new THREE.InstancedMesh(geo.plane, shadowMat, Math.max(256, count * 2)); blobs.frustumCulled = false; blobs.raycast = noRaycast;
+    blobs.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(blobs);
+    return blobs;
+  }
+  let groupSeq = 0;
   function makeMesh(e) {
-    const g = new THREE.Group(); g.userData = { id: e.id, kind: e.kind, owner: e.owner, hp: e.hp };
+    const g = new THREE.Group(); g.userData = { id: e.id, kind: e.kind, owner: e.owner, hp: e.hp, seq: ++groupSeq };
     const age = e.kind === 'building' ? game.players[e.owner].age : null;
     const m = buildModel(e, age); g.add(m.root); g.userData.anim = m.anim; g.userData.age = age;
-    const sh = new THREE.Mesh(geo.plane, shadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.04; sh.scale.set(m.shadow * 2.8, m.shadow * 2.8, 1); sh.raycast = () => {}; g.add(sh);
-    if (e.kind === 'unit' || e.kind === 'building') {
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 48), new THREE.MeshBasicMaterial({ color: 0xf3df93, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
-      const r = e.kind === 'building' ? e.size * 0.68 : 0.48; ring.scale.set(r, r, 1); ring.visible = false; ring.renderOrder = 3; g.add(ring); g.userData.ring = ring;
-      const bg = new THREE.Mesh(geo.plane, new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false })), fg = new THREE.Mesh(geo.plane, new THREE.MeshBasicMaterial({ color: 0x22c55e, depthTest: false }));
-      bg.renderOrder = fg.renderOrder = 4; bg.scale.set(1, 0.14, 1); const bar = new THREE.Group(); bar.add(bg, fg); bar.visible = false; bar.position.y = e.kind === 'building' ? (e.gatherType ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar); g.userData.bar = { bar, fg };
-    }
-    g.traverse(o => { if (!o.isMesh) return; if (o === g.userData.ring || o === sh || o.parent === g.userData.bar?.bar || o.material?.blending === THREE.AdditiveBlending) { o.raycast = () => {}; return; } o.userData.gid = e.id; });
+    g.userData.blob = new THREE.Matrix4().makeTranslation(0, 0.04, 0).multiply(_x).scale(new THREE.Vector3(m.shadow * 2.8, m.shadow * 2.8, 1));
+    g.traverse(o => { if (!o.isMesh) return; if (o.material?.blending === THREE.AdditiveBlending) { o.raycast = noRaycast; return; } o.userData.gid = e.id; });
+    batch.add(g);
     return g;
   }
+  function selectionRing(g) {
+    const ud = g.userData; if (ud.ring) return ud.ring;
+    const ring = ud.ring = new THREE.Mesh(geo.selection, overlay.ring); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
+    const r = ud.kind === 'building' ? ud.entity.size * 0.68 : 0.48; ring.scale.set(r, r, 1); ring.renderOrder = 3; ring.raycast = noRaycast; g.add(ring);
+    return ring;
+  }
+  function healthBar(g) {
+    const ud = g.userData; if (ud.bar) return ud.bar;
+    const e = ud.entity, bg = new THREE.Mesh(geo.plane, overlay.barBg), fg = new THREE.Mesh(geo.plane, overlay.barFg[0]), bar = new THREE.Group();
+    // Overlapping bars stack per entity (background, then fill) in the order their entities appeared.
+    bg.renderOrder = 4 + ud.seq * 1e-6; fg.renderOrder = bg.renderOrder + 1e-7; bg.scale.set(1, 0.14, 1); bg.raycast = fg.raycast = noRaycast; bar.add(bg, fg);
+    bar.position.y = e.kind === 'building' ? (e.gatherType ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar);
+    return ud.bar = { bar, fg };
+  }
+  const removeGroup = g => { scene.remove(g); batch.remove(g); disposeObject(g); };
   const seen = new Set();
   let syncStamp = -1;
   view.selection = new Set();
@@ -141,12 +172,12 @@ export function createView(container, game) {
       seen.add(e.id);
       let g = view.groups.get(e.id);
       if (g && e.kind === 'building' && g.userData.age !== game.players[e.owner].age) {
-        scene.remove(g); disposeObject(g); view.groups.delete(e.id); view.pickables.splice(view.pickables.indexOf(g), 1); g = null;
+        removeGroup(g); view.groups.delete(e.id); view.pickables.splice(view.pickables.indexOf(g), 1); g = null;
       }
       if (!g) { g = makeMesh(e); view.groups.set(e.id, g); scene.add(g); view.pickables.push(g); g.position.set(...worldPos(e)); }
       g.userData.entity = e;
     }
-    for (const [id, g] of view.groups) if (!seen.has(id) || !game.entities.has(id)) { scene.remove(g); disposeObject(g); view.groups.delete(id); const i = view.pickables.indexOf(g); if (i >= 0) view.pickables.splice(i, 1); }
+    for (const [id, g] of view.groups) if (!seen.has(id) || !game.entities.has(id)) { removeGroup(g); view.groups.delete(id); const i = view.pickables.indexOf(g); if (i >= 0) view.pickables.splice(i, 1); }
   };
   const worldPos = e => e.kind === 'building' ? [e.x + e.size / 2, 0, e.y + e.size / 2] : [e.x, e.kind === 'relic' ? (e.holder !== null ? 1.35 : 0.2) : 0, e.y];
   view.frame = (dt, t) => {
@@ -168,22 +199,29 @@ export function createView(container, game) {
       } else g.position.set(x, y, z);
       if (e.kind === 'unit' || e.kind === 'building') { if (e.hp < ud.hp - 0.01) ud.pop = 0.12; ud.hp = e.hp; if (ud.pop > 0) { ud.pop -= dt; g.scale.setScalar(1 + Math.max(0, ud.pop) * (e.kind === 'unit' ? 1.6 : 0.25)); } else g.scale.setScalar(1); }
       animate(g, e, t, moving);
-      if (ud.ring) ud.ring.visible = view.selection.has(e.id);
-      if (ud.bar) { const show = view.selection.has(e.id) || e.hp < e.maxHp; ud.bar.bar.visible = show; if (show) { const f = Math.max(0.001, e.hp / e.maxHp); ud.bar.bar.parent.getWorldQuaternion(_wq).invert(); ud.bar.bar.quaternion.copy(_wq).multiply(camera.quaternion); ud.bar.fg.scale.set(f, 0.14, 1); ud.bar.fg.position.x = (f - 1) / 2; ud.bar.fg.position.z = 0.001; ud.bar.fg.material.color.setHex(f > 0.5 ? 0x22c55e : f > 0.25 ? 0xeab308 : 0xef4444); } }
+      if (e.kind === 'unit' || e.kind === 'building') {
+        const selected = view.selection.has(e.id), show = selected || e.hp < e.maxHp;
+        if (selected || ud.ring) selectionRing(g).visible = selected;
+        if (show || ud.bar) { const { bar, fg } = healthBar(g); bar.visible = show; if (show) { const f = Math.max(0.001, e.hp / e.maxHp); bar.parent.getWorldQuaternion(_wq).invert(); bar.quaternion.copy(_wq).multiply(camera.quaternion); fg.scale.set(f, 0.14, 1); fg.position.x = (f - 1) / 2; fg.position.z = 0.001; fg.material = overlay.barFg[f > 0.5 ? 0 : f > 0.25 ? 1 : 2]; } }
+      }
     }
     fog.visible = view.fogEnabled;
+    scene.updateMatrixWorld(); batch.update();
+    const shadows = blobMesh(view.groups.size); let n = 0;
+    for (const g of view.groups.values()) if (g.userData.entity) shadows.setMatrixAt(n++, _blob.multiplyMatrices(g.matrixWorld, g.userData.blob));
+    shadows.count = n; shadows.instanceMatrix.needsUpdate = true;
     renderer.info.reset(); effects.render();
   };
   // placement ghost
   const ghost = new THREE.Mesh(geo.box, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.5, depthTest: false })); ghost.visible = false; ghost.renderOrder = 5; scene.add(ghost);
   view.showGhost = (type, tx, ty, ok) => { if (!type) { ghost.visible = false; return; } const s = BUILDINGS[type].size; ghost.visible = true; ghost.scale.set(s, 1.2, s); ghost.position.set(tx + s / 2, 0.6, ty + s / 2); ghost.material.color.setHex(ok ? 0x22c55e : 0xef4444); };
   // picking helpers
-  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); ray.layers.enable(PROXY_LAYER);
   const setRay = (cx, cy) => { const r = renderer.domElement.getBoundingClientRect(); ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); };
   view.pickEntity = (cx, cy) => { setRay(cx, cy); const hits = ray.intersectObjects(view.pickables, true); for (const h of hits) { const id = h.object.userData.gid; if (id !== undefined && view.groups.get(id)) return view.groups.get(id).userData.entity; } return null; };
   view.pickGround = (cx, cy) => { setRay(cx, cy); const h = ray.intersectObject(ground)[0]; return h ? { x: h.point.x, y: h.point.z } : null; };
   view.project = (x, y) => { const v = new THREE.Vector3(x, 0.4, y).project(camera), r = renderer.domElement.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; };
-  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
+  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); blobs?.dispose(); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
   const markers = [];
   view.marker = (x, y) => { const m = new THREE.Mesh(geo.ring, new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, side: THREE.DoubleSide, depthTest: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, y); m.renderOrder = 6; m.userData.age = 0; scene.add(m); markers.push(m); };
   const baseFrame = view.frame;

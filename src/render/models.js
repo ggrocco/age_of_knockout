@@ -1,5 +1,5 @@
-// Procedural models with merged vertex colors (cached per type, team and architectural style)
-// so a whole building or tree costs 1-6 draw calls; only limbs / arms / flags are separate animated meshes.
+// Procedural models with merged vertex colors (cached per type, team and architectural style).
+// Limbs / arms / flags are separate animated meshes; the view draws every MODEL_MATERIAL mesh through one batch.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createModelMaterial, surfaceKind } from './materials.js';
@@ -8,6 +8,7 @@ import { ageIndex } from '../data/ages.js';
 export const TEAM = [0x356bb0, 0xb84532], TEAM_DARK = [0x234779, 0x7c3027];
 const C = { skin: 0xe8b98a, hair: 0x4a3222, wood: 0x7a5230, woodD: 0x4e3320, plaster: 0xe6d8b4, stone: 0x9a9a92, stoneD: 0x6f6f68, thatch: 0xc9a24a, thatchD: 0xa8822f, dark: 0x2a2018, gold: 0xf2c230, iron: 0xb9c0c8, bronze: 0xb5803a, leather: 0x8a5a2b, cloth: 0xc9b58a, hay: 0xe0c060, marble: 0xefe9dc, green: 0x3f7f3a, red: 0xc0392b, glass: 0x6fa8c8 };
 const VC = createModelMaterial();
+export const MODEL_MATERIAL = VC;
 const unit = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 10, 8), cyl: new THREE.CylinderGeometry(1, 1, 1, 10), rock: new THREE.DodecahedronGeometry(1, 0), foliage: new THREE.IcosahedronGeometry(1, 1), tor: new THREE.TorusGeometry(1, 0.08, 6, 14, Math.PI) };
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
 const prismCache = new Map();
