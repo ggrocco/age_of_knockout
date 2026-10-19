@@ -22,16 +22,19 @@ export function canPlace(game, pid, type, x, y) {
   return true;
 }
 
+// Advancing out of `age` needs this many distinct finished buildings of that age (extras like the Farm and Wonder don't count).
+const ageBuildings = age => Object.entries(BUILDINGS).filter(([id, d]) => d.age === age && id !== 'town_center' && !d.extra).map(([id]) => id);
+export const ageUpNeed = age => Math.min(2, ageBuildings(age).length);
+
 export function ageUpProblem(game, pid) {
   const p = game.players[pid];
   if (p.ageUp) return 'already researching';
   const next = AGES[ageIndex(p.age) + 1]; if (!next) return 'max age';
-  const owned = new Set(), avail = new Set();
-  for (const [id, d] of Object.entries(BUILDINGS)) if (d.age === p.age && id !== 'town_center' && !d.extra) avail.add(id);
+  const owned = new Set(), avail = new Set(ageBuildings(p.age));
   let hasTC = false;
   for (const b of game.buildings.values()) if (b.owner === pid && b.constructed) { if (b.type === 'town_center') hasTC = true; if (avail.has(b.type)) owned.add(b.type); }
   if (!hasTC) return 'needs town center';
-  if (owned.size < Math.min(2, avail.size)) return 'needs buildings';
+  if (owned.size < ageUpNeed(p.age)) return 'needs buildings';
   if (!canAfford(p, AGE_COST[next].cost)) return 'resources';
   return null;
 }
