@@ -7,7 +7,7 @@ export const NAMES = ['You', 'Ramses', 'Hammurabi', 'Sargon', 'Nebuchadnezzar', 
   'Agamemnon', 'Themistocles', 'Philip', 'Seleucus', 'Antiochus', 'Mithridates', 'Vercingetorix', 'Arminius'];
 // Difficulty of the opponent the human faces in each round, per chosen level. 'normal' is the original ramp.
 export const LEVELS = {
-  relaxed: ['relaxed', 'relaxed', 'easy', 'easy', 'medium'],
+  relaxed: ['relaxed', 'relaxed', 'relaxed', 'relaxed', 'relaxed'],
   normal: ['easy', 'easy', 'medium', 'medium', 'hard'],
   hard: ['medium', 'medium', 'hard', 'hard', 'hard'],
 };

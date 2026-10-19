@@ -18,7 +18,7 @@ test('opponent difficulty ramps up', () => {
 });
 test('chosen level sets the opponent ramp', () => {
   const ramp = level => { const t = createTournament(1, level), d = []; while (!t.over) { d.push(t.opponent.difficulty); t.resolve(true, stub([])); } return d; };
-  assert.deepEqual(ramp('relaxed'), ['relaxed', 'relaxed', 'easy', 'easy', 'medium']);
+  assert.deepEqual(ramp('relaxed'), ['relaxed', 'relaxed', 'relaxed', 'relaxed', 'relaxed']);
   assert.deepEqual(ramp('normal'), ['easy', 'easy', 'medium', 'medium', 'hard']);
   assert.deepEqual(ramp('hard'), ['medium', 'medium', 'hard', 'hard', 'hard']);
   assert.deepEqual(ramp('bogus'), ramp('normal'));

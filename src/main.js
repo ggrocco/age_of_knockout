@@ -1,5 +1,5 @@
 import { createGame } from './sim/game.js';
-import { createBot, THINK_EVERY } from './ai/bot.js';
+import { createBot, matchOptions, THINK_EVERY } from './ai/bot.js';
 import { ROUNDS, roundById, scoreOf } from './rounds/index.js';
 import { createTournament, LEVELS, LEVEL_NAME } from './tournament/bracket.js';
 import { createView } from './render/view.js';
@@ -16,7 +16,7 @@ const screenEl = document.getElementById('screen'), app = { tournament: null, ma
 window.__app = app;
 let gpuWarned = false;
 // Tournament difficulty level: ?level= wins, else the last pick (browser storage may be unavailable), else Normal.
-const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents wait until Bronze Age, about 15 minutes, before attacking.', normal: 'The standard ramp, from easy to hard opponents.', hard: 'Tough opponents from the first round.' };
+const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking. Matches last up to 40 minutes.', normal: 'The standard ramp, from easy to hard opponents.', hard: 'Tough opponents from the first round.' };
 const storedLevel = () => { try { return localStorage.getItem('level'); } catch { return null; } };
 let level = [params.get('level'), storedLevel()].find(l => Object.hasOwn(LEVELS, l ?? '')) || 'normal';
 function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catch {} }
@@ -51,13 +51,14 @@ function hide() { screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
   endMatch();
   document.body.classList.add('ingame');
-  const game = createGame({ seed, rules: roundById(roundId) });
+  const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO; // botDiff: the bot that drives player 0 in autoplay/test modes
+  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff]) });
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
   ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
-  const bots = [createBot(game, 1, oppDiff)]; const botDiff = params.get('bot') || 'hard'; // difficulty of the bot that drives player 0 in autoplay/test modes
-  if (params.get('autoplay') === '1' || AUTO) bots.unshift(createBot(game, 0, botDiff));
+  const bots = [createBot(game, 1, oppDiff)];
+  if (autoplay) bots.unshift(createBot(game, 0, botDiff));
   const diffs = { 0: botDiff, 1: oppDiff };
   const tc = [...game.buildings.values()].find(b => b.owner === 0); view.centerOn(tc.x + 1.5, tc.y + 1.5); view.setZoom(ui.touch ? (innerHeight > innerWidth ? 7.5 : 9) : 13);
   const m = app.match = { game, view, bots, diffs, acc: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
