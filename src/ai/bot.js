@@ -6,11 +6,16 @@ import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
 
-const DIFF = {
-  easy:   { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16 },
-  medium: { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28 },
-  hard:   { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36 },
+// attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
+// (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
+export const DIFF = {
+  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 18000, army: 12, attackAge: 'bronze', grace: 18000, dmWave: 20, dmArmy: 24 },
+  easy:    { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44 },
+  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44 },
+  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44 },
 };
+// Bot think interval in ticks for each difficulty.
+export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -125,7 +130,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (idle.length) assign(idle, vills, tc, home, done);
 
     // --- military production
-    const armyCap = roundId === 'deathmatch' ? 44 : D.army;
+    const armyCap = roundId === 'deathmatch' ? D.dmArmy : D.army;
     const armyCount = army.length + done.reduce((n, b) => n + b.queue.filter(q => UNITS[q.unit].cls !== 'civ').length, 0);
     const enemyClass = dominantEnemyClass(enemies); // counter-pick against what we can see
     if (!bot.saving && armyCount < armyCap && (vills.length >= D.villagers * 0.6 || roundId === 'deathmatch' || roundId === 'wonder')) {
@@ -233,9 +238,9 @@ export function createBot(game, pid, difficulty = 'medium') {
     const combat = army;
     const rush = roundId === 'wonder'; // contest the Wonder while it is being built
     // Death Match: whoever attacks piecemeal loses to defenders, so wait for a big army (bigger for harder bots)
-    const dmWave = { easy: 24, medium: 32, hard: 38 }[difficulty];
-    const needWave = rush ? 5 : roundId === 'deathmatch' ? dmWave : D.wave, needTime = rush ? 3600 : roundId === 'deathmatch' ? 9000 : D.attackAt;
-    if (!bot.waveActive && game.time >= needTime && combat.length >= needWave) bot.waveActive = true;
+    const needWave = rush ? 5 : roundId === 'deathmatch' ? D.dmWave : D.wave;
+    const needTime = Math.max(D.grace, rush ? 3600 : roundId === 'deathmatch' ? 9000 : D.attackAt);
+    if (!bot.waveActive && game.time >= needTime && ageIndex(me.age) >= ageIndex(D.attackAge) && combat.length >= needWave) bot.waveActive = true;
     if (bot.waveActive && combat.length < 3) bot.waveActive = false;
     if (!bot.waveActive) return;
     const cx = combat.reduce((s, u) => s + u.x, 0) / combat.length, cy = combat.reduce((s, u) => s + u.y, 0) / combat.length, c = { x: cx, y: cy };
