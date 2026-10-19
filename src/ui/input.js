@@ -65,7 +65,7 @@ export function createInput(ui) {
   });
   window.addEventListener('mouseup', e => {
     if (e.button !== 0 || !drag.on) return; drag.on = false; box.classList.add('hidden');
-    if (!el.contains(e.target)) return;
+    if (!el.contains(e.target) || !ui.game) return;
     if (ui.placing) return place(tileForPlacing(e.clientX, e.clientY));
     if (drag.moved) return boxSelect(drag.x, drag.y, e.clientX, e.clientY, shiftDown);
     const ent = ui.view.pickEntity(e.clientX, e.clientY);
@@ -76,13 +76,13 @@ export function createInput(ui) {
   window.addEventListener('keydown', e => { shiftDown = e.shiftKey; keys.add(e.key.toLowerCase()); onKey(e); });
   window.addEventListener('keyup', e => { shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase()); });
   el.addEventListener('contextmenu', e => {
-    e.preventDefault();
+    e.preventDefault(); if (!ui.game) return;
     if (ui.placing) return ui.stopPlacing();
     const ids = selectedUnitIds(); if (!ids.length) return;
     const r = orderAt(ui.view.pickEntity(e.clientX, e.clientY), ui.view.pickGround(e.clientX, e.clientY), ids);
     const gp = ui.view.pickGround(e.clientX, e.clientY); if (r && r.ok && gp) ui.marker(gp.x, gp.y);
   });
-  el.addEventListener('wheel', e => { e.preventDefault(); ui.view.setZoom(ui.view.zoom * (e.deltaY > 0 ? 1.1 : 0.9)); }, { passive: false });
+  el.addEventListener('wheel', e => { e.preventDefault(); if (ui.view) ui.view.setZoom(ui.view.zoom * (e.deltaY > 0 ? 1.1 : 0.9)); }, { passive: false });
   function onKey(e) {
     if (!ui.game) return;
     if (e.key === 'Escape') { ui.stopPlacing(); setSel([]); }

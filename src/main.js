@@ -15,6 +15,9 @@ document.body.classList.toggle('touch', TOUCH);
 const screenEl = document.getElementById('screen'), app = { tournament: null, match: null, ui: null };
 window.__app = app;
 const EVERY = { easy: 30, medium: 15, hard: 10 };
+let gpuWarned = false;
+// Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
+const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
 
 const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
   cmd(c) { const r = ui.game.command(0, c); if (!r.ok) hud.toast(reasonText(r.reason)); return r; },
@@ -28,34 +31,45 @@ const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, game: null,
   stopPlacing() { ui.placing = null; ui.view?.showGhost(null); },
   marker(x, y) { ui.view?.marker(x, y); } };
 window.addEventListener('orientationchange', () => setTimeout(() => app.onResize?.(), 250));
-const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.quit = () => { if (app.match) { cancelAnimationFrame(app.match.raf); app.match.ended = true; } ui.game = null; menu(); };
+const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.quit = () => { endMatch(); menu(); };
+
+// Stop the render loop and free the WebGL context; a finished match otherwise keeps drawing behind menus.
+function endMatch() {
+  const m = app.match; if (!m) return;
+  cancelAnimationFrame(m.raf); m.ended = true; app.match = null;
+  if (app.onResize) { window.removeEventListener('resize', app.onResize); app.onResize = null; }
+  ui.view?.dispose(); ui.view = null; ui.game = null; ui.minimap = null;
+}
 
 function show(html) { screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
 function hide() { screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 
 function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
-  if (app.match) { cancelAnimationFrame(app.match.raf); ui.view?.dispose(); }
+  endMatch();
   document.body.classList.add('ingame');
   const game = createGame({ seed, rules: roundById(roundId) });
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
+  if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
   ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
   const bots = [createBot(game, 1, oppDiff)]; const botDiff = params.get('bot') || 'hard'; // difficulty of the bot that drives player 0 in autoplay/test modes
   if (params.get('autoplay') === '1' || AUTO) bots.unshift(createBot(game, 0, botDiff));
   const diffs = { 0: botDiff, 1: oppDiff };
   const tc = [...game.buildings.values()].find(b => b.owner === 0); view.centerOn(tc.x + 1.5, tc.y + 1.5); view.setZoom(ui.touch ? (innerHeight > innerWidth ? 7.5 : 9) : 13);
-  const m = app.match = { game, view, bots, diffs, acc: 0, last: performance.now(), ended: false, frames: 0, label, onEnd };
-  if (app.onResize) window.removeEventListener('resize', app.onResize);
+  const m = app.match = { game, view, bots, diffs, acc: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
   app.onResize = () => { view.resize(); }; window.addEventListener('resize', app.onResize);
   const loop = now => {
     m.raf = requestAnimationFrame(loop);
+    const budget = ui.paused || game.result ? IDLE_FRAME_MS : FRAME_MS;
+    if (now < m.next - 2) return; // 2 ms slack keeps a jittery 60 Hz display at 60
+    m.next = Math.max(m.next, now - budget) + budget; // next due time: averages the cap on 120/144 Hz without catch-up bursts
     const dt = Math.min(0.1, (now - m.last) / 1000); m.last = now; m.frames++;
     if (!ui.paused && !game.result) {
       m.acc += dt * ui.speed * 20; let steps = Math.min(Math.floor(m.acc), 300); m.acc -= Math.floor(m.acc);
       for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
     input.update(dt); view.sync(); view.frame(dt, now / 1000); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
-    if (game.result && !m.ended) { m.ended = true; setTimeout(() => showResult(m), AUTO ? 300 : 1200); }
+    if (game.result && !m.ended) { m.ended = true; setTimeout(() => { if (app.match === m) showResult(m); }, AUTO ? 300 : 1200); }
   };
   m.raf = requestAnimationFrame(loop);
   hide();
@@ -68,7 +82,7 @@ function showResult(m) {
   const r = m.game.result, won = r.winner === 0, p = m.game.players;
   const stats = `Time ${Math.floor(m.game.time / 1200)}m ${Math.floor(m.game.time / 20) % 60}s &middot; your kills ${p[0].kills}, buildings destroyed ${p[0].bdestroyed} &middot; score ${scoreOf(m.game, 0).toFixed(0)} vs ${scoreOf(m.game, 1).toFixed(0)}`;
   show(`<div class="card"><h1 class="${won ? 'win' : 'lose'}">${won ? 'Victory' : 'Defeat'}</h1><p>${(REASON[r.reason] || (() => r.reason))(won)}</p><p><small>${stats}</small></p><button class="btn" data-auto id="cont">${m.onEnd ? 'Continue' : 'Back to menu'}</button></div>`);
-  document.getElementById('cont').onclick = () => { if (m.onEnd) m.onEnd(won); else menu(); };
+  document.getElementById('cont').onclick = () => { if (app.match === m) endMatch(); if (m.onEnd) m.onEnd(won); else menu(); };
 }
 
 // ---- tournament flow
