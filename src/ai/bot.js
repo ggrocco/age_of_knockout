@@ -234,7 +234,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     const rush = roundId === 'wonder'; // contest the Wonder while it is being built
     // Death Match: whoever attacks piecemeal loses to defenders, so wait for a big army (bigger for harder bots)
     const dmWave = { easy: 24, medium: 32, hard: 38 }[difficulty];
-    const needWave = rush ? 5 : roundId === 'deathmatch' ? dmWave : D.wave, needTime = rush ? 3600 : roundId === 'deathmatch' ? 6000 : D.attackAt;
+    const needWave = rush ? 5 : roundId === 'deathmatch' ? dmWave : D.wave, needTime = rush ? 3600 : roundId === 'deathmatch' ? 9000 : D.attackAt;
     if (!bot.waveActive && game.time >= needTime && combat.length >= needWave) bot.waveActive = true;
     if (bot.waveActive && combat.length < 3) bot.waveActive = false;
     if (!bot.waveActive) return;
