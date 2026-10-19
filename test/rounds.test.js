@@ -1,6 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { ROUNDS, roundById, scoreOf } from '../src/rounds/index.js';
+import { ageUpProblem } from '../src/sim/commands.js';
 const G = id => createGame({ seed: 2, rules: roundById(id) });
 const wipe = (g, p) => { for (const e of [...g.units.values(), ...g.buildings.values()]) if (e.owner === p) g.remove(e); };
 test('conquest ends when a side is wiped out', () => {
@@ -9,8 +10,10 @@ test('conquest ends when a side is wiped out', () => {
 test('both eliminated on the same tick still resolves', () => {
   const g = G('conquest'); wipe(g, 0); wipe(g, 1); g.tick(); assert.ok(g.result && [0, 1].includes(g.result.winner));
 });
-test('deathmatch setup grants 20000 each', () => {
-  const g = G('deathmatch'); for (const p of g.players) for (const k of ['food', 'wood', 'gold', 'stone']) assert.equal(p.res[k], 20000);
+test('deathmatch starts both players in the Iron Age with 20000 each', () => {
+  const g = G('deathmatch'); for (const p of g.players) { assert.equal(p.age, 'iron'); for (const k of ['food', 'wood', 'gold', 'stone']) assert.equal(p.res[k], 20000); }
+  assert.equal(ageUpProblem(g, 0), null, 'the Iron start can advance at once');
+  assert.equal(roundById('deathmatch').desc, 'Start in the Iron Age with 20000 of every resource. Destroy the enemy.');
 });
 test('regicide ends when the king dies', () => {
   const g = G('regicide'); g.damage(g.entities.get(g.roundState.kings[1]), 9999, g.units.get(1)); g.tick();

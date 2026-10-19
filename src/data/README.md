@@ -36,6 +36,8 @@ exactly:
 - **Reload times not reconciled.** The sim uses per-class attack cooldowns (archer 40 / siege 80 /
   other 30 ticks), not AoE1's per-unit reload times (e.g. Bowman 1.4 s = 28 ticks, Scout 0.9 s = 18,
   Catapult 5 s = 100). Kept class-based to preserve the cooldown model and its test; a known fidelity gap.
+  Two invented era units override the class default with their own `cooldown`: the Machine Gunner (12 ticks, rapid
+  fire) and the Tank (40 ticks).
 
 ## Combat model (melee/pierce armor + attack type)
 
@@ -79,3 +81,26 @@ The **AI Future age** (the 5th age, after Iron) and the units **Combat Drone**, 
 trained at the Archery Range, Mech Walkers at the Barracks and Railguns at the Government Center.
 Their costs and stats are guesses like the rest of the table, as is the age-up cost (1200 food,
 1200 gold, 300 stone, 60 s).
+
+## Invented content (historical eras)
+
+Four eras sit between Iron and AI Future: **Medieval Age, Age of Sail, Industrial Age, Modern Age**
+(`ages.js`; the sail era is titled "Age of Sail", never "Sail Age"). Like AI Future they are not part of Age of
+Empires I, and every number below is an invented, game-tuned approximation (spec:
+`docs/superpowers/specs/2026-10-19-era-chain-design.md`).
+
+- **Age-up costs** escalate from Iron: Medieval 1100 food / 200 wood / 900 gold (50 s), Age of Sail 1200/400/1000/100
+  stone (55 s), Industrial 1400/400/1100/200 (60 s), Modern 1600/0/1300/300 (65 s). **AI Future was raised** from
+  1200 food / 1200 gold / 300 stone (60 s) to 1800/1500/400 (70 s) so it stays the most expensive.
+- **Units**: Knight (cavalry, Stable), Crossbowman (ranged, Archery Range), Trebuchet (siege, Castle) in Medieval;
+  Musketeer (ranged, Barracks) and Cannon (siege, Castle) in the Age of Sail; Rifleman (ranged, Barracks) and Field
+  Artillery (siege, Factory) in Industrial; Machine Gunner (ranged, Barracks) and Tank in Modern. Gunpowder infantry use
+  the `archer` class (ranged, pierce damage).
+- **`armor` class** (label "Armored") exists only for the Tank, so the ancient class-based rules skip it: Bronze/Iron
+  Weapons (inf/cav), Bronze Shields (inf) and the Spearman's +8 vs cavalry do not apply. Ballistics (+1 range,
+  archer/siege) does apply to the new gunners and siege; the Railgun keeps the longest siege range.
+- **Buildings**: the **Castle** (Medieval, 1200 HP, melee/pierce armor 6/10) trains Trebuchets and Cannons and is the
+  building you need to leave the Medieval Age; the **Factory** (Industrial) trains Field Artillery and Tanks and is
+  needed to leave the Industrial Age. The Age of Sail and Modern Age have no gate building of their own.
+- **Death Match** starts both players in the Iron Age (20000 of every resource), so it is the round where these eras
+  are played.

@@ -44,8 +44,9 @@ const setAll = (game, v) => { for (const p of game.players) p.res = { food: v, w
 export const ROUNDS = [
   { id: 'conquest', name: 'Standard Game', desc: 'Destroy all enemy units and buildings.', capTicks: 30000,
     setup() {}, check(game) { return conquest(game) || capCheck(game, 30000); } },
-  { id: 'deathmatch', name: 'Death Match', desc: 'Start with 20000 of every resource. Destroy the enemy.', capTicks: 24000,
-    setup(game) { setAll(game, 20000); }, check(game) { return conquest(game) || capCheck(game, 24000); } },
+  { id: 'deathmatch', name: 'Death Match', desc: 'Start in the Iron Age with 20000 of every resource. Destroy the enemy.', capTicks: 24000,
+    // late start: Death Match is the round where the historical eras are played
+    setup(game) { setAll(game, 20000); for (const p of game.players) p.age = 'iron'; }, check(game) { return conquest(game) || capCheck(game, 24000); } },
   { id: 'regicide', name: 'Regicide', desc: 'Kill the enemy king. Protect yours.', capTicks: 30000,
     setup(game) {
       game.roundState = { kings: [] };

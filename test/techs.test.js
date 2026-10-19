@@ -75,3 +75,9 @@ test('research gates: building, age, prerequisite, duplicate, concurrent, afford
   p.res = { food: 0, wood: 0, gold: 0, stone: 0 };
   assert.equal(g.command(0, { type: 'research', buildingId: b1.id, tech: 'bronze_shields' }).reason, 'resources');
 });
+
+test('weapon techs reach the knight but not the tank; ballistics reaches gunners', () => {
+  const g = createGame({ seed: 1 }), k = g.spawnUnit('knight', 0, 20, 20), t = g.spawnUnit('tank', 0, 20, 21), m = g.spawnUnit('musketeer', 0, 20, 22), c = g.spawnUnit('cannon', 0, 20, 23);
+  g.completeTech(0, 'bronze_weapons'); assert.equal(k.atk, 14); assert.equal(t.atk, 22);
+  g.completeTech(0, 'ballistics'); assert.equal(m.range, 6); assert.equal(c.range, 10);
+});

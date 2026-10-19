@@ -70,3 +70,36 @@ test('bot at AI Future age falls back to affordable units when the top pick cost
   assert.ok(!mine.some(u => u.type === 'drone'), 'no drone (needs gold the bot never has)');
   assert.deepEqual(Object.keys(b.why).filter(k => k.startsWith('train')), [], 'bot never had a train command rejected');
 });
+
+// A bot set to `age` with rich resources, the listed buildings, 6 Houses and 20 villagers. pin = true holds the era
+// (an age-up that never finishes) so the bot cannot advance mid-test and change what it trains.
+function eraBot(age, buildings, ticks = 9000, pin = true) {
+  const g = createGame({ seed: 4, rules: roundById('conquest') }), b = createBot(g, 0, 'hard'), p = g.players[0], types = new Set();
+  const rich = () => { p.res = { food: 9000, wood: 9000, gold: 9000, stone: 9000 }; };
+  p.age = age; rich(); if (pin) p.ageUp = { to: age, remaining: Infinity };
+  const t = [...g.buildings.values()].find(x => x.owner === 0 && x.type === 'town_center');
+  const slots = [[t.x - 8, t.y], [t.x + 8, t.y], [t.x, t.y + 8], [t.x, t.y - 9], [t.x + 8, t.y + 8]];
+  buildings.forEach((type, i) => g.addBuilding(type, 0, slots[i][0], slots[i][1], true));
+  for (const [x, y] of [[t.x - 8, t.y + 8], [t.x - 8, t.y - 8], [t.x + 8, t.y - 8], [t.x - 5, t.y + 12], [t.x + 5, t.y + 12], [t.x + 12, t.y + 4]]) g.addBuilding('house', 0, x, y, true);
+  for (let k = 0; k < 20; k++) g.spawnUnit('villager', 0, t.x + 2 + k % 5, t.y + 4);
+  for (let i = 0; i < ticks; i++) {
+    g.tick();
+    if (i % 15 === 0) { rich(); b.think(); for (const u of g.units.values()) if (u.owner === 0) types.add(u.type); }
+  }
+  return { g, b, p, types };
+}
+test('bot trains every new era unit at its building', () => {
+  const table = [['medieval', ['stable', 'archery_range', 'castle'], ['knight', 'crossbowman', 'trebuchet']], ['sail', ['barracks', 'castle'], ['musketeer', 'cannon']],
+    ['industrial', ['barracks', 'factory'], ['rifleman', 'field_artillery']], ['modern', ['barracks', 'factory'], ['machine_gunner', 'tank']]];
+  for (const [age, buildings, want] of table) {
+    const { b, types } = eraBot(age, buildings);
+    for (const u of want) assert.ok(types.has(u), `${age}: trained ${u} (saw ${[...types].join(',')})`);
+    assert.deepEqual(Object.keys(b.why).filter(k => k.startsWith('train')), [], `${age}: no rejected train commands`);
+  }
+});
+test('a Medieval bot builds a Castle and advances to the Age of Sail', () => {
+  const { g, b, p } = eraBot('medieval', ['barracks', 'archery_range', 'stable'], 9000, false);
+  assert.ok([...g.buildings.values()].some(x => x.owner === 0 && x.type === 'castle' && x.constructed), 'built a Castle');
+  assert.ok(ageIndex(p.age) >= ageIndex('sail'), 'reached the Age of Sail, at ' + p.age);
+  assert.ok(b.maxRejects <= 20, 'rejects ' + b.maxRejects);
+});
