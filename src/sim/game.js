@@ -1,6 +1,7 @@
 import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { defenceStats } from '../data/defences.js';
 import { AGES } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
@@ -23,9 +24,10 @@ export function createGame({ seed = 1, rules = null, size = 64 } = {}) {
 
   game.addResource = r => { const e = { ...r, kind: 'resource', id: game.nextId++, dead: false }; game.entities.set(e.id, e); game.resources.set(e.id, e); mark(e, e.id); return e; };
   game.addBuilding = (type, owner, x, y, constructed) => {
-    const d = BUILDINGS[type];
-    const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp: d.hp, hp: constructed ? d.hp : 1, constructed, progress: constructed ? 1 : 0,
+    const d = BUILDINGS[type], def = d.defence ? defenceStats(d.defence, game.players[owner].age) : null, maxHp = def ? def.hp : d.hp; // defences: HP (and a tower's attack) come from the owner's era now
+    const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp, hp: constructed ? maxHp : 1, constructed, progress: constructed ? 1 : 0,
       queue: [], workers: 0, sight: d.sight, marmor: d.marmor ?? 3, parmor: d.parmor ?? 8, dead: false, gatherType: d.gatherType || null, amount: d.amount || 0 };
+    if (d.defence === 'tower') Object.assign(e, { atk: def.atk, atkType: def.atkType, range: def.range, cooldown: def.cooldown, splash: def.splash || 0, bonus: null, cd: 0 });
     game.entities.set(e.id, e); game.buildings.set(e.id, e); mark(e, e.id);
     for (const u of game.units.values()) if (u.x >= x && u.x <= x + e.size && u.y >= y && u.y <= y + e.size) { const sp = game.findSpawn(e); u.x = sp.x; u.y = sp.y; u.path = null; }
     return e;

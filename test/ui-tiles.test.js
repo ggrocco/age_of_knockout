@@ -21,6 +21,17 @@ test('era units and buildings have their own icon and description', () => {
   assert.equal(new Set(ERA_IDS.map(id => ICONS[id])).size, ERA_IDS.length, 'each glyph is its own');
   assert.equal(icon('made_up_unit', 'armor'), ICONS.tank);
 });
+test('tower and wall have their own icon and a description of what they do', () => {
+  for (const id of ['tower', 'wall']) {
+    assert.match(ICONS[id] || '', /^<svg[^>]*viewBox="0 0 24 24"/, id); assert.ok(DESC[id] && DESC[id].length >= 20 && DESC[id].length <= 200, id);
+    assert.doesNotMatch(DESC[id], /Sail Age/, id);
+    assert.equal(Object.entries(ICONS).filter(([, s]) => s === ICONS[id]).length, 1, `${id} glyph is its own`);
+    assert.equal(icon(id), ICONS[id]);
+  }
+  assert.match(DESC.tower, /shoots/i); assert.match(DESC.wall, /block/i); assert.match(DESC.wall, /gate/i);
+  const h = tipHtml({ kind: 'building', id: 'tower' }); for (const s of ['Tower', DESC.tower, '40', '120']) assert.ok(h.includes(s), s);
+  const w = tipHtml({ kind: 'building', id: 'wall' }); for (const s of ['Wall', DESC.wall, '</i>5<em>stone']) assert.ok(w.includes(s), s);
+});
 test('icon() falls back by unit class, then to a generic glyph', () => {
   assert.equal(icon('made_up_unit', 'siege'), ICONS.catapult);
   assert.equal(icon('made_up_unit', 'archer'), ICONS.bowman);

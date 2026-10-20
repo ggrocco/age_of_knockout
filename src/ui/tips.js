@@ -26,6 +26,8 @@ export const DESC = {
   wonder: `In the Wonder Race, keeping one standing for ${Math.round(WONDER_TICKS / 1200)} minutes wins the round.`,
   castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age.',
   factory: 'Industrial Age works that builds Field Artillery and Tanks. You need one to advance out of the Industrial Age.',
+  tower: 'Shoots the nearest enemy in range, on its own. Towers built in a later Age are tougher and hit harder. Does not count toward advancing an Age.',
+  wall: 'One-tile barrier that blocks every unit, yours too. It has no gates: leave a gap or delete it. Walls built in a later Age are tougher.',
   villager: 'Gathers food, wood, gold and stone and builds every structure. Weak in a fight.',
   clubman: 'Cheap melee infantry that fights well early and falls behind in later Ages.',
   axeman: 'Melee infantry with a heavier swing than the Clubman.',
