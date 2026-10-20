@@ -4,7 +4,7 @@
 // butts, a stable with a hay loft, an arcaded market hall, a hall with a rose window and a gothic cathedral.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place, horse } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, CYL6, BALL, CONE4, FRUSTUM, HORSE_HEAD, sack } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2, D = s - 0.3;
@@ -44,11 +44,8 @@ export function town_center(ctx) {
 const STONE = C.stone, STONE_D = C.stoneD, STONE_L = 0xb4b1a6, SLATE = P.slate, SLATE_L = 0x5f6a77, SLATE_D = 0x3a434d;
 const OAK = P.beam, PLASTER = P.plaster, BOARD = 0x6e4c2c, BOARD_L = 0x84623e, STRAW = C.hay, STRAW_D = 0xc9a548;
 const YARD = 0x8a7d62, COBBLE = 0x8d887c, PAVE = 0xb3ae9f, GRASS = 0x6a8a3e, GRASS_L = 0x7e9c4c, TURF = 0x5b7a37;
-const SOIL = 0x6a5233, SOIL_L = 0x7d6440, GLASS = 0x28323c, ROPE = 0xcbb98a, HORSE_HEAD = 0x8a5a33;
-const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), BALL = new THREE.SphereGeometry(1, 6, 4);
-const CONE4 = new THREE.ConeGeometry(1, 1, 4), DISC = new THREE.CylinderGeometry(1, 1, 1, 12);
-// A square base of half-side 1 at y = -0.5 tapering to 0.7 at y = 0.5 (turf banks).
-const FRUSTUM = new THREE.CylinderGeometry(0.7, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
+const SOIL = 0x6a5233, SOIL_L = 0x7d6440, GLASS = 0x28323c, ROPE = 0xcbb98a;
+const CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), DISC = new THREE.CylinderGeometry(1, 1, 1, 12);
 // A point on a wall face centred at (x, z) facing along ry (0: +z): u along the face, o out from it.
 const onFace = (x, z, ry) => (u, o = 0) => [x + u * Math.cos(ry) + o * Math.sin(ry), z - u * Math.sin(ry) + o * Math.cos(ry)];
 
@@ -128,8 +125,6 @@ const barrel = (b, x, y, z, r = 0.07, hh = 0.17) => {
   b.cylT(r * 0.86, r * 0.86, hh, C.wood, x, y, z, 8).cylT(r, r, hh * 0.56, C.wood, x, y + hh * 0.22, z, 8);
   for (const f of [0.1, 0.84]) b.cylT(r * 0.9, r * 0.9, 0.018, P.iron, x, y + hh * f, z, 8);
 };
-// A sack of grain standing on y.
-const sack = (b, x, y, z, r = 0.08) => b.add(BALL, C.cloth, x, y + r * 0.9, z, r, r, r * 0.85).add(CYL6, C.leather, x, y + r * 1.8, z, r * 0.3, r * 0.4, r * 0.3);
 // A two-wheeled cart facing +x built at the origin for place(); load(c) piles its goods on the bed (top at y = 0.19).
 const cart = load => {
   const c = new B();
@@ -185,7 +180,7 @@ export function granary(ctx) {
   gableEnd(b, prw - 0.08, prh * (prw - 0.08) / prw, BOARD, px, top, pz + 0.022);
   // A cart of sacks, sacks by the doors, stooks of wheat.
   place(b, cart(c => { for (const [dx, dy, dz] of [[-0.14, 0, -0.06], [0, 0, 0.06], [0.13, 0, -0.05], [-0.06, 0.11, 0], [0.08, 0.11, 0.02]]) sack(c, dx, 0.19 + dy, dz, 0.07); }), 0.42, 0.03, 0.72, -0.35);
-  for (const [x, z] of [[0.33, 0.66], [0.3, 0.48]]) sack(b, x, 0.03, z);
+  for (const [x, z] of [[0.33, 0.66], [0.3, 0.48]]) sack(b, x, 0.03, z, 0.08);
   for (const [x, z] of [[-0.68, 0.42], [-0.48, 0.68], [-0.74, 0.76], [-0.28, 0.82]]) stook(b, x, z);
   return top + rh + 0.03;
 }
@@ -496,7 +491,7 @@ export function market(ctx) {
     b.box(0.36, 0.03, 0.22, C.wood, x, fl + 0.2, z).box(0.03, 0.2, 0.2, C.woodD, x - 0.15, fl, z).box(0.03, 0.2, 0.2, C.woodD, x + 0.15, fl, z);
     for (const [i, c] of [0x6b3a1e, t, 0x4f6b2a].entries()) b.add(CYL6, c, x - 0.11 + i * 0.11, fl + 0.27, z, 0.04, 0.2, 0.04, Math.PI / 2, 0, 0);
   }
-  barrel(b, 0.6, fl, -0.6); barrel(b, 0.58, fl, -0.84, 0.065); sack(b, -0.58, fl, -0.5); sack(b, -0.48, fl, -0.46, 0.07);
+  barrel(b, 0.6, fl, -0.6); barrel(b, 0.58, fl, -0.84, 0.065); sack(b, -0.58, fl, -0.5, 0.08); sack(b, -0.48, fl, -0.46, 0.07);
   // The jettied upper hall, its windows, the team banners hung from the jetty.
   const j = 0.08, ux1 = x1 + j, uz1 = z1 + j, ucx = (x0 + ux1) / 2, ucz = (z0 + uz1) / 2, UW = ux1 - x0, UD = uz1 - z0, uh = 0.46, uy = ay + 0.05;
   b.box(UW, 0.05, UD, OAK, ucx, ay, ucz).box(UW, uh, UD, PLASTER, ucx, uy, ucz);

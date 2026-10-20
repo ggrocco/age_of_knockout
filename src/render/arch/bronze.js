@@ -3,7 +3,7 @@
 // pyramid.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place, horse, WEDGE } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, WEDGE, CYL6, BALL, CONE4, FRUSTUM } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2;
@@ -29,11 +29,9 @@ export function town_center(ctx) {
 }
 
 // ---------- shared Bronze parts ----------
-// Low-poly shapes for small repeated parts, centred on the origin (DOME: a hemisphere, flat side down at y = 0;
-// FRUSTUM: an axis-aligned square base of half-side 1 tapering to 0.7; WEDGE, the ramp, is in the kit).
-const DOME = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), BALL = new THREE.SphereGeometry(1, 6, 4);
-const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), LEAF = new THREE.ConeGeometry(1, 1, 4);
-const FRUSTUM = new THREE.CylinderGeometry(0.7, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
+// DOME: a hemisphere, flat side down at y = 0, for small repeated parts (the kit has CYL6, BALL, CONE4, FRUSTUM and
+// WEDGE, the ramp).
+const DOME = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
 const STAIR = 0xb88f5c, LIME = 0xe0c9a0, DOMEC = 0xd2aa72, JAR = 0xa56843, SAND = 0xc8ad7a, WATER = 0x3f7fa3;
 const PALM = 0x5d7a32, OCHRE = 0xd9a441, LIMESTONE = 0xc9baa0;
 
@@ -161,9 +159,9 @@ export function farm(ctx) {
       if ((x > sx - 0.2 && z > sz - 0.2) || (x < -0.3 && z < -0.42 && z > -0.72)) continue;
       const hh = 0.2 + hash(c + 11 * j, r + 3 * i) * 0.08, lean = (hash(r * 7 + i, c * 3 + j) - 0.5) * 0.3;
       const green = ripe ? 0x9a9a45 : [0x6f9a3a, 0x7fa845][(r + c) % 2], sn = Math.sin(lean), cs = Math.cos(lean);
-      cr.add(LEAF, green, x, 0.025 + hh / 2, z, 0.045, hh, 0.045, lean, 0, -lean);
-      cr.add(LEAF, green, x + 0.025, 0.025 + hh * 0.3, z - 0.015, 0.035, hh * 0.6, 0.035, -0.4, 0, -0.5);
-      cr.add(LEAF, ripe ? 0xd8b04a : 0xa8b85a, x + sn * hh * 0.55, 0.025 + hh / 2 + cs * cs * hh * 0.55, z + sn * cs * hh * 0.55, 0.026, 0.1, 0.026, lean, 0, -lean);
+      cr.add(CONE4, green, x, 0.025 + hh / 2, z, 0.045, hh, 0.045, lean, 0, -lean);
+      cr.add(CONE4, green, x + 0.025, 0.025 + hh * 0.3, z - 0.015, 0.035, hh * 0.6, 0.035, -0.4, 0, -0.5);
+      cr.add(CONE4, ripe ? 0xd8b04a : 0xa8b85a, x + sn * hh * 0.55, 0.025 + hh / 2 + cs * cs * hh * 0.55, z + sn * cs * hh * 0.55, 0.026, 0.1, 0.026, lean, 0, -lean);
     }
   }));
   extra.crops = cr.geometry();
@@ -198,7 +196,7 @@ export function barracks(ctx) {
   for (let i = 0; i < 7; i++) {
     const z = -0.22 + i * 0.16, p = [sx + 0.2, 0.06, z], q = [sx - 0.05, 1.08, z];
     stick(b, 0.014, C.wood, p, q, CYL6);
-    stick(b, 0.03, C.bronze, q, lerp(p, q, 1.1), LEAF);
+    stick(b, 0.03, C.bronze, q, lerp(p, q, 1.1), CONE4);
   }
   for (const [z, r] of [[0.02, 0.12], [0.3, 0.11]]) shield(b, t, sx + 0.12, 0.2, z, true, r);
   // Training posts: a post with arms and a straw head.

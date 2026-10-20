@@ -37,14 +37,22 @@ export const place = (b, part, x, y, z, ry = 0, k = 1) => {
   g.dispose();
 };
 
+// ---------- low-poly shapes for small repeated parts, centred on the origin ----------
+export const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), BALL = new THREE.SphereGeometry(1, 6, 4), CONE4 = new THREE.ConeGeometry(1, 1, 4);
+// A square base of half-side 1 at y = -0.5 tapering to 0.7 at y = 0.5 (turf banks, plinths).
+export const FRUSTUM = new THREE.CylinderGeometry(0.7, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
 // A ramp of unit size across x, high at z = 0 and down to the ground at z = 1 (stairs, ramps, lean-to gable walls).
 export const WEDGE = (() => {
   const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath();
   const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(0.5, 0, 0);
   return g;
 })();
-// A low-poly horse facing +x at the origin, with a team-coloured saddle cloth (t); for place().
-const HORSE = 0x8a5a33, MANE = 0x3a2a1c;
+// A sack of grain of radius r standing on y.
+export const sack = (b, x, y, z, r) => b.add(BALL, C.cloth, x, y + r * 0.9, z, r, r, r * 0.85).add(CYL6, C.leather, x, y + r * 1.8, z, r * 0.3, r * 0.4, r * 0.3);
+// A low-poly horse facing +x at the origin, with a team-coloured saddle cloth (t); for place(). HORSE_HEAD is its coat,
+// for horses' heads drawn looking out of stalls.
+export const HORSE_HEAD = 0x8a5a33;
+const HORSE = HORSE_HEAD, MANE = 0x3a2a1c;
 export const horse = (t, grazing = false) => {
   const h = new B();
   h.box(0.44, 0.2, 0.17, HORSE, 0, 0.34, 0);

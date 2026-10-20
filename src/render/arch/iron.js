@@ -5,16 +5,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { B, C, unit } from '../builder.js';
-import { P, flag, firePit, stick, hash, place, horse, WEDGE } from './kit.js';
+import { P, flag, firePit, stick, hash, place, horse, WEDGE, CYL6, BALL, CONE4, HORSE_HEAD, sack } from './kit.js';
 
 // ---------- shared Iron parts ----------
 const MARBLE = C.marble, MARBLE_D = 0xd9d1bf, PLASTER = 0xd7c7a4, ASHLAR = 0xbcad8d, ASHLAR_D = 0xa39579;
 const TILE = 0xa96342, TILE_L = 0xb7714e, TILE_D = 0x8a4c34, CLAY = 0xb5693f, PAVING = 0xbfb193, SAND = 0xd2bf8e;
 const EARTH = 0x7a6346, SOIL = 0x6b5232, WALLSTONE = 0x9a8f78, OLIVE = 0x7d8c63, OLIVE_D = 0x5f6d4a, OLIVE_L = 0x9aa582, BARK = 0x5e4e3c;
-const WATER = 0x3f7fa3, HORSE_HEAD = 0x8a5a33;
+const WATER = 0x3f7fa3;
 // Low-poly shapes (ARCH: a half disc facing +z, flat side down; RING: its half-ring frame; AMPHORA: a terracotta
 // amphora 0.61 tall with two handles, foot at the origin).
-const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), BALL = new THREE.SphereGeometry(1, 6, 4), CONE4 = new THREE.ConeGeometry(1, 1, 4);
 const ARCH = new THREE.CircleGeometry(1, 8, 0, Math.PI), RING = new THREE.TorusGeometry(1, 0.16, 4, 8, Math.PI);
 const AMPHORA = (() => {
   const prof = [[0, 0], [0.03, 0.05], [0.08, 0.18], [0.1, 0.33], [0.08, 0.45], [0.035, 0.51], [0.035, 0.58], [0.05, 0.61], [0, 0.61]];
@@ -66,8 +65,6 @@ const amphora = (b, x, y, z, k = 1, seal = null, rx = 0, rz = 0) => {
 // bronze boss.
 const scutum = t => new B().box(0.22, 0.32, 0.02, C.woodD, 0, 0, 0).box(0.19, 0.29, 0.02, t, 0, 0.015, 0.012).box(0.03, 0.29, 0.024, C.gold, 0, 0.015, 0.016)
   .add(BALL, C.bronze, 0, 0.16, 0.03, 0.045, 0.045, 0.03);
-// A sack of grain standing on y.
-const sack = (b, x, y, z, r = 0.09) => b.add(BALL, C.cloth, x, y + r * 0.9, z, r, r, r * 0.85).add(CYL6, C.leather, x, y + r * 1.8, z, r * 0.3, r * 0.4, r * 0.3);
 
 // Granary: a Roman horreum. A long plastered hall raised on a podium against damp and rats, its walls buttressed with
 // ventilation slits between the buttresses; a portico of four marble columns at the +x end over the loading doors and
