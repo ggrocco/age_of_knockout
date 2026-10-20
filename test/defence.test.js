@@ -333,7 +333,7 @@ test('a wall line places and pays per segment and stops when stone runs out', ()
   assert.notEqual(vs[0].order.queue, vs[1].order.queue, 'each villager gets its own copy of the queue');
   // nothing placed: fail('placement'), no stone spent, orders untouched
   const orders = vs.map(v => v.order);
-  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: lineTiles({ x: x + 3, y }, { x: x + 5, y }) }), { ok: false, reason: 'placement' }, 'cannot afford even one');
+  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: lineTiles({ x: x + 3, y }, { x: x + 5, y }) }), { ok: false, reason: 'resources' }, 'cannot afford even one');
   p.res.stone = 100;
   assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: lineTiles({ x, y }, { x: x + 2, y }) }), { ok: false, reason: 'placement' }, 'every tile already has a foundation');
   assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: [] }), { ok: false, reason: 'placement' });
@@ -498,4 +498,23 @@ test('a Modern tower sees, and so shoots, an enemy at its full range on the nega
   for (let k = 0; k < 8 && v.hp === v.maxHp; k++) g.tick(); // vision refreshes every 4 ticks, then the tower fires
   assert.equal(g.players[0].visible[i], 1, 'sight 10 reaches it');
   assert.ok(v.hp < v.maxHp, 'and the tower shoots it');
+});
+
+// --- wall command: not enough stone (Task 17) ---
+test('a wall line over free ground with too little stone for one segment fails with resources; an all-blocked line still fails with placement', () => {
+  const g = wallGame(4), p = g.players[0], vs = villagers(g), ids = vs.map(v => v.id), { x, y } = clearBlock(g, 3, 1);
+  const orders = vs.map(v => v.order), line = lineTiles({ x, y }, { x: x + 2, y });
+  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: line }), { ok: false, reason: 'resources' }, 'free tiles, 4 stone: the first segment is unaffordable');
+  assert.equal(p.res.stone, 4); assert.equal(wallsOf(g).length, 0); assert.deepEqual(vs.map(v => v.order), orders, 'nothing is spent, placed or ordered');
+  // a blocked tile before the first free one is skipped, then the free one cannot be paid for: still resources
+  p.res.stone = 5; assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: [{ x, y }] }), { ok: true, placed: 1 });
+  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: line }), { ok: false, reason: 'resources' }, 'the foundation at the start is skipped free, the next tile is unaffordable');
+  // every tile blocked: placement, whether or not there is stone
+  p.res.stone = 5; assert.ok(g.command(0, { type: 'wall', ids, tiles: [{ x: x + 1, y }] }).ok);
+  p.res.stone = 5; assert.ok(g.command(0, { type: 'wall', ids, tiles: [{ x: x + 2, y }] }).ok);
+  assert.equal(p.res.stone, 0);
+  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: line }), { ok: false, reason: 'placement' }, 'every tile has a foundation and there is no stone');
+  p.res.stone = 100;
+  assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: line }), { ok: false, reason: 'placement' }, 'every tile has a foundation, plenty of stone');
+  assert.equal(p.res.stone, 100); assert.equal(wallsOf(g).length, 3);
 });

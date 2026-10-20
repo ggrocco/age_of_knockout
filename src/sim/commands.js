@@ -73,13 +73,13 @@ export function execute(game, pid, cmd) {
       const def = BUILDINGS.wall, us = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager');
       if (!us.length) return fail('no villagers');
       if (ageIndex(def.age) > ageIndex(p.age)) return fail('age');
-      const placed = [];
+      const placed = []; let short = false;
       for (const t of Array.isArray(cmd.tiles) ? cmd.tiles : []) {
         if (!t || !canPlace(game, pid, 'wall', t.x, t.y)) continue;
-        if (!canAfford(p, def.cost)) break; // out of stone: the rest of the line is not placed
+        if (!canAfford(p, def.cost)) { short = true; break; } // out of stone: the rest of the line is not placed
         pay(p, def.cost); placed.push(game.addBuilding('wall', pid, t.x, t.y, false).id);
       }
-      if (!placed.length) return fail('placement');
+      if (!placed.length) return fail(short ? 'resources' : 'placement'); // a free tile it could not pay for, or nowhere free
       const [target, ...rest] = placed;
       for (const u of us) { u.order = { type: 'build', target, queue: rest.slice(), fails: 0 }; u.path = null; u.retry = 0; }
       return { ok: true, placed: placed.length };

@@ -1,13 +1,30 @@
 import { BUILDINGS } from '../data/buildings.js';
 import { canPlace, canAfford } from '../sim/commands.js';
+import { lineTiles } from '../sim/util.js';
+
+// The ghost line for a wall: ok[i] is canPlace for tiles[i], the per-tile check the wall command uses; a repeated tile is listed
+// (and counted) once. Placement only: stone is not checked here, the command's 'resources' toast covers that. DOM-free.
+export function wallPlan(game, pid, tiles) {
+  const seen = new Set(), out = [], ok = [];
+  let count = 0;
+  for (const t of tiles) {
+    const key = `${t.x},${t.y}`; if (seen.has(key)) continue; seen.add(key);
+    const can = canPlace(game, pid, 'wall', t.x, t.y); if (can) count++;
+    out.push(t); ok.push(can);
+  }
+  return { tiles: out, ok, count };
+}
 
 // Mouse + keyboard (desktop) and touch (phone) input. Both paths share selectAt/orderAt so behaviour matches.
 export function createInput(ui) {
   const el = document.getElementById('viewport'), keys = new Set(), drag = { on: false, x: 0, y: 0, moved: false }, box = document.getElementById('dragbox');
   let mouse = { x: 0, y: 0 }, lastClick = { t: 0, id: -1 }, shiftDown = false;
+  let wallDrag = null, wallCur = null; // desktop wall drag: the start tile while the button is held, and the last tile under the cursor
   const g = () => ui.game;
   const selectedUnitIds = () => [...ui.sel].filter(id => g().entities.get(id)?.kind === 'unit');
-  const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; };
+  const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; ui.delArm = null; };
+  // The building the Delete tile and key act on: the first own building in the selection, finished or not (same pick as the HUD).
+  const selectedBuilding = () => [...ui.sel].map(id => g().entities.get(id)).find(e => e && e.kind === 'building' && e.owner === 0) || null;
   const onScreen = u => { const p = ui.view.project(u.x, u.y), r = el.getBoundingClientRect(); return p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom; };
   const tileForPlacing = (cx, cy) => { const p = ui.view.pickGround(cx, cy); if (!p) return null; const s = BUILDINGS[ui.placing].size; return { x: Math.round(p.x - s / 2), y: Math.round(p.y - s / 2) }; };
 
@@ -44,18 +61,45 @@ export function createInput(ui) {
     const r = ui.cmd({ type: 'build', ids: vills, building: ui.placing, x: tile.x, y: tile.y });
     if (r.ok && !(shiftDown && !ui.touch)) ui.stopPlacing();
   }
+  // Issue a wall line from tile a to tile b; toasts the placed count and stone spent (ui.cmd toasts a failure's reason).
+  function placeWall(a, b) {
+    const tiles = lineTiles(a, b), vills = selectedUnitIds().filter(id => g().entities.get(id).type === 'villager');
+    const r = ui.cmd({ type: 'wall', ids: vills, tiles });
+    if (r.ok) ui.toast?.(`Wall: ${r.placed < tiles.length ? `${r.placed} of ${tiles.length}` : r.placed} tile${tiles.length > 1 ? 's' : ''} placed, ${r.placed * BUILDINGS.wall.cost.stone} stone`);
+    if (r.ok && !(shiftDown && !ui.touch)) ui.stopPlacing();
+    return r;
+  }
+  // Phone: the first tap sets the start, the second the end; a third starts a new line. Place (place-ok) issues it.
+  function wallTap(x, y) {
+    const t = tileForPlacing(x, y); if (!t) return;
+    if (!ui.wallStart || ui.wallEnd) { ui.wallStart = t; ui.wallEnd = null; } else ui.wallEnd = t;
+  }
   const idleVillagers = () => g().visibleEntities(0).filter(u => u.owner === 0 && u.type === 'villager' && u.order.type === 'idle');
   ui.actions = {
     idle() { const idle = idleVillagers(); if (!idle.length) return ui.toast?.('No idle villagers'); ui.idleIdx = (ui.idleIdx || 0) % idle.length; const u = idle[ui.idleIdx++]; setSel([u.id]); ui.view.centerOn(u.x, u.y); },
     home() { const tc = [...g().buildings.values()].find(b => b.owner === 0 && b.type === 'town_center'); if (tc) { ui.view.centerOn(tc.x + 1.5, tc.y + 1.5); setSel([tc.id]); } },
     box() { ui.boxMode = !ui.boxMode; },
     clear() { ui.stopPlacing(); ui.boxMode = false; setSel([]); },
-    'place-ok'() { if (ui.placing && ui.placeTile) place(ui.placeTile); },
+    'place-ok'() {
+      if (ui.placing === 'wall') { if (!ui.wallStart) return ui.toast?.('Tap where the wall starts'); if (!ui.wallEnd) return ui.toast?.('Tap where the wall ends'); return placeWall(ui.wallStart, ui.wallEnd); }
+      if (ui.placing && ui.placeTile) place(ui.placeTile);
+    },
     'place-cancel'() { ui.stopPlacing(); },
+    // Desktop deletes at once. Touch arms first (the tile reads "Tap again to delete"); a second tap within 3 s deletes.
+    delete(id) {
+      const b = g().entities.get(id); if (!b || b.kind !== 'building' || b.owner !== 0) return;
+      const now = performance.now();
+      if (ui.touch && !(ui.delArm?.id === id && now - ui.delArm.t < 3000)) { ui.delArm = { id, t: now }; return; }
+      ui.delArm = null;
+      if (ui.cmd({ type: 'delete', id }).ok) { ui.sel.delete(id); ui.toast?.(`${BUILDINGS[b.type].name} deleted`); }
+    },
   };
 
   // ----- mouse (desktop) -----
-  el.addEventListener('mousedown', e => { if (e.button !== 0) return; drag.on = true; drag.x = e.clientX; drag.y = e.clientY; drag.moved = false; });
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return; drag.on = true; drag.x = e.clientX; drag.y = e.clientY; drag.moved = false;
+    if (ui.game && ui.placing === 'wall') wallDrag = wallCur = tileForPlacing(e.clientX, e.clientY);
+  });
   window.addEventListener('mousemove', e => {
     mouse = { x: e.clientX, y: e.clientY };
     if (drag.on) {
@@ -65,7 +109,11 @@ export function createInput(ui) {
   });
   window.addEventListener('mouseup', e => {
     if (e.button !== 0 || !drag.on) return; drag.on = false; box.classList.add('hidden');
+    const start = wallDrag; wallDrag = null;
+    // a wall drag ends wherever the button is let go, even over the HUD: the ghost line showed the ground tile under the cursor
+    if (start && ui.game && ui.placing === 'wall') return placeWall(start, tileForPlacing(e.clientX, e.clientY) || wallCur || start);
     if (!el.contains(e.target) || !ui.game) return;
+    if (ui.placing === 'wall') return;
     if (ui.placing) return place(tileForPlacing(e.clientX, e.clientY));
     if (drag.moved) return boxSelect(drag.x, drag.y, e.clientX, e.clientY, shiftDown);
     const ent = ui.view.pickEntity(e.clientX, e.clientY);
@@ -77,15 +125,18 @@ export function createInput(ui) {
   window.addEventListener('keyup', e => { shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase()); });
   el.addEventListener('contextmenu', e => {
     e.preventDefault(); if (!ui.game) return;
-    if (ui.placing) return ui.stopPlacing();
+    if (ui.placing) { cancelDrag(); return ui.stopPlacing(); }
     const ids = selectedUnitIds(); if (!ids.length) return;
     const r = orderAt(ui.view.pickEntity(e.clientX, e.clientY), ui.view.pickGround(e.clientX, e.clientY), ids);
     const gp = ui.view.pickGround(e.clientX, e.clientY); if (r && r.ok && gp) ui.marker(gp.x, gp.y);
   });
   el.addEventListener('wheel', e => { e.preventDefault(); if (ui.view) ui.view.setZoom(ui.view.zoom * (e.deltaY > 0 ? 1.1 : 0.9)); }, { passive: false });
+  // Cancelling a placement mid-drag (Esc / right-click) also ends the drag, so letting go of the button neither places nor box-selects.
+  function cancelDrag() { drag.on = false; wallDrag = null; box.classList.add('hidden'); }
   function onKey(e) {
     if (!ui.game) return;
-    if (e.key === 'Escape') { ui.stopPlacing(); setSel([]); }
+    if (e.key === 'Escape') { if (ui.placing) cancelDrag(); ui.stopPlacing(); setSel([]); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); ui.actions.delete(b.id); } } // Backspace: the Mac "delete" key
     else if (e.key === '.') ui.actions.idle();
     else if (e.key.toLowerCase() === 'h') ui.actions.home();
     else if (e.key === ' ') { e.preventDefault(); ui.togglePause(); }
@@ -110,6 +161,7 @@ export function createInput(ui) {
   }
   function setPlaceTile(x, y) { const t = tileForPlacing(x, y); if (t) ui.placeTile = t; }
   function tap(x, y) {
+    if (ui.placing === 'wall') return wallTap(x, y);
     if (ui.placing) return setPlaceTile(x, y);
     const ent = ui.view.pickEntity(x, y), gp = ui.view.pickGround(x, y), ids = selectedUnitIds();
     const own = ent && ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building');
@@ -123,7 +175,7 @@ export function createInput(ui) {
     const p = pts(e);
     if (p.length >= 2) { TT.moved = true; box.classList.add('hidden'); const [a, b] = p; TT.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; TT.last = null; return; }
     TT.start = { ...p[0], t: performance.now() }; TT.last = p[0]; TT.moved = false; TT.pinch = null;
-    if (ui.placing) setPlaceTile(p[0].x, p[0].y);
+    if (ui.placing && ui.placing !== 'wall') setPlaceTile(p[0].x, p[0].y); // a wall end is set only by a finished tap (touchEnd), so pans and pinches leave it alone
   }, { passive: false });
   el.addEventListener('touchmove', e => {
     e.preventDefault(); if (!ui.game) return;
@@ -137,8 +189,8 @@ export function createInput(ui) {
     const cur = p[0];
     if (!TT.moved && Math.hypot(cur.x - TT.start.x, cur.y - TT.start.y) > 10) TT.moved = true;
     if (!TT.moved) return;
-    if (ui.placing) setPlaceTile(cur.x, cur.y);
-    else if (ui.boxMode) { box.classList.remove('hidden'); Object.assign(box.style, { left: Math.min(TT.start.x, cur.x) + 'px', top: Math.min(TT.start.y, cur.y) + 'px', width: Math.abs(cur.x - TT.start.x) + 'px', height: Math.abs(cur.y - TT.start.y) + 'px' }); }
+    if (ui.placing && ui.placing !== 'wall') setPlaceTile(cur.x, cur.y);
+    else if (ui.boxMode && !ui.placing) { box.classList.remove('hidden'); Object.assign(box.style, { left: Math.min(TT.start.x, cur.x) + 'px', top: Math.min(TT.start.y, cur.y) + 'px', width: Math.abs(cur.x - TT.start.x) + 'px', height: Math.abs(cur.y - TT.start.y) + 'px' }); }
     else panBy(TT.last, cur);
     TT.last = cur;
   }, { passive: false });
@@ -164,6 +216,16 @@ export function createInput(ui) {
     if (keys.has('a') || keys.has('arrowleft')) { dx -= 1; dz += 1; } if (keys.has('d') || keys.has('arrowright')) { dx += 1; dz -= 1; }
     if (keys.has('w') || keys.has('arrowup')) { dx -= 1; dz -= 1; } if (keys.has('s') || keys.has('arrowdown')) { dx += 1; dz += 1; }
     if (dx || dz) ui.view.pan(dx * s * 0.7, dz * s * 0.7);
-    if (ui.placing) { const t = ui.touch ? ui.placeTile : tileForPlacing(mouse.x, mouse.y); if (t) { const ok = canPlace(g(), 0, ui.placing, t.x, t.y) && canAfford(g().players[0], BUILDINGS[ui.placing].cost); ui.view.showGhost(ui.placing, t.x, t.y, ok); } }
+    if (ui.placing === 'wall') {
+      // desktop: the hovered tile, or the dragged line; phone: the start tile, then the tapped line
+      ui.view.showGhost(null);
+      let a, b;
+      if (ui.touch) { a = ui.wallStart; b = ui.wallEnd || a; }
+      else { const cur = tileForPlacing(mouse.x, mouse.y); if (cur) wallCur = cur; a = wallDrag || cur; b = wallDrag ? wallCur : cur; }
+      if (a && b) { const plan = wallPlan(g(), 0, lineTiles(a, b)); ui.view.showGhostLine(plan.tiles, plan.ok); } else ui.view.showGhostLine(null);
+    } else if (ui.placing) {
+      ui.view.showGhostLine(null);
+      const t = ui.touch ? ui.placeTile : tileForPlacing(mouse.x, mouse.y); if (t) { const ok = canPlace(g(), 0, ui.placing, t.x, t.y) && canAfford(g().players[0], BUILDINGS[ui.placing].cost); ui.view.showGhost(ui.placing, t.x, t.y, ok); }
+    } else wallDrag = null;
   } };
 }

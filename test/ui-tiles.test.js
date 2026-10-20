@@ -5,6 +5,10 @@ import { TECHS } from '../src/data/techs.js';
 import { AGES } from '../src/data/ages.js';
 import { ICONS, icon } from '../src/ui/icons.js';
 import { DESC, costHtml, tipHtml } from '../src/ui/tips.js';
+import { wallPlan } from '../src/ui/input.js';
+import { createGame } from '../src/sim/game.js';
+import { canPlace } from '../src/sim/commands.js';
+import { lineTiles } from '../src/sim/util.js';
 
 const ids = [...Object.keys(UNITS), ...Object.keys(BUILDINGS)];
 
@@ -87,4 +91,53 @@ test('every tip renders without throwing and never leaks "undefined"', () => {
   for (const id of Object.keys(BUILDINGS)) assert.doesNotMatch(tipHtml({ kind: 'building', id }), /undefined|NaN/, id);
   for (const id of Object.keys(TECHS)) assert.doesNotMatch(tipHtml({ kind: 'tech', id }), /undefined|NaN/, id);
   for (const a of AGES.slice(1)) assert.doesNotMatch(tipHtml({ kind: 'age', id: 'age', next: a }), /undefined|NaN/, a);
+});
+
+// ---- Delete tile and the wall ghost line (Task 17) ----
+test('the Delete tile has its own icon, a description and a tip that render', () => {
+  assert.match(ICONS.delete || '', /^<svg[^>]*viewBox="0 0 24 24"/); assert.ok(ICONS.delete.endsWith('</svg>'));
+  assert.equal(Object.entries(ICONS).filter(([, s]) => s === ICONS.delete).length, 1, 'delete glyph is its own');
+  assert.equal(icon('delete'), ICONS.delete);
+  assert.ok(DESC.delete && DESC.delete.length >= 20 && DESC.delete.length <= 200);
+  assert.match(DESC.delete, /refund/i);
+  const h = tipHtml({ kind: 'delete', id: 'delete' });
+  for (const s of ['Delete', DESC.delete]) assert.ok(h.includes(s), s);
+  assert.doesNotMatch(h, /undefined|NaN/);
+});
+
+// Player 0 in the Tool Age, every tile explored, `stone` stone; and a tree with two placeable tiles on each side of it in its row.
+const ghostGame = stone => {
+  const g = createGame({ seed: 1 }), p = g.players[0]; p.age = 'tool'; p.res.stone = stone; p.explored.fill(1);
+  const ok = (x, y) => canPlace(g, 0, 'wall', x, y);
+  for (const r of g.resources.values()) {
+    const tx = Math.floor(r.x), ty = Math.floor(r.y);
+    if (r.type === 'tree' && !ok(tx, ty) && [-2, -1, 1, 2].every(d => ok(tx + d, ty))) return { g, p, tx, ty };
+  }
+  throw new Error('no suitable tree');
+};
+const vills = g => [...g.units.values()].filter(u => u.owner === 0 && u.type === 'villager').map(u => u.id);
+const walls = g => [...g.buildings.values()].filter(b => b.type === 'wall' && b.owner === 0).map(b => ({ x: b.x, y: b.y }));
+
+test('wallPlan flags each tile by canPlace: a tree is a red gap, the rest green', () => {
+  const { g, tx, ty } = ghostGame(500), line = lineTiles({ x: tx - 2, y: ty }, { x: tx + 2, y: ty });
+  const plan = wallPlan(g, 0, line);
+  assert.deepEqual(plan.tiles, line); assert.deepEqual(plan.ok, [true, true, false, true, true]); assert.equal(plan.count, 4);
+  assert.deepEqual(g.command(0, { type: 'wall', ids: vills(g), tiles: line }), { ok: true, placed: plan.count }, 'the command places what the ghost showed green');
+  assert.deepEqual(walls(g), plan.tiles.filter((t, i) => plan.ok[i]));
+  assert.deepEqual(wallPlan(g, 0, line).ok, [false, false, false, false, false], 'once placed, the foundations are red');
+});
+
+test('wallPlan counts a repeated tile once', () => {
+  const { g, tx, ty } = ghostGame(500), a = { x: tx - 2, y: ty }, b = { x: tx - 1, y: ty };
+  const plan = wallPlan(g, 0, [a, b, a, { ...b }]);
+  assert.deepEqual(plan.tiles, [a, b]); assert.deepEqual(plan.ok, [true, true]); assert.equal(plan.count, 2);
+  assert.deepEqual(g.command(0, { type: 'wall', ids: vills(g), tiles: [a, b, a, b] }), { ok: true, placed: 2 });
+});
+
+test('wallPlan flags placement only, not stone: with too little stone the free tiles stay green and the command says resources', () => {
+  const { g, p, tx, ty } = ghostGame(3), line = lineTiles({ x: tx - 2, y: ty }, { x: tx + 2, y: ty });
+  const plan = wallPlan(g, 0, line);
+  assert.deepEqual(plan.ok, [true, true, false, true, true], 'canPlace per tile: only the tree is red'); assert.equal(plan.count, 4);
+  assert.deepEqual(g.command(0, { type: 'wall', ids: vills(g), tiles: line }), { ok: false, reason: 'resources' }, 'the toast gives the reason');
+  assert.equal(p.res.stone, 3); assert.deepEqual(walls(g), []);
 });
