@@ -100,3 +100,24 @@ test('Stone farm: crops show once finished and shrink with the food left', () =>
   e.amount = 0; animate(g, e, 1, false);
   assert.ok(a.crops.scale.y < full, `crops did not shrink (${a.crops.scale.y} vs ${full})`);
 });
+
+// ---------- Bronze: Granary, Storage Pit, Farm, Barracks, Archery Range, Stable, Market, Government Center, Wonder ----------
+const BRONZE = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder'];
+// As for Stone: each Bronze design against every other era, not all pairs, until Task 11.
+test('bronze designs differ from every other era', () => {
+  for (const type of BRONZE) {
+    assert.equal(designOf(type, 'bronze').kind, 'design', `${type}: no Bronze design`);
+    const bronze = posHash(type, 'bronze');
+    for (const a of available(type).filter(a => a !== 'bronze')) assert.notEqual(posHash(type, a), bronze, `${type}: Bronze shares a shape with ${a}`);
+  }
+});
+test('Bronze designs: heights within the cap', () => heightsOk(BRONZE));
+test('Bronze farm: crops show once finished and shrink with the food left', () => {
+  const { e, anim: a, g } = build('farm', 'bronze', false);
+  assert.ok(a.crops, 'Bronze farm has no crops');
+  animate(g, e, 1, false); assert.equal(a.crops.visible, false, 'crops show while unfinished');
+  e.constructed = true; e.amount = 400; animate(g, e, 1, false);
+  assert.equal(a.crops.visible, true); const full = a.crops.scale.y;
+  e.amount = 0; animate(g, e, 1, false);
+  assert.ok(a.crops.scale.y < full, `crops did not shrink (${a.crops.scale.y} vs ${full})`);
+});

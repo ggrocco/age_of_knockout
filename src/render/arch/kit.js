@@ -18,6 +18,25 @@ export function designCtx(type, team, size, age) {
   return { b: new B(), mast: new B(), extra: {}, type, team, size, s, h: s / 2, t: TEAM[team], td: TEAM_DARK[team], age };
 }
 
+// ---------- shape helpers (any B) ----------
+// A pole (or log) of radius r from point p to point q; geo's +y end lands on q.
+export const stick = (b, r, c, [x1, y1, z1], [x2, y2, z2], geo = unit.cyl) => {
+  const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1, L = Math.hypot(dx, dy, dz);
+  b.add(geo, c, (x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2, r, L, r, Math.atan2(dz, dy), 0, -Math.asin(dx / L));
+};
+export const lerp = (p, q, f) => p.map((v, i) => v + (q[i] - v) * f);
+// A deterministic 0..1 value per integer pair, for scatter that comes out the same on every build.
+export const hash = (i, j) => (Math.imul(i * 73 + j * 151 + 7, 2654435761) >>> 0) % 1000 / 1000;
+// Adds a part drawn in its own B (built at the origin) to b at (x, y, z), turned ry about y and scaled k, keeping its
+// colours.
+export const place = (b, part, x, y, z, ry = 0, k = 1) => {
+  const g = part.geometry();
+  b.add(g, 0xffffff, x, y, z, k, k, k, 0, ry, 0);
+  const last = b.geos[b.geos.length - 1];
+  last.setAttribute('color', g.attributes.color.clone()); last.setAttribute('surface', g.attributes.surface.clone());
+  g.dispose();
+};
+
 // ---------- body helpers (draw into ctx.b) ----------
 export const door = (ctx, w, hh, z, x = 0) => { ctx.b.box(w, hh, 0.06, C.dark, x, 0.16, z).box(w + 0.1, 0.06, 0.08, C.woodD, x, 0.16 + hh, z); };
 export const win = (ctx, x, y, z, ry = 0) => { ctx.b.box(0.22, 0.22, 0.05, C.glass, x, y, z, 0, ry).box(0.28, 0.04, 0.07, C.woodD, x, y + 0.22, z, 0, ry); };

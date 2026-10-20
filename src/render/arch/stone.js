@@ -2,20 +2,12 @@
 // patch of wild grain and a sparring ground.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, firePit } from './kit.js';
+import { P, flag, firePit, stick, lerp, hash } from './kit.js';
 
 // Unit-tall shapes centred on the origin along +y, for stick(): a sheaf (narrow at the base), a club (thick at the
 // head), a grain stalk and a spear point.
 const SHEAF = new THREE.CylinderGeometry(1, 0.7, 1, 6), CLUB = new THREE.CylinderGeometry(1, 0.45, 1, 6);
 const STALK = new THREE.CylinderGeometry(0.4, 1, 1, 4), POINT = new THREE.ConeGeometry(1, 1, 5);
-// A pole (or log) of radius r from point p to point q; geo's +y end lands on q.
-const stick = (b, r, c, [x1, y1, z1], [x2, y2, z2], geo = unit.cyl) => {
-  const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1, L = Math.hypot(dx, dy, dz);
-  b.add(geo, c, (x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2, r, L, r, Math.atan2(dz, dy), 0, -Math.asin(dx / L));
-};
-const lerp = (p, q, f) => p.map((v, i) => v + (q[i] - v) * f);
-// A deterministic 0..1 value per integer pair, for the wild grain's scatter.
-const hash = (i, j) => (Math.imul(i * 73 + j * 151 + 7, 2654435761) >>> 0) % 1000 / 1000;
 
 export function house(ctx) {
   const { b, t } = ctx;
