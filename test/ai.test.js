@@ -109,3 +109,9 @@ test('a Medieval bot builds a Castle and advances to the Age of Sail', () => {
   assert.ok(ageIndex(p.age) >= ageIndex('sail'), 'reached the Age of Sail, at ' + p.age);
   assert.ok(b.maxRejects <= 20, 'rejects ' + b.maxRejects);
 });
+
+test('disabling time limits overrides difficulty caps while keeping the bot handicap', () => {
+  assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: true }), { workRate: [1, 0.5], capTicks: Infinity });
+  assert.deepEqual(matchOptions(['hard', 'easy'], { noTimeLimit: true }), { workRate: [1, 1], capTicks: Infinity });
+  assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
+});
