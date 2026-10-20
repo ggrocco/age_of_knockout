@@ -1,5 +1,6 @@
 // Tower and Wall stats by era (invented, game-tuned: see src/data/README.md "Invented content (defences)").
-// A defence takes its numbers from its owner's era at the moment it is built. Eras before Tool use the Tool row.
+// A defence takes its numbers from its owner's current era: addBuilding sets them, and refreshDefences re-scales every
+// existing one when the owner advances. Eras before Tool use the Tool row.
 // Tower attack type: 'pierce' (arrows, bullets, beams) or 'melee' (the heavy shot of the sail and modern towers).
 export const TOWER = {
   tool:       { hp: 125, atk: 3,  atkType: 'pierce', range: 5, cooldown: 40 },

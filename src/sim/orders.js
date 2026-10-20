@@ -93,8 +93,22 @@ function doGather(game, u, o) {
   }
 }
 
+// The nearest building in a build queue (a wall line) that is still standing and unfinished; it is taken off the queue.
+// Finished or destroyed ones are dropped. A tie on distance goes to the earlier one in the queue.
+function nextInQueue(game, u, o) {
+  let best = null, bd = Infinity;
+  o.queue = (o.queue || []).filter(id => { const b = game.entities.get(id); return b && !b.dead && !b.constructed && b.owner === u.owner; });
+  for (const id of o.queue) { const b = game.entities.get(id), d = distPoint(u.x, u.y, b); if (d < bd) { bd = d; best = b; } }
+  if (best) o.queue = o.queue.filter(id => id !== best.id);
+  return best;
+}
+
 function doBuild(game, u, o) {
   const b = game.entities.get(o.target);
+  if (!b || b.dead || b.constructed) { // done (or gone): move on to the nearest segment left in the queue
+    const next = o.queue && nextInQueue(game, u, o);
+    if (next) { o.target = next.id; o.fails = 0; u.path = null; u.retry = 0; return; }
+  }
   if (!b || b.dead) return stop(u);
   if (b.constructed) {
     if (b.gatherType && b.amount > 0) { u.order = { type: 'gather', res: b.id, kind: 'food', phase: 'go', fails: 0 }; u.path = null; }
