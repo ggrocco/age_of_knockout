@@ -1,9 +1,9 @@
 // Bronze Age: Mesopotamian and Egyptian mud-brick, flat roof terraces, ramps and stairs, columns and bronze ornament;
 // a stepped ziggurat with a shrine, domed silos, irrigated basins with a shaduf, a palace on a terrace and a great
-// pyramid.
+// pyramid; for defence, a battered mud-brick tower and a niched wall crowned with stepped merlons.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place, horse, WEDGE, CYL6, BALL, CONE4, FRUSTUM } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, streak, WEDGE, CYL6, BALL, CONE4, FRUSTUM } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2;
@@ -398,4 +398,73 @@ export function wonder(ctx) {
   for (const k of [-1, 1]) { const x = px + k * 0.22; b.add(FRUSTUM, 0xd9c49a, x, 0.65, 1.76, 0.065, 1.1, 0.065).cone(0.065, 0.12, C.gold, x, 1.2, 1.76, 4, Math.PI / 4); }
   place(b, sphinx(), 1.25, 0.05, 1.25, -Math.PI / 4, 1.5);
   return 4.02;
+}
+
+// ---------- Bronze defences ----------
+// A square block of half-side 1 at y = -0.5 battered in to 0.86 at y = 0.5: a mud-brick tower's sloping walls.
+const BATTER = new THREE.CylinderGeometry(0.86, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
+const MUD_L = 0xd2ab78;
+
+// Tower: a mud-brick tower. Battered walls on a plinth course rise to a corbelled parapet of stepped merlons, cedar
+// beam ends poking out under it; a team band girds the tower, bronze-faced shields hang on the parapet and a bronze
+// door opens at its foot under arrow slits. An outside stair climbs to a side door; on the roof a team awning shades
+// the archers beside a brazier, and the flag flies. Its shot is a flight of bronze-tipped arrows over the merlons
+// (extra.fire).
+export function tower(ctx) {
+  const { b, t, extra } = ctx, yb = 0.18, H = 2.0, hs0 = 0.64, top = yb + H, at = y => hs0 * (1 - 0.14 * (y - yb) / H);
+  b.box(1.72, 0.06, 1.72, P.mudD).box(1.42, 0.12, 1.42, P.mudD, 0, 0.06, 0);
+  b.add(BATTER, P.mud, 0, yb + H / 2, 0, hs0, H, hs0);
+  // The team band and a darker course near the foot.
+  for (const [y, hh, c] of [[1.42, 0.12, t], [0.5, 0.05, P.mudD]]) { const w = 2 * at(y) + 0.025; b.box(w, hh, w, c, 0, y, 0); }
+  // Beam ends under the parapet, on every face.
+  const vy = top - 0.16, vf = at(vy);
+  for (const u of [-0.36, -0.12, 0.12, 0.36]) for (const [ux, uz, ox, oz] of [[u, 0, 0, 1], [u, 0, 0, -1], [0, u, 1, 0], [0, u, -1, 0]]) {
+    stick(b, 0.032, C.wood, [ux + ox * (vf - 0.04), vy, uz + oz * (vf - 0.04)], [ux + ox * (vf + 0.1), vy, uz + oz * (vf + 0.1)], CYL6);
+  }
+  // The corbelled parapet, its stepped merlons, and the shields hung on its camera faces.
+  block(b, 1.24, 0.24, 1.24, 0, top, 0);
+  const py = top + 0.31;
+  for (const k of [-1, 1]) { merlons(b, -0.55, 0.55, k * 0.58, py); merlons(b, -0.33, 0.33, k * 0.58, py, true); }
+  shield(b, t, -0.3, top + 0.12, 0.625); shield(b, t, 0.3, top + 0.12, 0.625); shield(b, t, 0.625, top + 0.12, 0, true);
+  // The bronze door at the foot, the slits above it and on the side.
+  const fz = at(0.5) + 0.005;
+  b.box(0.3, 0.5, 0.03, C.dark, 0, yb, fz).box(0.26, 0.46, 0.02, C.bronze, 0, yb, fz + 0.012).box(0.02, 0.46, 0.03, C.dark, 0, yb, fz + 0.02).box(0.4, 0.07, 0.06, C.wood, 0, yb + 0.5, fz + 0.01);
+  for (const [x, y] of [[0, 1.0], [-0.3, 1.7], [0.3, 1.7]]) b.box(0.06, 0.22, 0.03, C.dark, x, y, at(y) + 0.008);
+  for (const z of [-0.3, 0.3]) b.box(0.03, 0.22, 0.06, C.dark, at(1.7) + 0.008, 1.7, z);
+  // The outside stair up the +x face to a side door.
+  const sx = at(0.6) + 0.12;
+  for (let i = 0; i < 6; i++) b.box(0.22, 0.15 * (i + 1), 0.16, STAIR, sx, 0.06, 0.62 - i * 0.16);
+  b.box(0.03, 0.4, 0.22, C.dark, at(1.1) + 0.005, 0.96, -0.3);
+  // On the roof: the team awning on four poles, a brazier, a jar of water and an arrow basket.
+  for (const [x, z] of [[-0.48, -0.48], [-0.48, 0.0], [0.0, -0.48], [0.0, 0.0]]) b.cylT(0.022, 0.022, 0.5, C.wood, x, top + 0.24, z, 6);
+  b.box(0.6, 0.03, 0.6, t, -0.24, top + 0.74, -0.24, 0.08, 0, -0.08).box(0.6, 0.08, 0.02, t, -0.24, top + 0.68, 0.07);
+  brazier(b, 0.35, top + 0.24, 0.35);
+  jar(b, -0.3, top + 0.24, 0.32, 0.08); b.cylT(0.08, 0.06, 0.14, P.wattle, 0.32, top + 0.24, -0.3, 6);
+  // Storage jars at the foot.
+  jar(b, -0.74, 0.06, 0.55, 0.1, t); jar(b, -0.74, 0.06, 0.78, 0.08);
+  flag(ctx, -0.42, top + 0.24, -0.42, 0.95);
+  // The flight of arrows, out over the merlons to the camera sides.
+  const fire = new B();
+  for (const [dx, dz, y] of [[0.25, 1, 0.12], [1, 0.25, 0.12], [-0.3, 1, 0.02]]) {
+    const L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L;
+    streak(fire, [ux * 0.62, y, uz * 0.62], [ux * 1.45, y - 0.2, uz * 1.45], 0.028, undefined, P.ember, 0.075);
+  }
+  extra.fire = { geo: fire.geometry(), at: [0, py, 0] };
+  return top + 0.77;
+}
+
+// Wall: a mud-brick wall. A niched block of brick (pilasters at its corners and the middle of every face) on a darker
+// footing, girded by a team band under the coping and crowned with stepped merlons; it fills its tile edge to edge, so
+// segments in a line close up into one wall, the pilasters pairing up at the joins.
+export function wall(ctx) {
+  const { b, t } = ctx, h0 = 0.08, h1 = 0.62, hh = h1 - h0;
+  b.box(1, h0, 1, P.mudD).box(0.96, hh, 0.96, P.mud, 0, h0, 0);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.12, hh, 0.12, MUD_L, x * 0.44, h0, z * 0.44);
+  for (const [x, z, w, d] of [[0, 0.49, 0.14, 0.02], [0, -0.49, 0.14, 0.02], [0.49, 0, 0.02, 0.14], [-0.49, 0, 0.02, 0.14]]) b.box(w, hh, d, MUD_L, x, h0, z);
+  b.box(1, 0.06, 1, t, 0, h1, 0).box(1, 0.06, 1, P.mudD, 0, h1 + 0.06, 0);
+  const y = h1 + 0.12;
+  for (const [x, z] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
+    b.box(0.16, 0.1, 0.16, P.mud, x * 0.36, y, z * 0.36).box(0.08, 0.08, 0.08, P.mud, x * 0.36, y + 0.1, z * 0.36);
+  }
+  return y + 0.18;
 }

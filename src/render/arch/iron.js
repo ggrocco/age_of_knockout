@@ -1,11 +1,12 @@
 // Iron Age: Greek and Roman masonry, beside today's kept Town Center, House, Government Center and Wonder (legacy.js):
 // plaster and ashlar under terracotta tile, marble columns and pediments with team-coloured tympana. A buttressed
 // horreum, a storehouse with an amphora pit, olive and grain terraces, a palisaded camp of leather tents, a stone
-// archery yard with marble targets, an arcaded stable and an agora round a market tholos.
+// archery yard with marble targets, an arcaded stable and an agora round a market tholos; for defence, a stone tower
+// with a ballista on its roof and an ashlar wall.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { B, C, unit } from '../builder.js';
-import { P, flag, firePit, stick, hash, place, horse, WEDGE, CYL6, BALL, CONE4, ARCH, ARCH_RING, HORSE_HEAD, sack } from './kit.js';
+import { P, flag, firePit, stick, hash, place, horse, streak, WEDGE, CYL6, BALL, CONE4, ARCH, ARCH_RING, HORSE_HEAD, sack } from './kit.js';
 
 // ---------- shared Iron parts ----------
 const MARBLE = C.marble, MARBLE_D = 0xd9d1bf, PLASTER = 0xd7c7a4, ASHLAR = 0xbcad8d, ASHLAR_D = 0xa39579;
@@ -389,4 +390,78 @@ export function market(ctx) {
   b.box(0.42, 0.24, 0.2, MARBLE, -0.2, 0.06, -0.3);
   for (const [dx, r] of [[-0.12, 0.05], [0.02, 0.04], [0.13, 0.03]]) b.cylT(r, r, 0.01, C.dark, -0.2 + dx, 0.3, -0.3, 8);
   return 1.36;
+}
+
+// ---------- Iron defences ----------
+// A ballista built at the origin for place(), shooting along +z from its trestle: the stock and slider, the torsion
+// frame with its two sinew skeins (team-painted front plate, bronze washers), the arms swept back, the bowstring drawn
+// to the trigger and a bolt laid in the groove. Returns its B and the bolt's tip.
+const ballista = t => {
+  const g = new B(), y = 0.3, fz = 0.22;
+  for (const [x, z] of [[-0.14, -0.16], [0.14, -0.16], [-0.12, 0.12], [0.12, 0.12]]) stick(g, 0.018, C.woodD, [x, 0, z], [x * 0.3, y - 0.04, z * 0.4], CYL6);
+  g.cylT(0.05, 0.06, 0.05, C.woodD, 0, y - 0.07, 0, 6);
+  g.box(0.08, 0.05, 0.72, C.wood, 0, y - 0.025, -0.06, 0.06).box(0.03, 0.012, 0.66, C.woodD, 0, y + 0.02, -0.06, 0.06);
+  g.box(0.44, 0.2, 0.08, C.woodD, 0, y - 0.06, fz).box(0.2, 0.12, 0.012, t, 0, y - 0.02, fz + 0.046);
+  for (const k of [-1, 1]) {
+    g.add(CYL6, P.hideD, k * 0.16, y + 0.04, fz, 0.04, 0.3, 0.04).add(CYL6, C.bronze, k * 0.16, y + 0.2, fz, 0.055, 0.03, 0.055).add(CYL6, C.bronze, k * 0.16, y - 0.12, fz, 0.055, 0.03, 0.055);
+    stick(g, 0.016, C.wood, [k * 0.16, y + 0.04, fz], [k * 0.42, y + 0.04, fz - 0.16], CYL6);
+    stick(g, 0.004, P.bone, [k * 0.42, y + 0.04, fz - 0.16], [0, y + 0.05, -0.3], CYL6);
+  }
+  stick(g, 0.012, C.wood, [0, y + 0.06, -0.3], [0, y + 0.06, 0.4], CYL6);
+  stick(g, 0.02, C.iron, [0, y + 0.06, 0.4], [0, y + 0.06, 0.48], CONE4);
+  return g;
+};
+
+// Tower: a stone tower with a ballista. A square Roman tower of ashlar courses on a podium, a marble string course
+// halfway up, a team frieze under a marble cornice and a battlemented top with team shields on the merlons; an arched
+// gate at its foot and arched windows above. On the roof a ballista on its trestle covers the approach, with a rack of
+// bolts and the flag. Its shot is the bolt loosed from the ballista (extra.fire).
+export function tower(ctx) {
+  const { b, t, extra } = ctx, W = 1.3, y0 = 0.2, ch = 0.36, n = 5, top = y0 + n * ch, fz = W / 2;
+  b.box(1.76, 0.06, 1.76, PAVING).box(1.56, 0.14, 1.56, ASHLAR_D, 0, 0.06, 0);
+  for (let i = 0; i < n; i++) { const w = W - (i % 2) * 0.014; b.box(w, ch, w, i % 2 ? ASHLAR : ASHLAR_D, 0, y0 + i * ch, 0); }
+  b.box(W + 0.05, 0.05, W + 0.05, MARBLE_D, 0, y0 + 2 * ch, 0);
+  b.box(W + 0.03, 0.09, W + 0.03, t, 0, top - 0.11, 0).box(W + 0.1, 0.06, W + 0.1, MARBLE, 0, top - 0.02, 0);
+  // The gate and the windows on the camera faces (the +x ones framed in marble).
+  archway(b, 0, y0, fz + 0.002, 0.36, 0.34);
+  for (const x of [-0.34, 0.34]) archway(b, x, y0 + 3 * ch + 0.06, fz + 0.002, 0.14, 0.16);
+  for (const z of [-0.34, 0.34]) b.box(0.02, 0.22, 0.14, C.dark, fz + 0.001, y0 + 3 * ch + 0.06, z).box(0.03, 0.04, 0.2, MARBLE_D, fz + 0.005, y0 + 3 * ch + 0.28, z);
+  b.box(0.02, 0.4, 0.3, C.dark, fz + 0.001, y0 + 0.02, 0.25).box(0.03, 0.05, 0.36, MARBLE_D, fz + 0.005, y0 + 0.42, 0.25);
+  // The roof: paving inside the battlements, merlons all round, team shields on the camera faces.
+  const ry = top + 0.04, M = W + 0.06;
+  b.box(W - 0.06, 0.03, W - 0.06, PAVING, 0, ry, 0);
+  for (let i = 0; i < 5; i++) {
+    const u = -M / 2 + 0.09 + i * (M - 0.18) / 4;
+    for (const [x, z, w, d] of [[u, M / 2 - 0.06, 0.18, 0.12], [u, -M / 2 + 0.06, 0.18, 0.12], [M / 2 - 0.06, u, 0.12, 0.18], [-M / 2 + 0.06, u, 0.12, 0.18]]) b.box(w, 0.26, d, ASHLAR, x, ry, z).box(w + 0.02, 0.03, d + 0.02, MARBLE_D, x, ry + 0.26, z);
+  }
+  b.box(M, 0.1, 0.1, ASHLAR_D, 0, ry, M / 2 - 0.06).box(M, 0.1, 0.1, ASHLAR_D, 0, ry, -M / 2 + 0.06).box(0.1, 0.1, M, ASHLAR_D, M / 2 - 0.06, ry, 0).box(0.1, 0.1, M, ASHLAR_D, -M / 2 + 0.06, ry, 0);
+  for (const x of [-0.31, 0.31]) place(b, scutum(t), x, ry + 0.06, M / 2 + 0.002);
+  place(b, scutum(t), M / 2 + 0.002, ry + 0.06, -0.31, Math.PI / 2);
+  // The ballista and a rack of spare bolts.
+  place(b, ballista(t), 0, ry + 0.03, 0.06);
+  for (let i = 0; i < 4; i++) stick(b, 0.012, C.wood, [-0.42 + i * 0.05, ry + 0.03, -0.45], [-0.4 + i * 0.05, ry + 0.48, -0.5], CYL6);
+  b.box(0.3, 0.04, 0.06, C.woodD, -0.34, ry + 0.3, -0.48);
+  flag(ctx, 0.48, ry + 0.03, -0.48, 0.95);
+  // The bolt in flight, just loosed from the slider.
+  const fire = new B();
+  streak(fire, [0, 0, 0], [0, -0.06, 0.9], 0.032, undefined, P.ember, 0.075);
+  stick(fire, 0.05, P.ember, [0, -0.06, 0.88], [0, -0.065, 1.0], CONE4);
+  extra.fire = { geo: fire.geometry(), at: [0, ry + 0.39, 0.6] };
+  return ry + 0.55;
+}
+
+// Wall: an ashlar wall. Courses of dressed stone (each alternate course set back a hair, so the joints read) on a dark
+// plinth, a team-painted frieze under a marble cornice and a paved walk behind a low breastwork with corner piers; it
+// fills its tile edge to edge, so segments in a line close up into one wall.
+export function wall(ctx) {
+  const { b, t } = ctx, h0 = 0.1, ch = 0.2;
+  b.box(1, h0, 1, ASHLAR_D);
+  for (let i = 0; i < 3; i++) { const w = 1 - (i % 2) * 0.014; b.box(w, ch, w, i % 2 ? WALLSTONE : ASHLAR, 0, h0 + i * ch, 0); }
+  const y = h0 + 3 * ch;
+  b.box(1, 0.07, 1, t, 0, y, 0).box(1, 0.05, 1, MARBLE, 0, y + 0.07, 0);
+  const py = y + 0.12;
+  b.box(0.84, 0.02, 0.84, PAVING, 0, py, 0);
+  for (const [x, z, w, d] of [[0, 0.45, 0.82, 0.1], [0, -0.45, 0.82, 0.1], [0.45, 0, 0.1, 0.82], [-0.45, 0, 0.1, 0.82]]) b.box(w, 0.14, d, ASHLAR, x, py, z);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.16, 0.22, 0.16, ASHLAR_D, x * 0.41, py, z * 0.41).box(0.18, 0.03, 0.18, MARBLE_D, x * 0.41, py + 0.22, z * 0.41);
+  return py + 0.25;
 }

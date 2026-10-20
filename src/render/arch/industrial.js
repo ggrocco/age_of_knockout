@@ -3,10 +3,11 @@
 // steam, beside today's kept Factory (legacy.js). Brick works and row houses, brick grain silos with their elevator, a
 // goods depot with a steam gantry crane, ploughed rows with a traction engine, a castellated armoury with a searchlight,
 // a rifle range of sandbagged lanes, a horse depot on a siding, a glass-vaulted shopping arcade, a clock-tower parliament,
-// an iron lattice tower and an armoured fort with gun turrets.
+// an iron lattice tower and an armoured fort with gun turrets; for defence, a machine-gun nest on a brick tower and a
+// breastwork of sandbags and barbed wire.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, gear, puff, stick, lerp, hash, place, horse, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM, ARCH, ARCH_RING, WEDGE, HORSE_HEAD, sack, barrel } from './kit.js';
+import { P, flag, gear, puff, stick, lerp, hash, place, horse, streak, muzzleFlash, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM, ARCH, ARCH_RING, WEDGE, HORSE_HEAD, sack, barrel } from './kit.js';
 
 export function house(ctx) {
   const { b, extra, s, td } = ctx, W = s - 0.25, D = s - 0.35;
@@ -793,4 +794,64 @@ export function castle(ctx) {
   b.cylT(0.12, 0.12, 0.08, IRON, 0.18, kt, 0.12, 10).add(DOME, IRON_D, 0.18, kt + 0.08, 0.12, 0.12, 0.08, 0.12);
   flag(ctx, -0.1, kt, 0.28, 0.7, IRON);
   return kt + 0.42;
+}
+
+// ---------- Industrial defences ----------
+// Tower: a machine-gun nest on a brick tower. A square brick tower on a blue-brick plinth with buff string courses, a
+// team band and cast-iron windows, a team-painted iron door at its foot and an iron ladder up its side. Its corbelled
+// top is ringed with sandbags round a Maxim gun on its tripod behind a steel shield, ammunition boxes stencilled in
+// team colour beside it, a searchlight on the back corner and the flag. Its shot is the gun's burst: a muzzle flash and
+// a tracer (extra.fire), which blinks as the gun keeps firing.
+export function tower(ctx) {
+  const { b, t, extra } = ctx, W = 1.05, h = W / 2;
+  b.box(1.76, 0.03, 1.76, SETT);
+  const top = block(b, 0, 0, W, W, 2.0);
+  for (const y of [0.75, 1.42]) b.box(W + 0.02, 0.05, W + 0.02, BUFF, 0, y, 0);
+  b.box(W + 0.025, 0.1, W + 0.025, t, 0, 1.8, 0);
+  iwins(b, 0, h, 0, W, 2, [0.95, 1.55], 0.12, 0.22); iwins(b, h, 0, Math.PI / 2, W, 2, [0.95, 1.55], 0.12, 0.22);
+  b.box(0.3, 0.54, 0.02, IRON_D, 0, 0.11, h + 0.006).box(0.24, 0.5, 0.02, t, 0, 0.11, h + 0.012).box(0.36, 0.06, 0.03, BUFF, 0, 0.65, h + 0.012);
+  // The iron ladder up the +x face.
+  const lx = h + 0.05;
+  for (const z of [-0.2, -0.38]) b.box(0.02, top + 0.3 - 0.11, 0.02, IRON_D, lx, 0.11, z);
+  for (let y = 0.3; y < top + 0.3; y += 0.16) b.box(0.016, 0.016, 0.18, IRON, lx, y, -0.29);
+  // The corbelled deck and its ring of sandbags.
+  b.box(W + 0.12, 0.06, W + 0.12, BRICK_D, 0, top, 0).box(W + 0.22, 0.07, W + 0.22, BUFF_D, 0, top + 0.06, 0);
+  const dy = top + 0.13, e = (W + 0.22) / 2 - 0.06;
+  for (const [p, q] of [[[-e, e], [e, e]], [[e, e], [e, -e]], [[e, -e], [-e, -e]], [[-e, -e], [-e, e]]]) sandbags(b, p, q, 3, dy);
+  // The Maxim gun on its tripod, firing over the bags toward the camera side, behind a steel shield.
+  const d = [0.447, 0, 0.894], ry = Math.atan2(d[0], d[2]), gx = 0.02, gz = 0.06, gy = dy + 0.27, at = f => [gx + d[0] * f, gy, gz + d[2] * f];
+  for (const a of [ry + Math.PI, ry + Math.PI / 3, ry - Math.PI / 3]) stick(b, 0.014, IRON_D, [gx + Math.sin(a) * 0.2, dy, gz + Math.cos(a) * 0.2], [gx, gy - 0.04, gz], CYL6);
+  b.box(0.09, 0.09, 0.24, GUN, ...at(-0.04).map((v, i) => i === 1 ? v - 0.045 : v), 0, ry);
+  stick(b, 0.045, IRON, at(0.08), at(0.4), CYL8); stick(b, 0.022, GUN, at(0.4), at(0.48), CYL6);
+  b.box(0.34, 0.2, 0.02, IRON_D, ...at(0.14).map((v, i) => i === 1 ? v - 0.12 : v), 0, ry).box(0.3, 0.04, 0.024, t, ...at(0.14).map((v, i) => i === 1 ? v - 0.02 : v), 0, ry);
+  for (const [x, z] of [[-0.3, 0.18], [-0.3, 0.36]]) crate(b, x, dy, z, 0.13, 0.3, t);
+  searchlight(b, -0.36, dy, -0.36, [0.62, 0.22, 0.75]);
+  flag(ctx, 0.44, dy, -0.44, 0.85, IRON);
+  // The burst: a flash at the muzzle and a tracer streaking on from it.
+  const fire = new B(), m = at(0.5);
+  muzzleFlash(fire, m, d, 1.6);
+  streak(fire, [m[0] + d[0] * 0.4, m[1], m[2] + d[2] * 0.4], [m[0] + d[0] * 1.2, m[1] - 0.1, m[2] + d[2] * 1.2], 0.02, undefined, P.ember, 0.05);
+  extra.fire = { geo: fire.geometry(), at: [0, 0, 0] };
+  return dy + 0.4;
+}
+
+// Wall: sandbags and barbed wire. Three courses of sandbags laid in bond, alternately along x and along z, on the bare
+// ground, with team-painted iron pickets carrying a zigzag of barbed wire along the top both ways; it fills its tile
+// edge to edge, so segments in a line close up into one breastwork and the wire runs on from one to the next.
+export function wall(ctx) {
+  const { b, t } = ctx, ch = 0.13;
+  for (let c = 0; c < 3; c++) for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+    const u = (i - 1) * 0.34, v = (j - 0.5) * 0.52, [x, z] = c % 2 ? [v, u] : [u, v], k = hash(i + c * 3, j);
+    const [w, d] = c % 2 ? [0.48, 0.32] : [0.32, 0.48], sx = Math.sign(x), sz = Math.sign(z);
+    // The outer bags lie flush with the tile's edge; the rest sit a little apart.
+    const bw = w - 0.02 - k * 0.02, bd = d - 0.02 - k * 0.015;
+    b.box(bw, ch - 0.01, bd, k > 0.55 ? SAND_D : SAND, x + sx * (w - bw) / 2, c * ch, z + sz * (d - bd) / 2);
+  }
+  const y = 3 * ch - 0.01;
+  for (const [x, z] of [[-0.245, 0], [0.245, 0], [0, -0.245], [0, 0.245]]) b.box(0.03, 0.34, 0.03, t, x, y, z);
+  for (const axis of [0, 1]) for (let i = 0; i < 4; i++) {
+    const u0 = -0.49 + i * 0.245, u1 = u0 + 0.245, y0 = y + (i % 2 ? 0.3 : 0.06), y1 = y + (i % 2 ? 0.06 : 0.3);
+    stick(b, 0.015, CORR, axis ? [0, y0, u0] : [u0, y0, 0], axis ? [0, y1, u1] : [u1, y1, 0], unit.box);
+  }
+  return y + 0.34;
 }
