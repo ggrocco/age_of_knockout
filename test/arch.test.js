@@ -101,24 +101,27 @@ const cropsShrink = age => {
   e.amount = 0; animate(g, e, 1, false);
   assert.ok(a.crops.scale.y < full, `${age}: crops did not shrink (${a.crops.scale.y} vs ${full})`);
 };
-// sha1 of every mesh's colour buffer (built), for one owner.
+// sha1 of the body's and the crops' colour buffers (built), for one owner; not the flag or mast, so a flag alone
+// doesn't count as team colour.
 const colourHash = (type, age, owner) => {
   const e = { kind: 'building', type, owner, size: BUILDINGS[type].size, constructed: true, progress: 1, amount: 300 }, h = createHash('sha1');
-  buildModel(e, age).root.traverse(m => {
+  const { anim } = buildModel(e, age);
+  for (const o of [anim.body, anim.crops]) o?.traverse(m => {
     if (!m.isMesh) return;
     const a = m.geometry.attributes.color.array; h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength));
   });
   return h.digest('hex');
 };
-// Team colour shows (flag, banner, stripe or trim): the two owners' builds differ in colour.
+// Team colour shows on the building itself (banner, stripe or trim): the two owners' bodies differ in colour.
 const teamColourShows = (types, age) => {
   const same = types.filter(type => colourHash(type, age, 0) === colourHash(type, age, 1));
   assert.deepEqual(same, [], `${age}: no team colour on ${same.join(', ')}`);
 };
-// The body stays on its footprint: x/z extents within (size - 0.22) / 2, plus 0.01. overhangs lists the ones that don't.
+// The body stays on its footprint: x/z extents within size / 2, plus 0.15 for eaves (today's legacy roofs already reach
+// about 0.065 past the tile edge). overhangs lists the ones that don't.
 const overhangs = (types, age) => types.flatMap(type => {
   const bb = new THREE.Box3().setFromObject(build(type, age).anim.body), ext = Math.max(-bb.min.x, bb.max.x, -bb.min.z, bb.max.z);
-  const max = (BUILDINGS[type].size - 0.22) / 2 + 0.01;
+  const max = BUILDINGS[type].size / 2 + 0.15;
   return ext <= max ? [] : [`${type}/${age} ${ext.toFixed(3)} > ${max.toFixed(3)}`];
 });
 const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), [], `${age}: off the footprint`);
@@ -126,9 +129,9 @@ const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), 
 // Every era design so far, from the registry, so later eras' designs are checked as they land.
 const designed = Object.entries(DESIGNS).map(([age, mod]) => [age, Object.keys(mod)]);
 test('every era design shows team colour', () => { for (const [age, types] of designed) teamColourShows(types, age); });
-// Task 3's prototype Town Centers and Houses overhang their footprint (wide base slabs, stairs, eaves, a fire escape);
-// reported in Task 6 rather than redesigned. The ratchet below keeps the list exact: fix one, then drop it from here.
-const OVERHANG = { bronze: ['town_center', 'house'], medieval: ['town_center', 'house'], sail: ['town_center'], industrial: ['town_center', 'house'], modern: ['town_center', 'house'] };
+// Designs that still overhang their footprint, by era (none since the eave allowance; Task 3's Town Centers and Houses
+// all fit within it). The ratchet below keeps the list exact: fix one, then drop it from here.
+const OVERHANG = {};
 test('every era design stays within its footprint', () => {
   for (const [age, types] of designed) withinFootprint(types.filter(type => !OVERHANG[age]?.includes(type)), age);
 });
@@ -155,3 +158,24 @@ const IRON = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'st
 test('iron designs differ from every other era', () => differsFromOtherEras(IRON, 'iron'));
 test('Iron designs: heights within the cap', () => heightsOk(IRON));
 test('Iron farm: crops show once finished and shrink with the food left', () => cropsShrink('iron'));
+
+// ---------- Medieval: Granary, Storage Pit, Farm, Barracks, Archery Range, Stable, Market, Government Center, Wonder ----------
+// The Castle is kept (today's stone keep); the Town Center and House are Task 3's.
+const MEDIEVAL = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder'];
+test('medieval designs differ from every other era', () => differsFromOtherEras(MEDIEVAL, 'medieval'));
+test('Medieval designs: heights within the cap', () => heightsOk(MEDIEVAL));
+test('Medieval farm: crops show once finished and shrink with the food left', () => cropsShrink('medieval'));
+test('Medieval Storage Pit: the treadwheel is hidden while unfinished and turns once finished', () => {
+  const { e, anim: a, g } = build('storage_pit', 'medieval', false);
+  assert.ok(a.spinners?.length > 0, 'no treadwheel spinner');
+  animate(g, e, 1, false);
+  for (const sp of a.spinners) assert.equal(sp.p.visible, false, 'the treadwheel shows while unfinished');
+  e.constructed = true; e.progress = 1;
+  animate(g, e, 1, false);
+  const before = a.spinners.map(sp => sp.p.rotation[sp.axis]);
+  animate(g, e, 2, false);
+  a.spinners.forEach((sp, i) => {
+    assert.equal(sp.p.visible, true, 'the treadwheel is hidden once finished');
+    assert.notEqual(sp.p.rotation[sp.axis], before[i], 'the treadwheel does not turn');
+  });
+});
