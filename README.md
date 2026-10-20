@@ -4,68 +4,153 @@ A browser RTS in the spirit of Age of Empires I (1997), played as a 32-player kn
 against AI. Five rounds, each a different game type: Standard (conquest), Death Match, Regicide, Wonder Race,
 Capture the Relics. Lose once and you're out.
 
+![A Bronze Age base in Wonder Race: mud-brick houses, two towers and a Wonder under construction](docs/screenshots/wonder.jpg)
+
 ## Run
 
 ```
 npm install
 npm start                       # node serve.js, then open http://localhost:8000/
-npm test                         # simulation, UI-data, and render-model tests
-node test/bot-sim.js 12          # bot-vs-bot termination check, 12 seeds x 5 rounds
+npm test                        # simulation, rounds, bot, bracket, data and render-model tests
+node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rounds
 ```
 
-To review the building designs, open `http://localhost:8000/buildings.html`. It shows every building in every age, rendered with the game's own models (Fit/True scale, Blue/Red team; click a building to orbit it or see it under construction). The page reads `src/data`, so new ages and buildings appear on reload.
+No build step: plain ES modules, with three.js loaded through the import map in `index.html`.
 
-On desktop, hover or keyboard-focus a Quick game button, bracket round heading, or the in-game objective
-or clock for a card explaining the mode's goal, time limit and scoring rules. The clock shows elapsed / limit.
-Normal and Hard allow 25 minutes of game time (Death Match: 20); Relaxed allows 40 minutes in every mode.
-If no one wins before the limit, the higher score wins. Speed controls change how quickly game time passes;
-pausing stops the clock.
+## How a tournament works
 
-Check **No time limit** in the main menu to play quick matches and your tournament rounds without a
-score deadline. The choice is saved in this browser; uncheck it to restore the difficulty's usual limit.
-The clock shows `elapsed / ∞`, and normal victory conditions, Wonder/relic countdowns and resigning
-still end a match. Use `?noTimeLimit=1` (or `0`) to override the saved choice for a session.
+![Main menu: difficulty picker, No time limit option, Begin Tournament and the five quick-match buttons](docs/screenshots/menu.jpg)
 
-## Deploy (Docker)
+Pick a **difficulty** and press **Begin Tournament**, or jump straight into one game type with a **Quick** button.
+The difficulty sets the opponent for each of your five rounds:
 
+| Level | Round 1 | Round 2 | Round 3 | Round 4 | Round 5 |
+| --- | --- | --- | --- | --- | --- |
+| Relaxed | relaxed | relaxed | relaxed | relaxed | relaxed |
+| Normal | easy | easy | medium | medium | hard |
+| Hard | medium | medium | hard | hard | hard |
+
+Relaxed opponents work at half your speed and wait 30 minutes, and until the Bronze Age, before attacking.
+
+![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
+
+Before each round the bracket shows the rules, the time limit and your opponent. The other matches in each round are
+played out by bots in the background.
+
+| Round | Game type | Goal |
+| --- | --- | --- |
+| 1 | Standard Game | Destroy all enemy units and buildings |
+| 2 | Death Match | Start in the Iron Age with 20,000 of every resource; destroy the enemy |
+| 3 | Regicide | Kill the enemy king, protect yours |
+| 4 | Wonder Race | Build a Wonder (Bronze Age) and keep it standing for 3 minutes |
+| 5 | Capture the Relics | Hold all 5 relics in your Town Center for 3 minutes |
+
+**Time limits.** Normal and Hard allow 25 minutes of game time (Death Match: 20); Relaxed allows 40 minutes in
+every mode. If no one wins before the limit, the higher score wins. Speed controls change how quickly game time
+passes; pausing stops the clock, which shows elapsed / limit. On desktop, hover or keyboard-focus a Quick button, a
+bracket round heading, or the in-game objective or clock for a card with the mode's goal, time limit and scoring.
+
+Check **No time limit** in the main menu to play quick matches and your tournament rounds without a score
+deadline. The choice is saved in this browser. The clock then shows `elapsed / ∞`, and normal victory conditions,
+Wonder/relic countdowns and resigning still end a match.
+
+## Playing
+
+![Stone Age village with the Town Center selected: the HUD offers Villager, Advance: Tool and Delete](docs/screenshots/village.jpg)
+
+You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few villagers on a 96-tile map, at a random point on a ring
+around the centre (the opponent mirrors you). Gather food, wood, gold and stone, build houses for population, and
+**advance through nine eras**: Stone, Tool, Bronze, Iron, Medieval, Age of Sail, Industrial, Modern and AI Future.
+Each era unlocks units and buildings and changes how your buildings look.
+
+![Industrial Age Death Match base: brick houses with chimneys, a factory, a castle and red-brick towers](docs/screenshots/deathmatch.jpg)
+
+**Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
+era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
+where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
+
+### Controls (desktop)
+
+Left click / drag select (double-click: all of a type) · right click move / gather / build / attack / fetch relic ·
+WASD or arrows pan, wheel zooms · `.` next idle villager, `H` Town Center, Space pause, Esc cancel · click the
+minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
+
+### Controls (phone / touch)
+
+<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
+
+Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
+tree/mine/farm = gather, unfinished building = help build, relic = pick up). One finger drags the map, two fingers
+pinch-zoom and pan.
+
+Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap
+or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit.
+
+Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a
+real iPhone.
+
+<br clear="right">
+
+## Buildings by era
+
+![buildings.html: Town Center, House, Granary, Storage Pit and Farm rendered in every era from Stone to Modern](docs/screenshots/gallery.jpg)
+
+Open `http://localhost:8000/buildings.html` to see every building in every era, rendered with the game's own
+models. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
+reads `src/data`, so new eras and buildings appear on reload.
+
+## How it's built
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    input["src/ui input<br/>(mouse, keys, touch)"]
+    view["src/render<br/>Three.js view"]
+    hud["src/ui HUD"]
+  end
+  bot["src/ai/bot.js"]
+  cmds["src/sim/commands.js<br/>execute()"]
+  sim["src/sim game.js<br/>deterministic · seeded RNG · 20 ticks/s"]
+  rounds["src/rounds<br/>win checks · time caps"]
+  data[("src/data<br/>units · buildings · ages · techs · defences")]
+  tour["src/tournament<br/>bracket + headless runner"]
+
+  input --> cmds
+  bot --> cmds
+  cmds --> sim
+  data --> sim
+  sim --> rounds
+  sim -. reads state .-> view
+  sim -. reads state .-> hud
+  tour --> sim
 ```
-docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PORT=9000 to change)
-```
 
-The image is static files only (`index.html`, `styles.css`, `src/`, the two three.js folders the import map
-uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .` builds the same image.
+The player and the bot change the game only through `commands.js`. The simulation in `src/sim` has no DOM and a
+seeded RNG, so the same match runs headlessly in tests, in `test/bot-sim.js` and for the other bracket matches. The renderer and HUD only read its state.
 
-## CI (Jenkins)
-
-`Jenkinsfile` runs the unit tests (JUnit report), `test/bot-sim.js 12`, then builds the nginx image and
-smoke-tests it (page, CSS, JS and both three.js import-map paths served with the right content type). Everything
-runs in Docker, so the agent needs only the docker CLI with a reachable daemon (e.g. Jenkins in a container with
-`/var/run/docker.sock` mounted and the docker CLI installed) and the JUnit plugin. Nothing is pushed or deployed.
-Same tests without Jenkins:
-
-```
-docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test
-```
-
-URL parameters: `?round=1..5` (quick match), `&opp=easy|medium|hard`, `&seed=N`, `&speed=N`,
-`&autoplay=1` (a bot plays your side, `&bot=` sets its difficulty), `?autotour=1` (whole tournament on autopilot).
-`window.__app` exposes the live game for debugging.
+- `src/sim`: game state, unit orders, A* pathfinding, fog of war, towers and walls, map generation.
+- `src/rounds`: the five game types, their win checks, time caps and score tiebreak.
+- `src/ai`: the bot (relaxed / easy / medium / hard); it also plays your side with `&autoplay=1`.
+- `src/tournament`: the 32-player bracket and headless match runner.
+- `src/render`, `src/ui`, `src/main.js`: Three.js view, per-era building designs (`src/render/arch`), HUD, input
+  and tournament flow.
+- `src/data`: unit, building, age, tech and defence tables. Unit combat and cost stats are checked against
+  openage's AoE1 manual data; buildings, age-up costs, techs, towers/walls and AI Future content are approximations
+  or invented. See `src/data/README.md` for every deviation from AoE1.
 
 ## Rendering
 
-The Three.js view uses warm directional lighting, filtered shadows, sky reflections, textured
-wood/stone/metal, wind-blown grass, and reflective water with animated normals and shoreline foam.
-High and Ultra add ambient occlusion for depth around buildings, foliage and units.
-Buildings use timber and detailed thatch in the Stone/Tool
-ages, with tiled roofs and masonry details from Bronze onward. Trees have irregular crowns and roots;
-units have articulated equipment, including separate drone, mech, and railgun models for AI Future.
-These are original procedural interpretations of an ancient RTS setting, not original Age of Empires assets.
+The Three.js view uses warm directional lighting, filtered shadows, sky reflections, textured wood/stone/metal,
+wind-blown grass, and reflective water with animated normals and shoreline foam. High and Ultra add ambient
+occlusion for depth around buildings, foliage and units. Every era has its own building designs, from hide tents and
+thatch through mud brick, terracotta tile, castles, colonial whitewash, industrial brick and modern concrete to AI Future
+glass. Units have articulated equipment, including separate drone, mech and railgun models for AI Future. These are
+original procedural models (no image or model files), not Age of Empires assets.
 
-Choose **Settings → Graphics quality** on desktop, or open the top-right menu on a phone.
-Changes apply without restarting the match and are saved in this browser. The default is **High**;
-try High on an iPhone 17 Pro and Ultra on an M2 Max, then adjust for frame rate and battery use.
-These are starting recommendations, not measured performance guarantees on those devices.
-Use `&quality=balanced|high|ultra` to override the saved preference when opening a match.
+Choose **Settings → Graphics quality** on desktop, or open the top-right menu on a phone. Changes apply without
+restarting the match and are saved in this browser. The default is **High**; try High on an iPhone 17 Pro and Ultra
+on an M2 Max, then adjust for frame rate and battery use. These are starting recommendations, not measured
+performance guarantees on those devices. Use `&quality=balanced|high|ultra` to override the saved preference.
 
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Grass clumps |
 | --- | --- | --- | --- | --- |
@@ -73,32 +158,58 @@ Use `&quality=balanced|high|ultra` to override the saved preference when opening
 | High | 2 / 4 million | 2048 | Half resolution, 12 samples | 8,000 |
 | Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | 14,000 |
 
-No extra assets, network downloads, or build step are needed. Geometry is shared between models and
-grass is instanced. Decorative grass respects fog and building/resource footprints. Float render-target
-support is checked before enabling sky reflections and ambient occlusion; direct rendering remains available.
-`test/render-models.test.js` checks every unit and building age for valid geometry and animation transforms.
-`test/graphics-quality.test.js` covers preference handling, pixel budgets and the rendering fallback.
-Browser checks are still necessary for shaders, picking, lighting, and visual quality. Try
-`?round=1&seed=1` for the starting village and `?round=3&seed=1&touch=1` for the phone layout.
+No extra assets, network downloads, or build step are needed. Geometry is shared between models, every model is
+drawn through one batched mesh, and grass is instanced. Decorative grass respects fog and building/resource
+footprints. Float render-target support is checked before enabling sky reflections and ambient occlusion; direct
+rendering remains available. `test/render-models.test.js` checks every unit and building era for valid geometry and
+animation transforms, and `test/graphics-quality.test.js` covers preference handling, pixel budgets and the
+rendering fallback. Shaders, picking, lighting and visual quality are checked in a browser.
 
-## Controls (phone / touch)
+## URL parameters
 
-Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack, tree/mine/farm = gather, unfinished building = help build, relic = pick up). One finger drags the map, two fingers pinch-zoom and pan. Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit. Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a real iPhone.
+| Param | Effect |
+| --- | --- |
+| `?round=1..5` | Start that round as a quick match, skipping the menus |
+| `&opp=relaxed\|easy\|medium\|hard` | Opponent for `?round=` (default `medium`) |
+| `&seed=N` | Replay a map; without it every match gets a fresh map and start position |
+| `&speed=N` | Game speed multiplier |
+| `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets its difficulty (default `hard`) |
+| `?autotour=1` | Whole tournament on autopilot |
+| `?level=relaxed\|normal\|hard` | Tournament difficulty, overriding the saved menu pick |
+| `?noTimeLimit=1\|0` | Override the saved No time limit choice |
+| `?touch=1` | Force the touch layout |
+| `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
+| `&quality=balanced\|high\|ultra` | Graphics preset |
 
-## Controls (desktop)
+`window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,
+`?round=2&seed=3&autoplay=1&speed=8` to watch two bots race through the eras, and `?round=3&seed=1&touch=1` for the
+phone layout.
 
-Left click / drag select (double-click: all of a type) - right click move / gather / build / attack / fetch relic -
-WASD or arrows pan, wheel zooms - `.` next idle villager, `H` Town Center, Space pause, Esc cancel -
-click the minimap to jump. Select villagers to get the build menu, select a building to train / advance Age.
+## Deploy (Docker)
 
-## Layout
+```
+docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PORT=9000 to change)
+```
 
-`src/sim` deterministic simulation (no DOM, seeded RNG, 20 ticks/s) - `src/data` unit/building tables
-(**unverified approximations**, see `src/data/README.md`) - `src/ai` bot - `src/rounds` game types and win checks -
-`src/tournament` bracket and headless match runner - `src/render`, `src/ui`, `src/main.js` Three.js view, HUD, input.
+The image is static files only (`index.html`, `buildings.html`, `styles.css`, `favicon.svg`, `src/`, the two
+three.js folders the import map uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .`
+builds the same image.
+
+## CI (Jenkins)
+
+`Jenkinsfile` runs the unit tests (JUnit report), `test/bot-sim.js 12`, then builds the nginx image and smoke-tests
+it (page, CSS, JS and both three.js import-map paths served with the right content type). Everything runs in Docker,
+so the agent needs only the docker CLI with a reachable daemon (e.g. Jenkins in a container with
+`/var/run/docker.sock` mounted and the docker CLI installed) and the JUnit plugin. Nothing is pushed or deployed.
+Same tests without Jenkins:
+
+```
+docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test
+```
 
 ## Status
 
-See the final report in the session that built this; in short: rules, AI and bracket are bot-tested; the
-renderer/UI was checked with screenshots and scripted events; feel, balance and fidelity to the original were
-not judged by a human.
+Rules, AI and bracket are covered by headless tests and bot-vs-bot runs; the renderer and UI were checked with
+browser screenshots and scripted events. Feel, balance and fidelity to the original have not been judged by a human
+player. `progress.md` records rulings, known gaps and deferred issues; design specs and plans are in
+`docs/superpowers/`. Contributor and agent notes are in `AGENTS.md`.
