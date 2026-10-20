@@ -21,6 +21,11 @@ Normal and Hard allow 25 minutes of game time (Death Match: 20); Relaxed allows 
 If no one wins before the limit, the higher score wins. Speed controls change how quickly game time passes;
 pausing stops the clock.
 
+Check **No time limit** in the main menu to play quick matches and your tournament rounds without a
+score deadline. The choice is saved in this browser; uncheck it to restore the difficulty's usual limit.
+The clock shows `elapsed / ∞`, and normal victory conditions, Wonder/relic countdowns and resigning
+still end a match. Use `?noTimeLimit=1` (or `0`) to override the saved choice for a session.
+
 ## Deploy (Docker)
 
 ```

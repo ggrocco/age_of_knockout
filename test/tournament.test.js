@@ -23,12 +23,19 @@ test('chosen level sets the opponent ramp', () => {
   assert.deepEqual(ramp('hard'), ['medium', 'medium', 'hard', 'hard', 'hard']);
   assert.deepEqual(ramp('bogus'), ramp('normal'));
 });
-test('real off-screen simulation resolves round 1', () => {
-  const t = createTournament(2); t.resolve(true); assert.equal(t.alive.length, 16); assert.equal(t.history[0].results.length, 16);
+test('off-screen simulation still resolves with no time limit on human rounds', () => {
+  const t = createTournament(2, 'normal', { noTimeLimit: true }); t.resolve(true); assert.equal(t.alive.length, 16); assert.equal(t.history[0].results.length, 16);
 });
 test('resolveAsync gives the same bracket as resolve', async () => {
   const stubSim = (id, seed) => ({ winner: seed % 2, reason: 'stub' });
   const a = createTournament(3), b = createTournament(3); a.resolve(true, stubSim); let prog = 0;
   await b.resolveAsync(true, { simulate: stubSim, onProgress: () => prog++ });
   assert.deepEqual(a.alive.map(p => p.id), b.alive.map(p => p.id)); assert.equal(prog, 15);
+});
+
+test('tournament remembers the no-time-limit choice for all five human rounds', () => {
+  assert.equal(createTournament(1).noTimeLimit, false);
+  const t = createTournament(1, 'relaxed', { noTimeLimit: true });
+  while (!t.over) { assert.equal(t.noTimeLimit, true); t.resolve(true, stub([])); }
+  assert.equal(t.champion.id, 0);
 });

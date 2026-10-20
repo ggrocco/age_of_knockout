@@ -19,14 +19,14 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 
 Buildings-by-era design page: `http://localhost:8000/buildings.html` (`?team=1`, `?scale=true`). It renders every building in every age with the game's own models, and its rows and columns come straight from `src/data`, so new ages and buildings show up on reload with no page edits.
 
-Useful URL params: `?round=1..5&opp=relaxed|easy|medium|hard&seed=N&speed=N`, `?level=relaxed|normal|hard` (tournament difficulty, else the menu pick saved in localStorage), `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
+Useful URL params: `?round=1..5&opp=relaxed|easy|medium|hard&seed=N&speed=N`, `?level=relaxed|normal|hard` (tournament difficulty, else the menu pick saved in localStorage), `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?noTimeLimit=1|0` (override the saved main-menu time-limit choice), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
 
 ## Architecture
 
 A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI; five rounds, each a different win condition.
 
 - `src/sim` — the game itself: **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (game.js) owns all state (entities/units/buildings/resources/relics Maps, occupancy grid); the player and the bot both act only through `commands.js` `execute`, and per-unit behaviour lives in `orders.js`. Keep it DOM-free and deterministic so the headless runner and tests work.
-- `src/rounds/index.js` — per-round rules: `check(game)` returns null or `{winner, reason}`; every round has a tick cap plus a score tiebreak (`scoreOf`), so matches always terminate.
+- `src/rounds/index.js` — per-round rules: `check(game)` returns null or `{winner, reason}`; rounds normally have a tick cap plus a score tiebreak (`scoreOf`). The main-menu No time limit option sets `capTicks: Infinity` for human matches; off-screen bracket matches keep finite caps so resolution always terminates.
 - `src/ai/bot.js` — the bot (easy/medium/hard); it is given the enemy start location. Also drives `?autoplay`.
 - `src/tournament` — bracket and a headless match runner (`sim.js`), used by tests and `test/bot-sim.js`.
 - `src/render`, `src/ui`, `src/main.js` — Three.js view (procedural, vertex-colour-baked models in `render/models.js`), HUD, desktop + touch input, tournament flow. Reads sim state; never mutates it except via commands.

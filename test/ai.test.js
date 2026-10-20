@@ -131,3 +131,9 @@ test('an army whose sweep move fails goes on to the next waypoint instead of ret
   const next = b.sweep[1];
   assert.ok(army.every(u => u.order.type === 'move' && u.order.x === next.x + 0.5 && u.order.y === next.y + 0.5), JSON.stringify(army.map(u => u.order)));
 });
+
+test('disabling time limits overrides difficulty caps while keeping the bot handicap', () => {
+  assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: true }), { workRate: [1, 0.5], capTicks: Infinity });
+  assert.deepEqual(matchOptions(['hard', 'easy'], { noTimeLimit: true }), { workRate: [1, 1], capTicks: Infinity });
+  assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
+});

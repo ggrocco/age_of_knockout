@@ -19,7 +19,10 @@ export const DIFF = {
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
 // createGame options for a match between these bot difficulties (null = a human player): each bot's handicap,
 // and the longest time limit any of them asks for (undefined keeps the round's own).
-export const matchOptions = diffs => ({ workRate: diffs.map(d => DIFF[d]?.work ?? 1), capTicks: Math.max(0, ...diffs.map(d => DIFF[d]?.cap ?? 0)) || undefined });
+export const matchOptions = (diffs, { noTimeLimit = false } = {}) => ({
+  workRate: diffs.map(d => DIFF[d]?.work ?? 1),
+  capTicks: noTimeLimit ? Infinity : Math.max(0, ...diffs.map(d => DIFF[d]?.cap ?? 0)) || undefined,
+});
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 

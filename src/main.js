@@ -8,7 +8,7 @@ import { createHud, reasonText } from './ui/hud.js';
 import { createInput } from './ui/input.js';
 import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
-import { roundTimeLabel, TIME_LIMIT_RULE } from './ui/tips.js';
+import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
@@ -17,10 +17,13 @@ const screenEl = document.getElementById('screen'), app = { tournament: null, ma
 window.__app = app;
 let gpuWarned = false;
 // Tournament difficulty level: ?level= wins, else the last pick (browser storage may be unavailable), else Normal.
-const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking. Matches last up to 40 minutes.', normal: 'The standard ramp, from easy to hard opponents.', hard: 'Tough opponents from the first round.' };
+const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking.', normal: 'The standard ramp, from easy to hard opponents.', hard: 'Tough opponents from the first round.' };
 const storedLevel = () => { try { return localStorage.getItem('level'); } catch { return null; } };
 let level = [params.get('level'), storedLevel()].find(l => Object.hasOwn(LEVELS, l ?? '')) || 'normal';
 function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catch {} }
+const storedNoTimeLimit = () => { try { return localStorage.getItem('noTimeLimit') === 'true'; } catch { return false; } };
+let noTimeLimit = params.has('noTimeLimit') ? params.get('noTimeLimit') === '1' : storedNoTimeLimit();
+function setNoTimeLimit(value) { noTimeLimit = value; try { localStorage.setItem('noTimeLimit', String(value)); } catch {} }
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
 const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
 
@@ -46,19 +49,19 @@ function endMatch() {
   ui.view?.dispose(); ui.view = null; ui.game = null; ui.minimap = null;
 }
 
-function updateRoundCaps(diffs) {
-  ui.roundCaps = Object.fromEntries(ROUNDS.map((r, i) => [r.id, matchOptions([null, diffs[i]]).capTicks ?? r.capTicks]));
+function updateRoundCaps(diffs, unlimited = noTimeLimit) {
+  ui.roundCaps = Object.fromEntries(ROUNDS.map((r, i) => [r.id, matchOptions([null, diffs[i]], { noTimeLimit: unlimited }).capTicks ?? r.capTicks]));
   hud.hideTip();
 }
 
 function show(html) { hud.hideTip(); screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
 function hide() { hud.hideTip(); screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 
-function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
+function startMatch({ roundId, seed, oppDiff, label, onEnd, unlimited = noTimeLimit }) {
   endMatch();
   document.body.classList.add('ingame');
   const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO; // botDiff: the bot that drives player 0 in autoplay/test modes
-  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff]) });
+  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff], { noTimeLimit: unlimited }) });
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
@@ -110,9 +113,9 @@ function bracketHtml(t) {
 }
 function bracketScreen() {
   const t = app.tournament, r = t.round, o = t.opponent;
-  updateRoundCaps(LEVELS[t.level]);
-  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>Time limit: <b>${roundTimeLabel(r, ui.roundCaps[r.id])} of game time.</b> ${TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
-  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, onEnd: won => afterMatch(won) });
+  updateRoundCaps(LEVELS[t.level], t.noTimeLimit);
+  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
+  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, unlimited: t.noTimeLimit, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
   const t = app.tournament;
@@ -123,7 +126,7 @@ async function afterMatch(won) {
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);
   document.getElementById('again').onclick = menu;
 }
-function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1), level); bracketScreen(); }
+function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1), level, { noTimeLimit }); bracketScreen(); }
 
 function menu() {
   updateRoundCaps(LEVELS[level]);
@@ -133,13 +136,19 @@ function menu() {
   ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, or pick up relics</span>
   <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager, jump to Town Center</span><b>Space, Esc</b><span>pause, cancel</span></div>`}
   <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
+  <label class="time-option"><input type="checkbox" id="no-time-limit" aria-describedby="time-limit-help" ${noTimeLimit ? 'checked' : ''}> No time limit</label>
+  <p id="time-limit-help"><small>Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</small></p>
   <button class="btn" data-auto id="start">Begin Tournament</button><br>
-  ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" data-tip="round:${r.id}" aria-describedby="tip" style="font-size:14px;padding:5px 12px">Quick: ${r.name}<small>${roundTimeLabel(r, ui.roundCaps[r.id])} of game time</small></button>`).join('')}</div>`);
+  ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" data-tip="round:${r.id}" aria-describedby="tip" style="font-size:14px;padding:5px 12px">Quick: ${r.name}<small>${roundLimitText(r, ui.roundCaps[r.id])}</small></button>`).join('')}</div>`);
   document.getElementById('start').onclick = startTournament;
+  const refreshOptions = () => {
+    updateRoundCaps(LEVELS[level]);
+    for (const quick of document.querySelectorAll('.quick')) { const r = ROUNDS[+quick.dataset.i]; quick.querySelector('small').textContent = roundLimitText(r, ui.roundCaps[r.id]); }
+  };
+  document.getElementById('no-time-limit').onchange = e => { setNoTimeLimit(e.target.checked); refreshOptions(); };
   for (const b of document.querySelectorAll('.level .btn')) b.onclick = () => {
     setLevel(b.dataset.level); document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
-    updateRoundCaps(LEVELS[level]);
-    for (const quick of document.querySelectorAll('.quick')) { const r = ROUNDS[+quick.dataset.i]; quick.querySelector('small').textContent = roundTimeLabel(r, ui.roundCaps[r.id]) + ' of game time'; }
+    refreshOptions();
     for (const x of document.querySelectorAll('.level .btn')) x.classList.toggle('on', x === b);
   };
   // A quick match faces the opponent that round would have in a tournament at the chosen level.
