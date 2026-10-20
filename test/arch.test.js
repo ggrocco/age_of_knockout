@@ -127,13 +127,14 @@ const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), 
 const designed = Object.entries(DESIGNS).map(([age, mod]) => [age, Object.keys(mod)]);
 test('every era design shows team colour', () => { for (const [age, types] of designed) teamColourShows(types, age); });
 // Task 3's prototype Town Centers and Houses overhang their footprint (wide base slabs, stairs, eaves, a fire escape);
-// reported in Task 6 rather than redesigned, and tracked by the todo test below.
+// reported in Task 6 rather than redesigned. The ratchet below keeps the list exact: fix one, then drop it from here.
 const OVERHANG = { bronze: ['town_center', 'house'], medieval: ['town_center', 'house'], sail: ['town_center'], industrial: ['town_center', 'house'], modern: ['town_center', 'house'] };
 test('every era design stays within its footprint', () => {
   for (const [age, types] of designed) withinFootprint(types.filter(type => !OVERHANG[age]?.includes(type)), age);
 });
-test('prototype Town Centers and Houses stay within their footprint', { todo: 'they overhang; see OVERHANG' }, () => {
-  assert.deepEqual(Object.entries(OVERHANG).flatMap(([age, types]) => overhangs(types, age)), []);
+test('the OVERHANG list holds exactly the designs that still overhang', () => {
+  const still = Object.entries(OVERHANG).flatMap(([age, types]) => overhangs(types, age));
+  assert.deepEqual(still.map(o => o.split(' ')[0]), Object.entries(OVERHANG).flatMap(([age, types]) => types.map(type => `${type}/${age}`)), still.join('; '));
 });
 
 // ---------- Stone: Granary, Storage Pit, Farm, Barracks ----------
