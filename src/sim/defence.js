@@ -1,8 +1,11 @@
-// Towers and walls: the tower's shooting, and re-scaling both when their owner advances an era.
+// Towers and walls: the tower's shooting, re-scaling both when their owner advances an era, and breaching them.
 // Deterministic and DOM-free like the rest of src/sim: no randomness, and Map iteration order breaks every tie.
+// orders.js imports breachTarget from here and this file imports hit from there: the cycle is safe because both sides only
+// export function declarations, used at run time and never while the modules load.
 import { BUILDINGS } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
 import { hit } from './orders.js';
+import { findPath } from './path.js';
 import { centerOf } from './util.js';
 
 // One tick of a tower. An unfinished tower does nothing. A finished one counts its cooldown down and, at 0, shoots the nearest enemy
@@ -40,4 +43,25 @@ export function refreshDefences(game, pid) {
     b.hp = b.hp / b.maxHp * s.hp; b.maxHp = s.hp;
     if (kind === 'tower') Object.assign(b, { atk: s.atk, atkType: s.atkType, range: s.range, cooldown: s.cooldown, splash: s.splash || 0 });
   }
+}
+
+// The enemy building unit `u` has to break through to reach `to` (or a tile `goal` accepts), or null. Called when the unit's
+// own path has failed. It paths again with every tile held by an enemy building (any building whose owner is not u's, which is
+// exactly what doAttack accepts as a target) counted as open; trees, mines, water, the map edge and u's own buildings still
+// block. It returns the first enemy building that path runs into, or null when there is no such path or it crosses none.
+// A diagonal step also counts its two corner tiles: real pathing never cuts a corner, so a step that squeezes between two enemy
+// buildings (two segments of a diagonal wall line) is blocked by them, and the first of the two is returned. A step past one
+// enemy corner is not blocked (the unit can go round by the other, open corner), so it does not count.
+export function breachTarget(game, u, to, goal) {
+  const enemyAt = (x, y) => { const e = game.entities.get(game.occAt(x, y)); return e && e.kind === 'building' && e.owner !== u.owner ? e : null; };
+  const from = { x: Math.floor(u.x), y: Math.floor(u.y) };
+  const path = findPath(game.map, (x, y) => game.blocked(x, y) && !enemyAt(x, y), from, to, goal);
+  if (!path) return null;
+  let p = from;
+  for (const t of path) {
+    if (t.x !== p.x && t.y !== p.y) { const a = enemyAt(t.x, p.y), b = enemyAt(p.x, t.y); if (a && b) return a.id; }
+    const e = enemyAt(t.x, t.y); if (e) return e.id;
+    p = t;
+  }
+  return null;
 }
