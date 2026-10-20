@@ -48,10 +48,10 @@ const bodyHeight = (type, age) => new THREE.Box3().setFromObject(build(type, age
 const available = type => AGES.filter(a => ageIndex(a) >= ageIndex(BUILDINGS[type].age));
 const distinctAcrossEras = types => { for (const type of types) { const hs = available(type).map(a => posHash(type, a)); assert.equal(new Set(hs).size, hs.length, `${type}: two eras share a shape`); } };
 const capOf = type => type === 'wonder' ? 5.5 : 3.6;
-// Bodies still over the height cap, by era: today's looks that an era design has yet to replace (the Industrial
-// Castle's re-skin of the kept Medieval keep is 3.72 tall; Task 9 designs it). The ratchet test below keeps the list
+// Bodies still over the height cap, by era: today's looks that an era design has yet to replace (Task 9's Industrial
+// Castle replaced the 3.72-tall re-skin of the kept Medieval keep, the last one). The ratchet test below keeps the list
 // exact: once one fits, drop it from here.
-const OVER_CAP = { industrial: ['castle'] };
+const OVER_CAP = {};
 const heightsOk = types => {
   for (const type of types) for (const a of available(type)) if (!OVER_CAP[a]?.includes(type)) assert.ok(bodyHeight(type, a) <= capOf(type), `${type}/${a} height ${bodyHeight(type, a)}`);
 };
@@ -220,4 +220,33 @@ test('Modern Barracks: the radar dish is hidden while unfinished and turns once 
 });
 test('Modern Wonder: the skyscraper towers over the office-tower Town Center', () => {
   assert.ok(bodyHeight('wonder', 'modern') > bodyHeight('town_center', 'modern') + 1.5, `wonder ${bodyHeight('wonder', 'modern')}`);
+});
+
+// --- industrial designs (Task 9) ---
+// Every type but the Town Center and House (Task 3's) and the kept Factory (today's brick works).
+const INDUSTRIAL = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder', 'castle'];
+// The design's smoke puffs are hidden while it is unfinished, then show and rise once it is finished.
+const smokeRises = (type, age) => {
+  const { e, anim: a, g } = build(type, age, false);
+  assert.ok(a.smoke?.length > 0, `${type}/${age}: no smoke`);
+  animate(g, e, 1, false);
+  for (const sm of a.smoke) assert.equal(sm.p.visible, false, `${type}/${age}: smoke shows while unfinished`);
+  e.constructed = true; e.progress = 1;
+  animate(g, e, 1, false);
+  const before = a.smoke.map(sm => sm.p.position.y);
+  animate(g, e, 2, false);
+  a.smoke.forEach((sm, i) => {
+    assert.equal(sm.p.visible, true, `${type}/${age}: smoke ${i} hidden once finished`);
+    assert.notEqual(sm.p.position.y, before[i], `${type}/${age}: smoke ${i} does not rise`);
+  });
+};
+test('Industrial designs differ from every other era', () => differsFromOtherEras(INDUSTRIAL, 'industrial'));
+test('Industrial designs: heights within the cap', () => heightsOk(INDUSTRIAL));
+test('Industrial farm: crops show once finished and shrink with the food left', () => cropsShrink('industrial'));
+test('Industrial Barracks, Market, Government Center and Castle: smoke hidden while unfinished, rising once finished', () => {
+  for (const type of ['barracks', 'market', 'government_center', 'castle']) smokeRises(type, 'industrial');
+});
+test('Industrial Storage Pit: the gantry crane is hidden while unfinished and turns once finished', () => {
+  spinnersTurn('storage_pit', 'industrial', 'gantry crane');
+  assert.ok(build('storage_pit', 'industrial').anim.spinners.some(sp => sp.axis === 'y'), 'the crane slews about its gantry');
 });
