@@ -15,7 +15,7 @@ const opensFoundation = type => BUILDINGS[type].defence === 'wall';
 
 // workRate: per-player speed of gathering, building, training, research and age-ups (a handicap, 1 = normal).
 // capTicks: round time limit, defaults to the round's own.
-export function createGame({ seed = 1, rules = null, size = 64, workRate = [1, 1], capTicks = rules?.capTicks } = {}) {
+export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1], capTicks = rules?.capTicks } = {}) {
   const map = generateMap(seed, size), n = map.size, occ = new Int32Array(n * n), reserved = new Set();
   const game = {
     seed, map, rules, capTicks, time: 0, result: null, nextId: 1,

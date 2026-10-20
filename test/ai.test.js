@@ -117,6 +117,31 @@ test('a Medieval bot builds a Castle and advances to the Age of Sail', () => {
   assert.ok(ageIndex(p.age) >= ageIndex('sail'), 'reached the Age of Sail, at ' + p.age);
   assert.ok(b.maxRejects <= 20, 'rejects ' + b.maxRejects);
 });
+test('bot sweep waypoints are land the army can reach from its start', () => {
+  for (const seed of [1058, ...Array.from({ length: 60 }, (_, i) => i + 1)]) {
+    const g = createGame({ seed }), n = g.map.size, res = new Set(g.map.resources.map(r => Math.floor(r.y) * n + Math.floor(r.x)));
+    for (const pid of [0, 1]) for (const wp of createBot(g, pid, 'medium').sweep) {
+      assert.notEqual(g.map.tiles[wp.y * n + wp.x], 1, `seed ${seed} pid ${pid}: waypoint ${wp.x},${wp.y} is water`);
+      assert.ok(findPath(g.map, (x, y) => res.has(y * n + x), g.map.starts[pid], wp) !== null, `seed ${seed} pid ${pid}: waypoint ${wp.x},${wp.y} unreachable`);
+    }
+  }
+});
+test('an army whose sweep move fails goes on to the next waypoint instead of retrying it', () => {
+  const g = createGame({ seed: 1, rules: roundById('conquest') }), b = createBot(g, 0, 'hard');
+  // centre of a 5x5 patch of water: unreachable even with the move's 2-tile slack
+  const n = g.map.size, wet = (x, y) => g.map.tiles[y * n + x] === 1, deep = [];
+  for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) { let all = true; for (let j = -2; j <= 2 && all; j++) for (let i = -2; i <= 2; i++) if (!wet(x + i, y + j)) { all = false; break; } if (all) deep.push({ x, y }); }
+  assert.ok(deep.length, 'seed 1 has deep water');
+  b.sweep[0] = deep[0];
+  const s = g.map.starts[0], army = [0, 1, 2, 3].map(k => g.spawnUnit('clubman', 0, s.x - 3 + k, s.y + 3));
+  b.waveActive = true; b.think();
+  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === deep[0].x + 0.5), 'sent to the lake first');
+  for (let i = 0; i < 20 && army.some(u => u.order.type !== 'idle'); i++) g.tick();
+  assert.ok(army.every(u => u.order.type === 'idle'), 'the move to the lake fails');
+  b.think();
+  const next = b.sweep[1];
+  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === next.x + 0.5 && u.order.y === next.y + 0.5), JSON.stringify(army.map(u => u.order)));
+});
 
 // ---- towers, siege and walls (Task 16) ----
 const towersOf = (g, pid) => [...g.buildings.values()].filter(b => b.owner === pid && b.type === 'tower');
@@ -126,6 +151,15 @@ const clearBox = (g, x0, y0, w, h) => {
   for (const r of [...g.resources.values()]) if (inside(Math.floor(r.x), Math.floor(r.y))) g.remove(r);
   for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) g.map.tiles[y * n + x] = 0;
   return inside;
+};
+
+// The top-left tile of the first w x h block, scanning on a 4-tile grid, that holds no unit or building.
+const emptyBlock = (g, w, h) => {
+  const n = g.map.size, ents = [...g.units.values(), ...g.buildings.values()];
+  for (let y0 = 1; y0 + h < n; y0 += 4) for (let x0 = 1; x0 + w < n; x0 += 4) {
+    if (!ents.some(e => e.x >= x0 - 3 && e.x < x0 + w && e.y >= y0 - 3 && e.y < y0 + h)) return { x0, y0 };
+  }
+  throw new Error('no empty block');
 };
 
 test('bot keeps its tower count', () => {
@@ -156,19 +190,20 @@ test('a tower never takes the stone the next age-up needs', () => {
 
 test('in an active wave, siege with no attack order of its own goes for the nearest enemy tower it can see', () => {
   const g = createGame({ seed: 1, rules: roundById('conquest') }), n = g.map.size, b = createBot(g, 0, 'hard');
-  const inBox = clearBox(g, 20, 20, 24, 24);
+  const { x0, y0 } = emptyBlock(g, 24, 24), X = x => x - 20 + x0, Y = y => y - 20 + y0;
+  const inBox = clearBox(g, x0, y0, 24, 24);
   assert.ok(![...g.units.values(), ...g.buildings.values()].some(e => inBox(Math.floor(e.x), Math.floor(e.y))), 'the box starts empty');
   const tower = (x, y) => g.addBuilding('tower', 1, x, y, true);
-  const north = tower(30, 22), south = tower(30, 32), fogged = tower(30, 42);
-  const wall = g.addBuilding('wall', 1, 26, 20, true), enemy = g.spawnUnit('swordsman', 1, 26.5, 27.5);
-  const cannon = (x, y, order) => { const u = g.spawnUnit('cannon', 0, x, y); if (order) u.order = order; return u; };
+  const north = tower(X(30), Y(22)), south = tower(X(30), Y(32)), fogged = tower(X(30), Y(42));
+  const wall = g.addBuilding('wall', 1, X(26), Y(20), true), enemy = g.spawnUnit('swordsman', 1, X(26.5), Y(27.5));
+  const cannon = (x, y, order) => { const u = g.spawnUnit('cannon', 0, X(x), Y(y)); if (order) u.order = order; return u; };
   const idleN = cannon(23.5, 22.5), idleS = cannon(23.5, 32.5);
   const auto = cannon(23.5, 26.5, { type: 'attack', target: enemy.id, fails: 0, auto: true }); // aggro picked a unit
-  const moving = cannon(23.5, 33.5, { type: 'move', x: 40.5, y: 33.5, slack: 0 }); // a sweep
+  const moving = cannon(23.5, 33.5, { type: 'move', x: X(40.5), y: Y(33.5), slack: 0 }); // a sweep
   const far = cannon(20.5, 40.5); // the fogged tower is nearer to it than any it can see
   const onTower = cannon(23.5, 23.5, { type: 'attack', target: south.id, fails: 0 }); // on a tower, though not the nearest
   const ordered = cannon(24.5, 27.5, { type: 'attack', target: enemy.id, fails: 0 }); // a commanded attack
-  const breaching = cannon(25.5, 20.5, { type: 'attack', target: wall.id, fails: 0, resume: { type: 'move', x: 40.5, y: 20.5, slack: 0 } });
+  const breaching = cannon(25.5, 20.5, { type: 'attack', target: wall.id, fails: 0, resume: { type: 'move', x: X(40.5), y: Y(20.5), slack: 0 } });
   const kept = [onTower, ordered, breaching].map(u => [u, u.order]);
   g.recount(); updateVision(g);
   const seen = t => g.players[0].visible[Math.floor(centerOf(t).y) * n + Math.floor(centerOf(t).x)] === 1;
@@ -193,16 +228,18 @@ test('a hard Death Match army breaks into a walled, towered base', () => {
   const g = createGame({ seed: 1, rules: roundById('deathmatch') });
   g.time = 9000; for (const p of g.players) p.age = 'sail'; // Cannons for the attacker; Sail-era walls and towers for the defender
   const tc = [...g.buildings.values()].find(x => x.owner === 1 && x.type === 'town_center');
-  assert.deepEqual([tc.x, tc.y], [52, 26], 'control: where seed 1 puts it');
-  // one closed ring of walls round the 13 x 13 block (47, 21)-(59, 33), 5 tiles out from the Town Center, cleared first
-  const x0 = 47, y0 = 21, side = 13; clearBox(g, x0, y0, side, side);
+  // one closed ring of walls round the 13 x 13 block 5 tiles out from the Town Center, cleared first
+  const x0 = tc.x - 5, y0 = tc.y - 5, side = 13; clearBox(g, x0, y0, side, side);
   const walls = [];
   for (let y = y0; y < y0 + side; y++) for (let x = x0; x < x0 + side; x++) if (x === x0 || y === y0 || x === x0 + side - 1 || y === y0 + side - 1) walls.push(g.addBuilding('wall', 1, x, y, true));
-  const towers = [[49, 26], [53, 23], [53, 30]].map(([x, y]) => g.addBuilding('tower', 1, x, y, true)); // west, north and south of it
+  const towers = [[-3, 0], [1, -3], [1, 4]].map(([dx, dy]) => g.addBuilding('tower', 1, tc.x + dx, tc.y + dy, true)); // west, north and south of it
   const inRing = u => { const x = Math.floor(u.x), y = Math.floor(u.y); return x > x0 && x < x0 + side - 1 && y > y0 && y < y0 + side - 1; };
-  // 24 mixed era units, 2 of them Cannons, 10 to 13 tiles west of the ring: out of aggro reach, so only the bot's orders move them
+  // 24 mixed era units, 2 of them Cannons, 10 to 13 tiles out from the ring on the map-centre side, with the ground between
+  // them and the ring cleared: out of aggro reach, so only the bot's orders move them
+  const west = tc.x > g.map.size / 2, ax = west ? x0 - 13 : x0 + side + 9;
+  clearBox(g, west ? ax : x0 + side, y0, west ? x0 - ax : ax + 4 - (x0 + side), side);
   const types = ['cannon', 'cannon', ...Array(6).fill('swordsman'), ...Array(4).fill('hoplite'), ...Array(4).fill('knight'), ...Array(4).fill('crossbowman'), ...Array(4).fill('musketeer')];
-  const army = types.map((type, k) => g.spawnUnit(type, 0, 34.5 + k % 4, 24.5 + Math.floor(k / 4)));
+  const army = types.map((type, k) => g.spawnUnit(type, 0, ax + 0.5 + k % 4, y0 + 3.5 + Math.floor(k / 4)));
   g.recount(); updateVision(g);
   assert.equal(army.length, 24); assert.ok(army.every(u => !g.blocked(Math.floor(u.x), Math.floor(u.y))), 'control: on open ground');
   assert.equal(walls.length, 48); assert.ok(towers.every(t => t.constructed && t.maxHp === 340), 'control: 3 finished Sail towers');
@@ -237,17 +274,4 @@ test('disabling time limits overrides difficulty caps while keeping the bot hand
   assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: true }), { workRate: [1, 0.5], capTicks: Infinity });
   assert.deepEqual(matchOptions(['hard', 'easy'], { noTimeLimit: true }), { workRate: [1, 1], capTicks: Infinity });
   assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
-});
-
-test('every sweep waypoint is land the army can reach', () => {
-  for (const seed of [1, 2, 3, 4, 5, 6]) {
-    const g = createGame({ seed, rules: roundById('deathmatch') }), n = g.map.size;
-    if (seed === 3) assert.equal(g.map.tiles[54 * n + 32], 1, 'control: seed 3 has a lake on the (32, 54) waypoint');
-    for (const pid of [0, 1]) for (const wp of createBot(g, pid, 'medium').sweep) {
-      assert.notEqual(g.map.tiles[wp.y * n + wp.x], 1, `seed ${seed}: waypoint ${wp.x},${wp.y} is not water`);
-      const from = tileOf([...g.units.values()].find(u => u.owner === pid));
-      const path = findPath(g.map, g.blocked, from, wp, (x, y) => Math.abs(x - wp.x) <= 2 && Math.abs(y - wp.y) <= 2);
-      assert.ok(path, `seed ${seed}: player ${pid} can reach waypoint ${wp.x},${wp.y}`);
-    }
-  }
 });

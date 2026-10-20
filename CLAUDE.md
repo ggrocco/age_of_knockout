@@ -19,7 +19,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 
 Buildings-by-era design page: `http://localhost:8000/buildings.html` (`?team=1`, `?scale=true`). It renders every building in every age with the game's own models, and its rows and columns come straight from `src/data`, so new ages and buildings show up on reload with no page edits.
 
-Useful URL params: `?round=1..5&opp=relaxed|easy|medium|hard&seed=N&speed=N`, `?level=relaxed|normal|hard` (tournament difficulty, else the menu pick saved in localStorage), `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?noTimeLimit=1|0` (override the saved main-menu time-limit choice), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
+Useful URL params: `?round=1..5&opp=relaxed|easy|medium|hard&seed=N&speed=N` (no `seed` = a random map and start position), `?level=relaxed|normal|hard` (tournament difficulty, else the menu pick saved in localStorage), `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?noTimeLimit=1|0` (override the saved main-menu time-limit choice), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
 
 ## Architecture
 
