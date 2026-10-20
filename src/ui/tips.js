@@ -3,7 +3,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageTitle } from '../data/ages.js';
-import { WONDER_TICKS } from '../rounds/index.js';
+import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
 
@@ -63,6 +63,31 @@ export const costHtml = (cost, short = [], compact = false) => RES.filter(k => c
 const cap = s => s[0].toUpperCase() + s.slice(1);
 const row = (label, value, wide) => `<div${wide ? ' class="wide"' : ''}><dt>${label}</dt><dd>${value}</dd></div>`;
 const names = ids => ids.map(i => (UNITS[i] || BUILDINGS[i]).name).join(', ');
+
+const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train units, and completed Wonders. Other buildings alone cannot keep an empire alive.';
+const ROUND_INFO = {
+  conquest: { icon: 'town_center', goal: CONQUEST_GOAL },
+  deathmatch: { icon: 'barracks', goal: CONQUEST_GOAL, start: 'Iron Age with 20,000 of each resource.' },
+  regicide: { icon: 'king', goal: 'Kill the enemy King while protecting yours. Losing your King ends the match immediately. You can also win by eliminating the enemy empire.' },
+  wonder: { icon: 'wonder', goal: `Reach the Bronze Age, complete a Wonder, and keep it standing for ${WONDER_TICKS / 1200} uninterrupted game minutes. Losing all your completed Wonders resets the countdown. You can also win by eliminating the enemy empire.`, start: '3,000 of each resource.' },
+  relics: { icon: 'villager', goal: `Control all 5 relics for ${RELIC_TICKS / 1200} uninterrupted game minutes. Carry them with units or store them in a Town Center or Government Center. Losing control of any relic resets the countdown. You can also win by eliminating the enemy empire.` },
+};
+
+export const roundTimeLabel = (round, capTicks = round.capTicks) => capTicks === Infinity ? 'No time limit' : `${capTicks / 1200} minutes`;
+export const roundLimitText = (round, capTicks = round.capTicks) => roundTimeLabel(round, capTicks) + (capTicks === Infinity ? '' : ' of game time');
+export const TIME_LIMIT_RULE = 'If no one wins before the limit, the higher score wins.';
+export const NO_TIME_LIMIT_RULE = 'Play until a victory condition is met or a player resigns.';
+
+// Uses the same hover-card layout as buildings; durations come from the actual round rules.
+export function roundTipHtml(round, capTicks = round.capTicks) {
+  const info = ROUND_INFO[round.id];
+  return `<div class="tip-h"><span class="orb">${icon(info.icon)}</span><div><h4>${round.name}</h4><span class="sub">Game mode</span></div></div>`
+    + `<dl>${row('Goal', info.goal, true)}${row('Time limit', roundLimitText(round, capTicks), true)}`
+    + (capTicks === Infinity ? row('Match ends', NO_TIME_LIMIT_RULE, true) : row('At the limit', TIME_LIMIT_RULE + ' An exact tie goes to you.', true))
+    + (info.start ? row('Starting resources', info.start, true) : '') + '</dl>'
+    + '<p>Score rewards combat, economy, exploration, research, relics and Wonders.</p>'
+    + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
+}
 
 // state: { kind: 'unit'|'building'|'tech'|'age'|'delete', id, next?, short?: string[], notes?: string[] }
 export function tipHtml({ kind, id, next, short = [], notes = [] }) {

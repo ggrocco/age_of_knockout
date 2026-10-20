@@ -3,9 +3,9 @@ import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle } from '../data/ages.js';
 import { canAfford, ageUpProblem, ageUpNeed } from '../sim/commands.js';
-import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
+import { ROUNDS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { icon } from './icons.js';
-import { COLORS, RES, costHtml, tipHtml } from './tips.js';
+import { COLORS, RES, costHtml, tipHtml, roundTipHtml } from './tips.js';
 import { QUALITY } from '../render/quality.js';
 
 const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
@@ -23,30 +23,36 @@ export function createHud(ui) {
   // tile() returns a descriptor: `key` (attributes + name + lock) changes only when the tile set, its target building or a lock state changes (then the panel is rebuilt);
   // otherwise `off` and `small` (cost line) are patched in place so hover/glow animations and focus survive resource ticks.
   const tips = new Map();
+  const roundTips = new Map(ROUNDS.map(r => [`round:${r.id}`, r]));
   const tile = (attrs, { kind, id, name, cost, tint, cls, ok, lockedAge, short = [], notes = [], next, extra = '', cx = '' }) => {
     tips.set(`${kind}:${id}`, tipHtml({ kind, id, next, short, notes }));
     const lock = lockedAge ? `<span class="lock">${icon('lock')}</span>` : '', small = lockedAge ? ageTitle(lockedAge) : costHtml(cost, short, true) + extra;
     return { key: `${attrs}|${name}|${lockedAge ? 'L' : ''}`, off: !ok, small,
       html: `<button class="btn tile ${tint}${ok ? '' : ' off'}${lockedAge ? ' locked' : ''}${cx}" ${attrs} data-tip="${kind}:${id}" aria-describedby="tip" aria-disabled="${!ok}"><span class="orb">${icon(id, cls)}${lock}</span><span class="lbl"><b>${name}</b><small>${small}</small></span></button>` };
   };
-  const tipEl = $('tip'); let tipKey = '';
-  const hideTip = () => { tipKey = ''; tipEl.classList.remove('show'); };
+  const tipEl = $('tip'); let tipKey = '', tipTarget = null;
+  const hideTip = () => { tipKey = ''; tipTarget = null; tipEl.classList.remove('show'); };
+  hud.hideTip = hideTip;
   const showTip = (b, force) => {
-    const html = tips.get(b.dataset.tip); if (!html || ui.touch) return hideTip();
-    const was = tipEl.classList.contains('show'); if (!force && was && tipKey === b.dataset.tip) return;
-    tipKey = b.dataset.tip; if (tipEl._html !== html) { tipEl.innerHTML = html; tipEl._html = html; }
-    const tint = [...b.classList].find(c => c.startsWith('t-')); if (tipEl._tint !== tint) { if (tipEl._tint) tipEl.classList.remove(tipEl._tint); tipEl.classList.add(tint); tipEl._tint = tint; }
+    const round = roundTips.get(b.dataset.tip);
+    const html = round ? roundTipHtml(round, ui.roundCaps?.[round.id]) : tips.get(b.dataset.tip); if (!html || ui.touch) return hideTip();
+    const was = tipEl.classList.contains('show'); if (!force && was && tipTarget === b) return;
+    tipKey = b.dataset.tip; tipTarget = b; if (tipEl._html !== html) { tipEl.innerHTML = html; tipEl._html = html; }
+    const tint = [...b.classList].find(c => c.startsWith('t-')) || 't-bld'; if (tipEl._tint !== tint) { if (tipEl._tint) tipEl.classList.remove(tipEl._tint); tipEl.classList.add(tint); tipEl._tint = tint; }
     tipEl.classList.toggle('move', was);
     const r = b.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
     tipEl.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
-    tipEl.style.top = (r.top - h - 10 < 8 ? r.bottom + 10 : r.top - h - 10) + 'px';
+    tipEl.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, r.top - h - 10 < 8 ? r.bottom + 10 : r.top - h - 10)) + 'px';
     tipEl.classList.add('show');
   };
-  document.addEventListener('mouseover', e => { const b = e.target.closest?.('#cmds .tile'); if (b) showTip(b); else if (tipKey) hideTip(); });
+  document.addEventListener('mouseover', e => { const b = e.target.closest?.('[data-tip]'); if (b) showTip(b); else if (tipKey) hideTip(); });
   document.addEventListener('mouseout', e => { if (!e.relatedTarget) hideTip(); });
-  document.addEventListener('focusin', e => { const b = e.target.closest?.('#cmds .tile'); if (b) showTip(b); });
+  document.addEventListener('focusin', e => { const b = e.target.closest?.('[data-tip]'); if (b) showTip(b); });
   document.addEventListener('focusout', hideTip);
-  cmds.addEventListener('scroll', hideTip, { passive: true });
+  document.addEventListener('scroll', hideTip, { passive: true, capture: true });
+  document.addEventListener('click', hideTip);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+  window.addEventListener('resize', hideTip);
   hud.update = () => {
     const g = ui.game, p = g.players[0], round = g.rules;
     let obj = round ? round.desc : '';
@@ -56,11 +62,13 @@ export function createHud(ui) {
     if (round && round.id === 'regicide') obj = `Protect your King (${g.entities.has(st.kings[0]) ? 'alive' : 'DEAD'}). Kill theirs.`;
     const resHtml = ['food', 'wood', 'gold', 'stone'].map(k => `<span class="res"><i class="dot" style="background:${COLORS[k]}"></i>${Math.floor(p.res[k])}</span>`).join('');
     const ageName = ageLabel(p.age);
+    const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
+    const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${round ? (g.capTicks === Infinity ? ' / no time limit' : ' / time limit') : ''}"></span>`;
     let html;
-    if (ui.touch) html = resHtml + `<span class="res" title="Population">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span><span class="res">${fmtTime(g.time)}</span><button data-menu="open" aria-label="Menu">&#9776;</button>`;
+    if (ui.touch) html = resHtml + `<span class="res" title="Population">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span>${clockHtml}<button data-menu="open" aria-label="Menu">&#9776;</button>`;
     else html = resHtml
       + `<span class="res" title="Population">Pop ${p.pop}/${p.popCap}</span><span class="res">${p.ageUp ? 'Advancing... ' : ''}${ageTitle(p.age)}</span>`
-      + `<span class="grow"><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span><span class="res">${fmtTime(g.time)}</span>`
+      + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span>${clockHtml}`
       + [1, 2, 4].map(s => `<button data-speed="${s}" class="${ui.speed === s ? 'on' : ''}">${s}x</button>`).join('') + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button><button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
     if (!ui.touch) html += '<button data-menu="open" aria-label="Game settings">Settings</button>';
     if (ui.touch) {
@@ -70,7 +78,16 @@ export function createHud(ui) {
       document.querySelector('#touchbar [data-act=box]').classList.toggle('on', !!ui.boxMode);
       $('placebar').classList.toggle('hidden', !ui.placing); document.body.classList.toggle('placing', !!ui.placing);
     }
-    if (top._html !== html) { top.innerHTML = html; top._html = html; }
+    if (top._html !== html) {
+      // Resource/countdown updates rebuild the bar; keep keyboard focus on its tooltip targets.
+      const active = document.activeElement, focusedTip = top.contains(active) && active.matches('[data-tip]');
+      const focusSelector = focusedTip ? (active.classList.contains('match-clock') ? '.match-clock' : '.grow') : null;
+      const tipWasShown = tipEl.classList.contains('show');
+      top.innerHTML = html; top._html = html;
+      if (focusSelector) { top.querySelector(focusSelector)?.focus({ preventScroll: true }); if (!tipWasShown) hideTip(); }
+    }
+    const clock = top.querySelector('.match-clock'), clockText = fmtTime(g.time) + (round ? ` / ${g.capTicks === Infinity ? '∞' : fmtTime(g.capTicks)}` : '');
+    if (clock.textContent !== clockText) clock.textContent = clockText;
     // info panel
     const sel = [...ui.sel].map(id => g.entities.get(id)).filter(Boolean), one = sel.length === 1 ? sel[0] : null, insp = ui.inspect && g.entities.get(ui.inspect.id);
     let ih = '';
@@ -119,7 +136,7 @@ export function createHud(ui) {
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }
       else btns.forEach((b, i) => { const el = cmds.children[i], sm = el.querySelector('small'); el.classList.toggle('off', b.off); el.setAttribute('aria-disabled', b.off); if (sm.innerHTML !== b.small) sm.innerHTML = b.small; });
-      if (tipKey) { const nb = cmds.querySelector(`[data-tip="${tipKey}"]`); if (nb) showTip(nb, true); else hideTip(); }
+      if (tipKey && !roundTips.has(tipKey)) { const nb = cmds.querySelector(`[data-tip="${tipKey}"]`); if (nb) showTip(nb, true); else hideTip(); }
     }
     document.body.classList.toggle('has-cmds', cmds.children.length > 0);
   };

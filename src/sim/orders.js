@@ -85,7 +85,7 @@ function doGather(game, u, o) {
     const r = travel(game, u, goalNear(res, 0.95), centerOf(res));
     if (r === 'fail') { if (++o.fails > 3) stop(u); else o.res = -1; }
   } else if (o.phase === 'work') {
-    const rate = RATE[kind] * DT * game.players[u.owner].gatherMult[kind];
+    const p = game.players[u.owner], rate = RATE[kind] * DT * p.gatherMult[kind] * p.workRate;
     if (u.carry.type !== kind) u.carry = { type: kind, amount: 0 };
     const take = Math.min(rate, res.amount); res.amount -= take; u.carry.amount += take; game.players[u.owner].gathered += take;
     if (res.amount <= 0) game.depleted(res);

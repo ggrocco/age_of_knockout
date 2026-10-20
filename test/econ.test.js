@@ -27,3 +27,11 @@ test('deterministic', () => {
     for (let i = 0; i < 500; i++) g.tick(); return JSON.stringify(g.snapshot()); };
   assert.equal(run(), run());
 });
+test('workRate 0.5 halves a player\'s gathering and training speed', () => {
+  const g = createGame({ seed: 1, workRate: [1, 0.5] }), tcs = [0, 1].map(p => [...g.buildings.values()].find(b => b.owner === p && b.type === 'town_center'));
+  for (const p of [0, 1]) { const v = villagers(g, p)[0]; g.command(p, { type: 'gather', ids: [v.id], resourceId: nearest(g, 'tree', v).id }); g.command(p, { type: 'train', buildingId: tcs[p].id, unit: 'villager' }); }
+  const ticks = tcs[0].queue[0].remaining; for (let i = 0; i < ticks; i++) g.tick();
+  assert.equal(tcs[0].queue.length, 0); assert.equal(tcs[1].queue.length, 1);
+  assert.ok(Math.abs(tcs[1].queue[0].remaining - ticks / 2) <= 1, 'p1 remaining ' + tcs[1].queue[0].remaining);
+  assert.ok(g.players[1].gathered > 0 && Math.abs(g.players[1].gathered / g.players[0].gathered - 0.5) < 0.15, `gathered ${g.players[0].gathered} vs ${g.players[1].gathered}`);
+});

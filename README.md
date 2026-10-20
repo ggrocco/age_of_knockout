@@ -15,6 +15,17 @@ node test/bot-sim.js 12          # bot-vs-bot termination check, 12 seeds x 5 ro
 
 To review the building designs, open `http://localhost:8000/buildings.html`. It shows every building in every age, rendered with the game's own models (Fit/True scale, Blue/Red team; click a building to orbit it or see it under construction). The page reads `src/data`, so new ages and buildings appear on reload.
 
+On desktop, hover or keyboard-focus a Quick game button, bracket round heading, or the in-game objective
+or clock for a card explaining the mode's goal, time limit and scoring rules. The clock shows elapsed / limit.
+Normal and Hard allow 25 minutes of game time (Death Match: 20); Relaxed allows 40 minutes in every mode.
+If no one wins before the limit, the higher score wins. Speed controls change how quickly game time passes;
+pausing stops the clock.
+
+Check **No time limit** in the main menu to play quick matches and your tournament rounds without a
+score deadline. The choice is saved in this browser; uncheck it to restore the difficulty's usual limit.
+The clock shows `elapsed / ∞`, and normal victory conditions, Wonder/relic countdowns and resigning
+still end a match. Use `?noTimeLimit=1` (or `0`) to override the saved choice for a session.
+
 ## Deploy (Docker)
 
 ```

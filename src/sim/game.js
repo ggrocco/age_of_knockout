@@ -13,14 +13,16 @@ import { secs, rectOf, centerOf } from './util.js';
 // A wall foundation (an unfinished wall) does not block movement: it only reserves its tile, and occupies it once finished.
 const opensFoundation = type => BUILDINGS[type].defence === 'wall';
 
-export function createGame({ seed = 1, rules = null, size = 64 } = {}) {
+// workRate: per-player speed of gathering, building, training, research and age-ups (a handicap, 1 = normal).
+// capTicks: round time limit, defaults to the round's own.
+export function createGame({ seed = 1, rules = null, size = 64, workRate = [1, 1], capTicks = rules?.capTicks } = {}) {
   const map = generateMap(seed, size), n = map.size, occ = new Int32Array(n * n), reserved = new Set();
   const game = {
-    seed, map, rules, time: 0, result: null, nextId: 1,
+    seed, map, rules, capTicks, time: 0, result: null, nextId: 1,
     entities: new Map(), units: new Map(), buildings: new Map(), resources: new Map(), relics: new Map(),
     players: [0, 1].map(id => ({ id, res: { food: 200, wood: 200, gold: 100, stone: 100 }, age: 'stone', ageUp: null,
       explored: new Uint8Array(n * n), visible: new Uint8Array(n * n), kills: 0, losses: 0, bdestroyed: 0, gathered: 0, pop: 0, popCap: 0, defeated: false,
-      techs: new Set(), gatherMult: { food: 1, wood: 1, gold: 1, stone: 1 } })),
+      techs: new Set(), gatherMult: { food: 1, wood: 1, gold: 1, stone: 1 }, workRate: workRate[id] })),
     reserved, // tile indices (y * size + x) held by wall foundations: walkable, but nothing else can be placed there
     occAt: (x, y) => (x < 0 || y < 0 || x >= n || y >= n) ? 1 : occ[y * n + x],
     blocked: (x, y) => occ[y * n + x] !== 0,
@@ -135,7 +137,7 @@ export function createGame({ seed = 1, rules = null, size = 64 } = {}) {
     game.time++;
     for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
     for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
-    for (const p of game.players) if (p.ageUp && --p.ageUp.remaining <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
+    for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
     for (const r of game.relics.values()) if (r.holder !== null) { const h = game.entities.get(r.holder); if (h) { r.x = h.x; r.y = h.y; } }
     game.recount();
     if (game.time % 4 === 0) updateVision(game);
@@ -158,16 +160,17 @@ export function createGame({ seed = 1, rules = null, size = 64 } = {}) {
 
 function updateBuilding(game, b) {
   if (b.gatherType && b.amount <= 0) return game.remove(b);
+  const rate = game.players[b.owner].workRate;
   if (!b.constructed) {
     const w = b.workers; b.workers = 0;
     if (w > 0) {
-      b.progress += Math.pow(w, 0.7) / secs(BUILDINGS[b.type].buildTime); b.hp = Math.max(b.hp, b.maxHp * Math.min(1, b.progress));
+      b.progress += Math.pow(w, 0.7) * rate / secs(BUILDINGS[b.type].buildTime); b.hp = Math.max(b.hp, b.maxHp * Math.min(1, b.progress));
       if (b.progress >= 1) { b.constructed = true; b.hp = b.maxHp; b.progress = 1; if (opensFoundation(b.type)) game.occupyFoundation(b); }
     }
     return;
   }
-  if (b.queue.length && --b.queue[0].remaining <= 0) {
+  if (b.queue.length && (b.queue[0].remaining -= rate) <= 0) {
     const q = b.queue.shift(), sp = game.findSpawn(b); game.spawnUnit(q.unit, b.owner, sp.x, sp.y);
   }
-  if (b.research && --b.research.remaining <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
+  if (b.research && (b.research.remaining -= rate) <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
 }

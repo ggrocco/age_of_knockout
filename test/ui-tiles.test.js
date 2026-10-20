@@ -4,11 +4,14 @@ import { BUILDINGS } from '../src/data/buildings.js';
 import { TECHS } from '../src/data/techs.js';
 import { AGES } from '../src/data/ages.js';
 import { ICONS, icon } from '../src/ui/icons.js';
-import { DESC, costHtml, tipHtml } from '../src/ui/tips.js';
+import { DESC, costHtml, tipHtml, roundTipHtml, roundTimeLabel, roundLimitText } from '../src/ui/tips.js';
 import { wallPlan } from '../src/ui/input.js';
+import { ROUNDS, roundById } from '../src/rounds/index.js';
 import { createGame } from '../src/sim/game.js';
 import { canPlace } from '../src/sim/commands.js';
 import { lineTiles } from '../src/sim/util.js';
+import { matchOptions } from '../src/ai/bot.js';
+import { LEVELS } from '../src/tournament/bracket.js';
 
 const ids = [...Object.keys(UNITS), ...Object.keys(BUILDINGS)];
 
@@ -86,6 +89,43 @@ test('tech tip: name, description, cost, research time and prerequisite', () => 
   const h = tipHtml({ kind: 'tech', id: 'iron_weapons', short: ['gold'], notes: ['Needs Bronze Weapons'] });
   for (const s of ['Iron Weapons', TECHS.iron_weapons.desc, 'Research time', `${TECHS.iron_weapons.time}s`, 'Requires', 'Bronze Weapons', 'Needs Bronze Weapons']) assert.ok(h.includes(s), s);
 });
+test('round tips disclose the actual game-time cap and score decision', () => {
+  for (const r of ROUNDS) {
+    const h = roundTipHtml(r);
+    assert.ok(h.includes(r.name), r.id);
+    assert.match(h, new RegExp(`${r.capTicks / 1200} minutes of game time`), r.id);
+    assert.match(h, /higher score wins/, r.id);
+    assert.match(h, /exact tie goes to you/, r.id);
+    assert.match(h, /2x or 4x.*Pausing stops the clock/, r.id);
+    assert.doesNotMatch(h, /undefined|NaN/, r.id);
+  }
+  const changed = { ...roundById('conquest'), capTicks: 48000 };
+  assert.equal(roundTimeLabel(changed), '40 minutes');
+  assert.match(roundTipHtml(changed), /40 minutes of game time/);
+  assert.doesNotMatch(roundTipHtml(changed), /25 minutes/);
+});
+test('round tips use the effective time limit for each difficulty', () => {
+  for (const [level, diffs] of Object.entries(LEVELS)) for (const [i, round] of ROUNDS.entries()) {
+    const game = createGame({ rules: round, ...matchOptions([null, diffs[i]]) });
+    const expected = level === 'relaxed' ? 40 : round.capTicks / 1200;
+    assert.equal(roundTimeLabel(round, game.capTicks), `${expected} minutes`, `${level} ${round.id}`);
+    assert.ok(roundTipHtml(round, game.capTicks).includes(`${expected} minutes of game time`), `${level} ${round.id}`);
+  }
+  assert.match(roundTipHtml(roundById('deathmatch')), /Iron Age with 20,000/);
+});
+test('round goals explain elimination, starting resources and objective countdowns', () => {
+  assert.match(roundTipHtml(roundById('conquest')), /buildings that train units.*Wonders/);
+  assert.match(roundTipHtml(roundById('deathmatch')), /20,000 of each resource/);
+  assert.match(roundTipHtml(roundById('regicide')), /Losing your King ends the match immediately/);
+  const wonder = roundTipHtml(roundById('wonder'));
+  assert.match(wonder, /Bronze Age.*3 uninterrupted game minutes/);
+  assert.match(wonder, /resets the countdown/);
+  assert.match(wonder, /3,000 of each resource/);
+  const relics = roundTipHtml(roundById('relics'));
+  assert.match(relics, /all 5 relics for 3 uninterrupted game minutes/);
+  assert.match(relics, /Town Center or Government Center/);
+  assert.match(relics, /Losing control of any relic resets the countdown/);
+});
 test('every tip renders without throwing and never leaks "undefined"', () => {
   for (const id of Object.keys(UNITS)) assert.doesNotMatch(tipHtml({ kind: 'unit', id }), /undefined|NaN/, id);
   for (const id of Object.keys(BUILDINGS)) assert.doesNotMatch(tipHtml({ kind: 'building', id }), /undefined|NaN/, id);
@@ -140,4 +180,17 @@ test('wallPlan flags placement only, not stone: with too little stone the free t
   assert.deepEqual(plan.ok, [true, true, false, true, true], 'canPlace per tile: only the tree is red'); assert.equal(plan.count, 4);
   assert.deepEqual(g.command(0, { type: 'wall', ids: vills(g), tiles: line }), { ok: false, reason: 'resources' }, 'the toast gives the reason');
   assert.equal(p.res.stone, 3); assert.deepEqual(walls(g), []);
+});
+
+test('unlimited mode tips explain how to win without showing a score deadline', () => {
+  for (const round of ROUNDS) {
+    const html = roundTipHtml(round, Infinity);
+    assert.equal(roundTimeLabel(round, Infinity), 'No time limit');
+    assert.equal(roundLimitText(round, Infinity), 'No time limit');
+    assert.match(html, /No time limit/);
+    assert.match(html, /victory condition is met or a player resigns/);
+    assert.doesNotMatch(html, /Infinity|NaN|undefined|At the limit|higher score wins|exact tie/);
+  }
+  assert.match(roundTipHtml(roundById('wonder'), Infinity), /3 uninterrupted game minutes/);
+  assert.match(roundTipHtml(roundById('relics'), Infinity), /3 uninterrupted game minutes/);
 });
