@@ -7,6 +7,7 @@ import { legacyGeos } from './legacy.js';
 import { designCtx, finish } from './kit.js';
 import * as stone from './stone.js';
 import * as bronze from './bronze.js';
+import * as iron from './iron.js';
 import * as medieval from './medieval.js';
 import * as sail from './sail.js';
 import * as industrial from './industrial.js';
@@ -22,7 +23,7 @@ export const KEPT = {
 };
 // Per era, type → design(ctx), which draws into ctx and returns its scaffold height (the body's top). Each era module
 // exports one design function per building type.
-export const DESIGNS = { stone, bronze, iron: {}, medieval, sail, industrial, modern, future };
+export const DESIGNS = { stone, bronze, iron, medieval, sail, industrial, modern, future };
 
 // Before a building unlocks (gallery, debug) it shows its unlock-era design.
 export const designAge = (type, age) => {

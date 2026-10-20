@@ -37,6 +37,27 @@ export const place = (b, part, x, y, z, ry = 0, k = 1) => {
   g.dispose();
 };
 
+// A ramp of unit size across x, high at z = 0 and down to the ground at z = 1 (stairs, ramps, lean-to gable walls).
+export const WEDGE = (() => {
+  const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(0.5, 0, 0);
+  return g;
+})();
+// A low-poly horse facing +x at the origin, with a team-coloured saddle cloth (t); for place().
+const HORSE = 0x8a5a33, MANE = 0x3a2a1c;
+export const horse = (t, grazing = false) => {
+  const h = new B();
+  h.box(0.44, 0.2, 0.17, HORSE, 0, 0.34, 0);
+  for (const [x, z] of [[-0.17, -0.055], [-0.17, 0.055], [0.16, -0.055], [0.16, 0.055]]) h.box(0.055, 0.36, 0.055, HORSE, x, 0, z).box(0.06, 0.04, 0.06, MANE, x, 0, z);
+  const [nx, ny, nr] = grazing ? [0.32, 0.36, 0.9] : [0.25, 0.6, -0.55];
+  h.box(0.1, 0.3, 0.1, HORSE, nx, ny - 0.15, 0, 0, 0, nr).box(0.03, 0.26, 0.04, MANE, nx - 0.04, ny - 0.13, 0, 0, 0, nr);
+  const hx = grazing ? 0.44 : 0.33, hy = grazing ? 0.12 : 0.62;
+  h.box(0.2, 0.09, 0.09, HORSE, hx, hy, 0, 0, 0, grazing ? -1.1 : -0.35);
+  h.box(0.05, 0.22, 0.04, MANE, -0.25, 0.26, 0, 0, 0, -0.35);
+  h.box(0.2, 0.025, 0.19, t, -0.02, 0.535, 0).box(0.2, 0.12, 0.012, t, -0.02, 0.42, 0.093).box(0.2, 0.12, 0.012, t, -0.02, 0.42, -0.093);
+  return h;
+};
+
 // ---------- body helpers (draw into ctx.b) ----------
 export const door = (ctx, w, hh, z, x = 0) => { ctx.b.box(w, hh, 0.06, C.dark, x, 0.16, z).box(w + 0.1, 0.06, 0.08, C.woodD, x, 0.16 + hh, z); };
 export const win = (ctx, x, y, z, ry = 0) => { ctx.b.box(0.22, 0.22, 0.05, C.glass, x, y, z, 0, ry).box(0.28, 0.04, 0.07, C.woodD, x, y + 0.22, z, 0, ry); };

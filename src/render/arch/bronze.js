@@ -3,7 +3,7 @@
 // pyramid.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, WEDGE } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2;
@@ -30,18 +30,12 @@ export function town_center(ctx) {
 
 // ---------- shared Bronze parts ----------
 // Low-poly shapes for small repeated parts, centred on the origin (DOME: a hemisphere, flat side down at y = 0;
-// FRUSTUM: an axis-aligned square base of half-side 1 tapering to 0.7; WEDGE: a ramp of unit size across x, high at
-// z = 0 and down to the ground at z = 1).
+// FRUSTUM: an axis-aligned square base of half-side 1 tapering to 0.7; WEDGE, the ramp, is in the kit).
 const DOME = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), BALL = new THREE.SphereGeometry(1, 6, 4);
 const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), LEAF = new THREE.ConeGeometry(1, 1, 4);
 const FRUSTUM = new THREE.CylinderGeometry(0.7, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
-const WEDGE = (() => {
-  const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath();
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(0.5, 0, 0);
-  return g;
-})();
 const STAIR = 0xb88f5c, LIME = 0xe0c9a0, DOMEC = 0xd2aa72, JAR = 0xa56843, SAND = 0xc8ad7a, WATER = 0x3f7fa3;
-const HORSE = 0x8a5a33, MANE = 0x3a2a1c, PALM = 0x5d7a32, OCHRE = 0xd9a441, LIMESTONE = 0xc9baa0;
+const PALM = 0x5d7a32, OCHRE = 0xd9a441, LIMESTONE = 0xc9baa0;
 
 // A flat-roofed mud-brick block standing on y, with a darker coping round its roof edge.
 const block = (b, w, hh, d, x, y, z, c = P.mud, cap = P.mudD) => {
@@ -70,19 +64,6 @@ const shield = (b, t, x, y, z, facingX = false, r = 0.13) => {
 };
 // A bronze brazier with its fire, standing on y.
 const brazier = (b, x, y, z) => b.cylT(0.03, 0.03, 0.22, C.bronze, x, y, z, 6).cylT(0.09, 0.05, 0.1, C.bronze, x, y + 0.22, z, 8).cone(0.07, 0.16, P.fire, x, y + 0.3, z, 5);
-// A low-poly horse facing +x at the origin, with a team-coloured saddle cloth.
-const horse = (t, grazing = false) => {
-  const h = new B();
-  h.box(0.44, 0.2, 0.17, HORSE, 0, 0.34, 0);
-  for (const [x, z] of [[-0.17, -0.055], [-0.17, 0.055], [0.16, -0.055], [0.16, 0.055]]) h.box(0.055, 0.36, 0.055, HORSE, x, 0, z).box(0.06, 0.04, 0.06, MANE, x, 0, z);
-  const [nx, ny, nr] = grazing ? [0.32, 0.36, 0.9] : [0.25, 0.6, -0.55];
-  h.box(0.1, 0.3, 0.1, HORSE, nx, ny - 0.15, 0, 0, 0, nr).box(0.03, 0.26, 0.04, MANE, nx - 0.04, ny - 0.13, 0, 0, 0, nr);
-  const hx = grazing ? 0.44 : 0.33, hy = grazing ? 0.12 : 0.62;
-  h.box(0.2, 0.09, 0.09, HORSE, hx, hy, 0, 0, 0, grazing ? -1.1 : -0.35);
-  h.box(0.05, 0.22, 0.04, MANE, -0.25, 0.26, 0, 0, 0, -0.35);
-  h.box(0.2, 0.025, 0.19, t, -0.02, 0.535, 0).box(0.2, 0.12, 0.012, t, -0.02, 0.42, 0.093).box(0.2, 0.12, 0.012, t, -0.02, 0.42, -0.093);
-  return h;
-};
 
 // Granary: beehive silos of mud brick (a drum and a dome, a filling hatch on top, a team band, a door at the foot) in a
 // walled yard, a stair up beside the big silo, and the harvest heaped and sacked in front.

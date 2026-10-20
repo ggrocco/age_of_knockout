@@ -11,7 +11,7 @@ export function house(ctx) {
   b.add(hipRoof, P.tile, 0, 1.23 + 0.32, 0, W * 0.78, 0.64, D * 0.8, 0, Math.PI / 4, 0);
   for (const k of [-1, 1]) b.box(0.16, 0.6, 0.32, P.brick, k * (W / 2 - 0.12), 1.23, 0).box(0.2, 0.06, 0.36, P.white, k * (W / 2 - 0.12), 1.83, 0);
   windowGrid(ctx, 3, 2, W, D / 2 + 0.01, 0.2, 0.5, P.white, 0x3f5f7a);
-  b.box(0.24, 0.42, 0.05, td, 0, 0.0, D / 2 + 0.04).roof(0.36, 0.12, 0.06, P.white, 0, 0.44, D / 2 + 0.05).box(0.4, 0.06, 0.2, 0xd9cfb0, 0, 0, D / 2 + 0.12);
+  b.box(0.24, 0.42, 0.05, td, 0, 0.0, D / 2 + 0.04).roof(0.36, 0.12, 0.06, P.white, 0, 0.44, D / 2 + 0.05).box(0.4, 0.06, 0.2, 0xd9cfb0, 0, 0, D / 2 + 0.08);
   return 1.89;
 }
 
