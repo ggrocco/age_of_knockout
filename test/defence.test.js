@@ -5,10 +5,10 @@ import { scoreOf, isEliminated } from '../src/rounds/index.js';
 import { AGES } from '../src/data/ages.js';
 import { BUILDINGS } from '../src/data/buildings.js';
 import { TOWER, WALL_HP, defenceStats } from '../src/data/defences.js';
-import { updateTower, refreshDefences } from '../src/sim/defence.js';
+import { updateTower, refreshDefences, breachTarget } from '../src/sim/defence.js';
 import { damageTo } from '../src/sim/orders.js';
 import { updateVision } from '../src/sim/vision.js';
-import { centerOf, lineTiles } from '../src/sim/util.js';
+import { centerOf, lineTiles, tileOf, distPoint } from '../src/sim/util.js';
 import { findPath } from '../src/sim/path.js';
 
 // The binding stats from the defences plan: [era, hp, atk, atkType, range, cooldown, splash]
@@ -498,4 +498,156 @@ test('a Modern tower sees, and so shoots, an enemy at its full range on the nega
   for (let k = 0; k < 8 && v.hp === v.maxHp; k++) g.tick(); // vision refreshes every 4 ticks, then the tower fires
   assert.equal(g.players[0].visible[i], 1, 'sight 10 reaches it');
   assert.ok(v.hp < v.maxHp, 'and the tower shoots it');
+});
+
+// ---- breaching (Task 15) ----
+// The w x h block in the middle of the map, cleared of trees, mines and water, so only what a test puts there stands in it.
+const arena = (g, w = 20, h = 20) => {
+  const n = g.map.size, x0 = (n - w) >> 1, y0 = (n - h) >> 1, inside = (x, y) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h;
+  for (const r of [...g.resources.values()]) if (inside(r.x, r.y)) g.remove(r);
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) g.map.tiles[y * n + x] = 0;
+  assert.ok(![...g.units.values(), ...g.buildings.values()].some(e => inside(e.x, e.y)), 'the arena starts empty');
+  return { x: x0, y: y0 };
+};
+// Finished walls of `owner` on the border of the w x h rectangle whose top-left tile is (x, y).
+const ring = (g, owner, x, y, w, h) => {
+  const out = [];
+  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i === x || j === y || i === x + w - 1 || j === y + h - 1) out.push(g.addBuilding('wall', owner, i, j, true));
+  return out;
+};
+const alive = es => es.filter(e => !e.dead);
+const near = t => (x, y) => distPoint(x + 0.5, y + 0.5, t) <= 0.9; // doAttack's goal for a melee unit
+const tickUntil = (g, done, max, what) => { for (let i = 0; !done(); i++) { assert.ok(i < max, what); g.tick(); } };
+
+test('a unit walled off from its target attacks a wall segment, then reaches the target', () => {
+  const g = createGame({ seed: 1 }), a = arena(g);
+  const house = g.addBuilding('house', 1, a.x + 9, a.y + 9, true), walls = ring(g, 1, a.x + 7, a.y + 7, 6, 6); // a free tile all round the house
+  const u = g.spawnUnit('swordsman', 0, a.x + 3.5, a.y + 9.5);
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), tileOf(house), near(house)), null, 'control: the ring seals the house in');
+  assert.ok(g.command(0, { type: 'attack', ids: [u.id], targetId: house.id }).ok);
+  const order = u.order;
+  g.tick();
+  const w = g.entities.get(u.order.target);
+  assert.ok(walls.includes(w), 'it turns on a segment of the ring'); assert.equal(w.x, a.x + 7, 'the one on its side');
+  assert.equal(u.order.type, 'attack'); assert.equal(u.order.fails, 0); assert.equal(u.order.resume, order, 'keeping the attack on the house to come back to');
+  g.tick(); assert.ok(u.path, 'it heads for the wall at once, not after the 40-tick retry');
+  tickUntil(g, () => w.dead, 2000, 'the segment falls');
+  assert.equal(house.hp, house.maxHp, 'the house is untouched meanwhile');
+  g.tick(); assert.equal(u.order, order, 'then it goes back to the house'); assert.equal(u.order.resume, undefined);
+  tickUntil(g, () => house.hp < house.maxHp, 1000, 'and reaches it');
+  assert.ok(distPoint(u.x, u.y, house) <= u.range + 0.1, 'striking it from inside the ring');
+  assert.equal(alive(walls).length, walls.length - 1, 'through the one segment it broke');
+});
+
+test('when the breached segment falls the unit takes up its old order at once, with no retry wait', () => {
+  const g = createGame({ seed: 1 }), a = arena(g);
+  const house = g.addBuilding('house', 1, a.x + 9, a.y + 9, true), walls = ring(g, 1, a.x + 7, a.y + 7, 6, 6);
+  const u = g.spawnUnit('swordsman', 0, a.x + 4.5, a.y + 9.5);
+  g.command(0, { type: 'attack', ids: [u.id], targetId: house.id }); const order = u.order;
+  g.tick(); const w = g.entities.get(u.order.target); assert.ok(walls.includes(w));
+  // its own walls pen it in: the way to the segment fails with nothing of the enemy's to break, so it counts a fail and waits to retry
+  const pen = ring(g, 0, a.x + 2, a.y + 7, 5, 5);
+  g.tick(); assert.equal(u.order.target, w.id); assert.equal(u.order.fails, 1); assert.ok(u.retry > g.time + 30, 'a retry 40 ticks off');
+  for (const p of pen) g.remove(p);
+  g.damage(w, w.hp, null); // the segment falls to something else
+  g.tick(); assert.equal(u.order, order, 'the next tick it is back on the house'); assert.equal(u.path, null); assert.equal(u.retry, 0, 'the retry cleared');
+  g.tick(); assert.ok(u.path, 'and it paths through the gap straight away');
+});
+
+test('a diagonal wall line is breached too: the unit cannot slip between two of its segments', () => {
+  const g = createGame({ seed: 1 }), a = arena(g), cx = a.x + 10, cy = a.y + 10;
+  // a diamond of radius 1: four diagonal sides of two segments each, around the single tile (cx, cy)
+  const walls = [[0, -1], [1, 0], [0, 1], [-1, 0]].map(([dx, dy]) => g.addBuilding('wall', 1, cx + dx, cy + dy, true));
+  const v = g.spawnUnit('villager', 1, cx + 0.5, cy + 0.5), u = g.spawnUnit('swordsman', 0, cx - 3.5, cy - 3.5); // north-west of it
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), tileOf(v), near(v)), null, 'control: sealed in');
+  const wallAt = (x, y) => walls.some(w => w.x === x && w.y === y);
+  const loose = findPath(g.map, (x, y) => g.blocked(x, y) && !wallAt(x, y), tileOf(u), tileOf(v), near(v));
+  assert.ok(loose && !loose.some(t => wallAt(t.x, t.y)), 'control: with the walls open, the shortest way in squeezes between two segments');
+  const id = breachTarget(g, u, tileOf(v), near(v));
+  assert.ok(walls.some(w => w.id === id), 'one of the two it would squeeze between is the breach');
+  g.command(0, { type: 'attack', ids: [u.id], targetId: v.id });
+  g.tick(); assert.equal(u.order.target, id);
+  tickUntil(g, () => v.dead, 3000, 'it breaks in and kills the villager');
+  assert.equal(alive(walls).length, 3, 'one segment down');
+});
+
+test('towers and other buildings used as a fence are breached too', () => {
+  const g = createGame({ seed: 1 }), a = arena(g), at = (dx, dy) => [a.x + dx, a.y + dy];
+  // eight 2 x 2 buildings round a 2 x 2 hole at (9, 9); the target, a villager, stands in it
+  const piece = (type, dx, dy) => g.addBuilding(type, 1, ...at(dx, dy), true);
+  const tower = piece('tower', 7, 9), north = piece('house', 9, 7), east = piece('storage_pit', 11, 9), south = piece('farm', 9, 11);
+  const fence = [tower, north, east, south, piece('house', 7, 7), piece('granary', 11, 7), piece('house', 7, 11), piece('house', 11, 11)];
+  const v = g.spawnUnit('villager', 1, a.x + 9.5, a.y + 9.5), goal = near(v), to = tileOf(v);
+  const from = (dx, dy) => g.spawnUnit('swordsman', 0, a.x + dx + 0.5, a.y + dy + 0.5);
+  const probes = { tower: from(2, 9), north: from(9, 2), east: from(16, 9), south: from(9, 16) };
+  assert.equal(findPath(g.map, g.blocked, tileOf(probes.tower), to, goal), null, 'control: sealed in');
+  assert.equal(breachTarget(g, probes.tower, to, goal), tower.id, 'from the west, the tower');
+  assert.equal(breachTarget(g, probes.north, to, goal), north.id, 'from the north, a house');
+  assert.equal(breachTarget(g, probes.east, to, goal), east.id, 'from the east, a storage pit');
+  assert.equal(breachTarget(g, probes.south, to, goal), south.id, 'from the south, a farm');
+  const u = probes.tower; for (const p of [probes.north, probes.east, probes.south]) g.remove(p);
+  g.command(0, { type: 'attack', ids: [u.id], targetId: v.id });
+  g.tick(); assert.equal(u.order.target, tower.id); assert.equal(u.order.resume.target, v.id);
+  tickUntil(g, () => v.dead, 3000, 'it knocks the tower down and gets to the villager');
+  assert.equal(tower.dead, true); assert.equal(u.dead, false, 'the tower shot at it, but it lived');
+  for (const b of fence.slice(1)) { assert.equal(b.dead, false); assert.equal(b.hp, b.maxHp, `${b.type} untouched`); }
+});
+
+test('Review Focus 3: a target cut off only by trees and water is not breached, and the unit gives up as before', () => {
+  const g = createGame({ seed: 1 }), a = arena(g), n = g.map.size, cx = a.x + 10, cy = a.y + 10;
+  // a 3 x 3 ring round the target: trees on its north and south rows, water east and west
+  const trees = [];
+  for (let dx = -1; dx <= 1; dx++) for (const dy of [-1, 1]) trees.push(g.addResource({ type: 'tree', x: cx + dx + 0.5, y: cy + dy + 0.5, amount: 100 }));
+  for (const dx of [-1, 1]) g.map.tiles[cy * n + cx + dx] = 1;
+  const v = g.spawnUnit('villager', 1, cx + 0.5, cy + 0.5), u = g.spawnUnit('swordsman', 0, cx - 8.5, cy + 0.5); // beyond its aggro reach
+  const to = tileOf(v), goal = near(v);
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), to, goal), null, 'control: cut off');
+  assert.equal(breachTarget(g, u, to, goal), null, 'nothing to break through');
+  g.command(0, { type: 'attack', ids: [u.id], targetId: v.id }); const order = u.order;
+  let ticks = 0;
+  while (u.order.type !== 'idle') { g.tick(); ticks++; assert.ok(u.order === order || u.order.type === 'idle', 'the order is never swapped for a breach'); assert.ok(ticks < 400); }
+  assert.equal(ticks, 121, 'four tries 40 ticks apart, then it stops: exactly the old behaviour');
+  for (let i = 0; i < 100; i++) g.tick();
+  assert.equal(u.order.type, 'idle'); assert.ok(trees.every(t => !t.dead && t.amount === 100), 'no tree touched'); assert.equal(v.hp, v.maxHp);
+  // controls: an enemy wall in place of the north tree is breached; one of your own is not
+  const nt = trees.find(t => Math.floor(t.x) === cx && Math.floor(t.y) === cy - 1); g.remove(nt);
+  const theirs = g.addBuilding('wall', 1, cx, cy - 1, true);
+  assert.equal(breachTarget(g, u, to, goal), theirs.id, 'control: an enemy wall there is the breach');
+  g.remove(theirs); g.addBuilding('wall', 0, cx, cy - 1, true);
+  assert.equal(breachTarget(g, u, to, goal), null, 'your own wall still blocks: you never breach your own');
+});
+
+test('a breach that is itself walled off wraps again, and each layer gives way to the one before', () => {
+  const g = createGame({ seed: 1 }), a = arena(g);
+  const house = g.addBuilding('house', 1, a.x + 13, a.y + 9, true), outer = ring(g, 1, a.x + 11, a.y + 7, 6, 6);
+  const u = g.spawnUnit('swordsman', 0, a.x + 4.5, a.y + 9.5);
+  g.command(0, { type: 'attack', ids: [u.id], targetId: house.id }); const order = u.order;
+  g.tick(); const first = u.order, w1 = g.entities.get(first.target);
+  assert.ok(outer.includes(w1)); assert.equal(first.resume, order);
+  const pen = ring(g, 1, a.x + 2, a.y + 7, 5, 5); // before it gets there, the enemy walls the unit in
+  g.tick();
+  const second = u.order, w2 = g.entities.get(second.target);
+  assert.ok(pen.includes(w2), 'it turns on the pen'); assert.equal(second.resume, first); assert.equal(second.resume.resume, order);
+  tickUntil(g, () => w2.dead, 2000, 'the pen breaks'); g.tick();
+  assert.equal(u.order, first, 'back to the outer wall');
+  tickUntil(g, () => w1.dead, 2000, 'the outer wall breaks'); g.tick();
+  assert.equal(u.order, order, 'back to the house');
+  tickUntil(g, () => house.hp < house.maxHp, 1000, 'and the house is reached');
+  assert.equal(alive(pen).length, pen.length - 1); assert.equal(alive(outer).length, outer.length - 1);
+});
+
+test('a move into an enemy-walled spot breaks through, then arrives on the very tile', () => {
+  const g = createGame({ seed: 1 }), a = arena(g), cx = a.x + 10, cy = a.y + 10;
+  const walls = ring(g, 1, cx - 3, cy - 3, 7, 7); // the spot is 3 tiles in: too deep for the move's 2-tile slack
+  const u = g.spawnUnit('swordsman', 0, a.x + 2.5, cy + 0.5);
+  g.command(0, { type: 'move', ids: [u.id], x: cx + 0.5, y: cy + 0.5 }); const order = u.order;
+  g.tick(); assert.equal(u.order, order, 'first it widens the slack, as before'); assert.equal(order.slack, 2);
+  g.tick();
+  const w = g.entities.get(u.order.target);
+  assert.equal(u.order.type, 'attack'); assert.ok(walls.includes(w), 'then it turns on the wall'); assert.equal(u.order.resume, order);
+  tickUntil(g, () => w.dead, 2000, 'the wall falls'); g.tick();
+  assert.equal(u.order, order, 'the move is taken up again'); assert.equal(order.slack, 0, 'aiming for the exact tile again');
+  tickUntil(g, () => u.order.type === 'idle', 1000, 'it arrives');
+  assert.deepEqual([Math.floor(u.x), Math.floor(u.y)], [cx, cy]);
+  assert.equal(alive(walls).length, walls.length - 1);
 });

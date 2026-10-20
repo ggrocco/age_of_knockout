@@ -1,4 +1,5 @@
 import { findPath } from './path.js';
+import { breachTarget } from './defence.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 
@@ -22,6 +23,9 @@ function travel(game, u, goal, to) {
   return 'moving';
 }
 const stop = u => { u.order = IDLE(); u.path = null; };
+// Walled off: attack the enemy building in the way, and take up `o` again once it falls (doAttack restores `resume`).
+// travel just set a 40-tick retry for the failed path; clear it so the unit heads for the breach at once.
+const breach = (u, id, o) => { u.order = { type: 'attack', target: id, fails: 0, resume: o }; u.path = null; u.retry = 0; };
 
 export function updateUnit(game, u) {
   if (u.cd > 0) u.cd--;
@@ -36,11 +40,17 @@ export function updateUnit(game, u) {
   }
 }
 
+// A move that cannot reach its tile first settles for within 2 tiles of it. If even that fails and enemy buildings are in the
+// way, the unit breaks through them, then tries for the exact tile again (slack back to 0); otherwise it stops.
 function doMove(game, u, o) {
-  const to = { x: Math.floor(o.x), y: Math.floor(o.y) };
-  const r = travel(game, u, (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack, to);
+  const to = { x: Math.floor(o.x), y: Math.floor(o.y) }, goal = (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack;
+  const r = travel(game, u, goal, to);
   if (r === 'arrived') return stop(u);
-  if (r === 'fail') { if (o.slack < 2) { o.slack = 2; u.retry = 0; } else stop(u); }
+  if (r !== 'fail') return;
+  if (o.slack < 2) { o.slack = 2; u.retry = 0; return; }
+  const id = breachTarget(game, u, to, goal);
+  if (id === null) return stop(u);
+  o.slack = 0; breach(u, id, o);
 }
 
 function nearestResource(game, u, kind, maxDist) {
@@ -141,9 +151,15 @@ export function hit(game, u, t) {
   }
 }
 
+// A breach order (one with `resume`) that loses its target hands back the order it interrupted, on the next tick and with no
+// retry wait. A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap
+// the order round itself); a breach can wrap again, each layer restoring the one before. Only an attack with no breach counts fails.
 function doAttack(game, u, o) {
   const t = game.entities.get(o.target);
-  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) return stop(u);
+  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) {
+    if (!o.resume) return stop(u);
+    u.order = o.resume; u.path = null; u.retry = 0; return;
+  }
   if (distPoint(u.x, u.y, t) <= u.range + 0.1) {
     u.path = null;
     if (u.cd === 0) { u.cd = u.cooldown; hit(game, u, t); }
@@ -152,8 +168,11 @@ function doAttack(game, u, o) {
   const tt = tileOf(t), key = tt.x + ',' + tt.y;
   if (u.path && o.last !== key && (game.time + u.id) % 5 === 0) u.path = null;
   o.last = key;
-  const r = travel(game, u, goalNear(t, Math.max(0.9, u.range - 0.5)), tt);
-  if (r === 'fail' && ++o.fails > 3) stop(u);
+  const goal = goalNear(t, Math.max(0.9, u.range - 0.5)), r = travel(game, u, goal, tt);
+  if (r !== 'fail') return;
+  const id = breachTarget(game, u, tt, goal);
+  if (id !== null && id !== o.target) return breach(u, id, o);
+  if (++o.fails > 3) stop(u);
 }
 
 function aggro(game, u) {
