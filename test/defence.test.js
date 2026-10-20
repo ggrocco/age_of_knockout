@@ -331,7 +331,7 @@ test('a wall line places and pays per segment and stops when stone runs out', ()
   for (const w of ws) { assert.equal(w.constructed, false); assert.equal(w.hp, 1); }
   for (const v of vs) { assert.equal(v.order.type, 'build'); assert.equal(v.order.target, ws[0].id); assert.deepEqual(v.order.queue, [ws[1].id, ws[2].id]); }
   assert.notEqual(vs[0].order.queue, vs[1].order.queue, 'each villager gets its own copy of the queue');
-  // nothing placed: fail('placement'), no stone spent, orders untouched
+  // nothing placed: fail('resources') when a free tile cannot be paid for, fail('placement') when no tile is free; no stone spent, orders untouched
   const orders = vs.map(v => v.order);
   assert.deepEqual(g.command(0, { type: 'wall', ids, tiles: lineTiles({ x: x + 3, y }, { x: x + 5, y }) }), { ok: false, reason: 'resources' }, 'cannot afford even one');
   p.res.stone = 100;

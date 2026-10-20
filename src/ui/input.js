@@ -136,7 +136,7 @@ export function createInput(ui) {
   function onKey(e) {
     if (!ui.game) return;
     if (e.key === 'Escape') { if (ui.placing) cancelDrag(); ui.stopPlacing(); setSel([]); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); ui.actions.delete(b.id); } } // Backspace: the Mac "delete" key
+    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); if (!e.repeat) ui.actions.delete(b.id); } } // Backspace: the Mac "delete" key; held keys auto-repeat, so one press deletes one building
     else if (e.key === '.') ui.actions.idle();
     else if (e.key.toLowerCase() === 'h') ui.actions.home();
     else if (e.key === ' ') { e.preventDefault(); ui.togglePause(); }
