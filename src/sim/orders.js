@@ -209,7 +209,10 @@ function doRelic(game, u, o) {
     }
     if (!d) return stop(u);
     if (bd <= REACH) { const rl = game.relics.get(u.relic); rl.holder = null; rl.stored = d.id; u.relic = null; return stop(u); }
-    const res = travel(game, u, goalNear(d, 0.95), centerOf(d));
-    if (res === 'fail' && ++o.fails > 3) stop(u);
+    const goal = goalNear(d, 0.95), to = centerOf(d), res = travel(game, u, goal, to);
+    if (res !== 'fail') return;
+    const id = breachTarget(game, u, to, goal); // the way home is walled off by the enemy: break through, then carry on home
+    if (id !== null) return breach(u, id, o);
+    if (++o.fails > 3) stop(u);
   }
 }

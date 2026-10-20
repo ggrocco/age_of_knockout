@@ -694,3 +694,28 @@ test("a relic walled in by the unit's own walls is not breached", () => {
   for (let i = 0; i < 100; i++) g.tick();
   assert.equal(u.order.type, 'idle'); assert.ok(walls.every(w => !w.dead && w.hp === w.maxHp), 'no wall damaged'); assert.equal(relic.holder, null);
 });
+
+// The way home is walled off too: the carrier's 'store' phase fails its path to the Town Center and breaches like 'go' does.
+test('a relic carrier walled off from its Town Center breaks a segment and stores the relic', () => {
+  const g = createGame({ seed: 1 }), a = arena(g);
+  const hall = g.addBuilding('town_center', 0, a.x + 9, a.y + 9, true), walls = ring(g, 1, a.x + 7, a.y + 7, 7, 7); // a free tile all round the 3 x 3 hall
+  const u = g.spawnUnit('swordsman', 0, a.x + 3.5, a.y + 9.5), relic = g.spawnRelic(u.x, u.y);
+  const to = centerOf(hall), goal = (x, y) => distPoint(x + 0.5, y + 0.5, hall) <= 0.95; // doRelic's store-phase goal
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), to, goal), null, 'control: the ring seals the hall in');
+  assert.ok(walls.includes(g.entities.get(breachTarget(g, u, to, goal))), 'and a segment of it is the way through');
+  assert.ok(g.command(0, { type: 'relic', ids: [u.id], relicId: relic.id }).ok);
+  const order = u.order;
+  g.tick(); assert.equal(relic.holder, u.id); assert.equal(order.phase, 'store', 'it already holds the relic and heads home');
+  g.tick();
+  const w = g.entities.get(u.order.target);
+  assert.equal(u.order.type, 'attack'); assert.ok(walls.includes(w), 'it turns on a segment of the ring'); assert.equal(w.x, walls[0].x, 'the one on its side');
+  assert.equal(u.order.fails, 0); assert.equal(u.order.resume, order, 'keeping the trip home to come back to'); assert.equal(order.fails, 0, 'the failed path was not counted as a try');
+  assert.equal(relic.holder, u.id, 'still carrying it');
+  g.tick(); assert.ok(u.path, 'it heads for the wall at once, not after the 40-tick retry');
+  tickUntil(g, () => w.dead, 2000, 'the segment falls');
+  assert.equal(relic.holder, u.id, 'the relic stays with it meanwhile');
+  g.tick(); assert.equal(u.order, order, 'then it goes back to carrying the relic home'); assert.equal(order.phase, 'store'); assert.equal(u.order.resume, undefined);
+  tickUntil(g, () => relic.stored !== null, 1000, 'and stores the relic in the Town Center');
+  assert.equal(relic.stored, hall.id); assert.equal(relic.holder, null); assert.equal(u.relic, null); assert.equal(g.relicOwner(relic), 0);
+  assert.equal(alive(walls).length, walls.length - 1, 'through the one segment it broke');
+});
