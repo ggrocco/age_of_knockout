@@ -30,9 +30,11 @@ export const found = (ctx, w, d) => {
 };
 export const banner = (ctx, x, z, y0, hh) => { ctx.b.cyl(0.025, hh, C.woodD, x, y0, z).box(0.02, 0.32, 0.28, ctx.t, x, y0 + hh - 0.34, z + 0.15); };
 // A pole `len` tall standing on y (into ctx.mast) with the team flag at its top, flush with the pole's tip.
-export const flag = (ctx, x, y, z, len = 0.7, pole = C.woodD) => {
+// cloth is the flag's [height, length]; it flies along +z from the pole.
+export const flag = (ctx, x, y, z, len = 0.7, pole = C.woodD, cloth = [0.28, 0.5]) => {
+  const [ch, cl] = cloth;
   ctx.mast.cyl(0.025, len, pole, x, y, z);
-  ctx.extra.flag = new B().box(0.025, 0.28, 0.5, ctx.t, 0, 0, 0.25).geometry(); ctx.extra.flagAt = [x, y + len - 0.28, z];
+  ctx.extra.flag = new B().box(0.025, ch, cl, ctx.t, 0, 0, cl / 2).geometry(); ctx.extra.flagAt = [x, y + len - ch, z];
 };
 export const firePit = (ctx, x, z) => {
   const { b } = ctx;

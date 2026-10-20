@@ -30,10 +30,11 @@ const build = (type, age, constructed = true) => {
   const m = buildModel(e, age), g = new THREE.Group(); g.add(m.root); g.userData.anim = m.anim;
   return { e, anim: m.anim, g };
 };
-// sha1 of the static meshes' position arrays (body and mast; not the scaffold, flag or animated parts), built, owner 0.
+// sha1 of the static meshes' position arrays (body, mast and a farm's crops; not the scaffold, flag or animated parts),
+// built, owner 0.
 const posHash = (type, age) => {
   const { anim } = build(type, age), h = createHash('sha1');
-  for (const o of [anim.body, anim.mast]) o?.traverse(m => {
+  for (const o of [anim.body, anim.mast, anim.crops]) o?.traverse(m => {
     if (!m.isMesh) return;
     const a = m.geometry.attributes.position.array; h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength));
   });
@@ -72,4 +73,30 @@ test('animated parts: hidden until finished, then they move', () => {
   assert.equal(a.mast.visible, false); assert.equal(a.flag.visible, false);
   e.constructed = true; animate(g, e, 2, false);
   assert.equal(a.mast.visible, true); assert.equal(a.flag.visible, true);
+  // Every flag hides while unfinished, also on mast-less kept designs.
+  const tool = build('town_center', 'tool', false);
+  assert.ok(!tool.anim.mast && tool.anim.flag, 'kept Tool Town Center has a flag and no mast');
+  animate(tool.g, tool.e, 1, false); assert.equal(tool.anim.flag.visible, false, 'kept Tool TC flag shows while unfinished');
+  tool.e.constructed = true; animate(tool.g, tool.e, 2, false); assert.equal(tool.anim.flag.visible, true);
+});
+
+// ---------- Stone: Granary, Storage Pit, Farm, Barracks ----------
+const STONE = ['granary', 'storage_pit', 'farm', 'barracks'];
+// Some eras without their own design still share today's look with each other, so Stone is checked against every
+// other era rather than all pairs (distinctAcrossEras) until Task 11.
+test('stone designs differ from every other era', () => {
+  for (const type of STONE) {
+    const stone = posHash(type, 'stone');
+    for (const a of available(type).filter(a => a !== 'stone')) assert.notEqual(posHash(type, a), stone, `${type}: Stone shares a shape with ${a}`);
+  }
+});
+test('Stone Granary, Storage Pit, Farm and Barracks: heights within the cap', () => heightsOk(STONE));
+test('Stone farm: crops show once finished and shrink with the food left', () => {
+  const { e, anim: a, g } = build('farm', 'stone', false);
+  assert.ok(a.crops, 'Stone farm has no crops');
+  animate(g, e, 1, false); assert.equal(a.crops.visible, false, 'crops show while unfinished');
+  e.constructed = true; e.amount = 400; animate(g, e, 1, false);
+  assert.equal(a.crops.visible, true); const full = a.crops.scale.y;
+  e.amount = 0; animate(g, e, 1, false);
+  assert.ok(a.crops.scale.y < full, `crops did not shrink (${a.crops.scale.y} vs ${full})`);
 });
