@@ -215,13 +215,24 @@ export function createView(container, game) {
   // placement ghost
   const ghost = new THREE.Mesh(geo.box, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.5, depthTest: false })); ghost.visible = false; ghost.renderOrder = 5; scene.add(ghost);
   view.showGhost = (type, tx, ty, ok) => { if (!type) { ghost.visible = false; return; } const s = BUILDINGS[type].size; ghost.visible = true; ghost.scale.set(s, 1.2, s); ghost.position.set(tx + s / 2, 0.6, ty + s / 2); ghost.material.color.setHex(ok ? 0x22c55e : 0xef4444); };
+  // wall ghost line: one 1x1 box per tile (lineTiles caps a line at 64), green where okFlags[i], red elsewhere; null hides it
+  const GHOST_LINE_MAX = 64, ghostOk = new THREE.Color(0x22c55e), ghostBad = new THREE.Color(0xef4444), _gm = new THREE.Matrix4();
+  const ghostLine = new THREE.InstancedMesh(geo.box, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5, depthTest: false }), GHOST_LINE_MAX);
+  ghostLine.visible = false; ghostLine.renderOrder = 5; ghostLine.frustumCulled = false; ghostLine.raycast = noRaycast;
+  ghostLine.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ghostLine.setColorAt(0, ghostOk); scene.add(ghostLine);
+  view.showGhostLine = (tiles, okFlags) => {
+    if (!tiles || !tiles.length) { ghostLine.visible = false; return; }
+    const n = Math.min(tiles.length, GHOST_LINE_MAX);
+    for (let i = 0; i < n; i++) { ghostLine.setMatrixAt(i, _gm.makeScale(1, 1.2, 1).setPosition(tiles[i].x + 0.5, 0.6, tiles[i].y + 0.5)); ghostLine.setColorAt(i, okFlags?.[i] ? ghostOk : ghostBad); }
+    ghostLine.count = n; ghostLine.instanceMatrix.needsUpdate = true; ghostLine.instanceColor.needsUpdate = true; ghostLine.visible = true;
+  };
   // picking helpers
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); ray.layers.enable(PROXY_LAYER);
   const setRay = (cx, cy) => { const r = renderer.domElement.getBoundingClientRect(); ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); };
   view.pickEntity = (cx, cy) => { setRay(cx, cy); const hits = ray.intersectObjects(view.pickables, true); for (const h of hits) { const id = h.object.userData.gid; if (id !== undefined && view.groups.get(id)) return view.groups.get(id).userData.entity; } return null; };
   view.pickGround = (cx, cy) => { setRay(cx, cy); const h = ray.intersectObject(ground)[0]; return h ? { x: h.point.x, y: h.point.z } : null; };
   view.project = (x, y) => { const v = new THREE.Vector3(x, 0.4, y).project(camera), r = renderer.domElement.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; };
-  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); blobs?.dispose(); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
+  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); blobs?.dispose(); ghostLine.dispose(); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
   const markers = [];
   view.marker = (x, y) => { const m = new THREE.Mesh(geo.ring, new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, side: THREE.DoubleSide, depthTest: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, y); m.renderOrder = 6; m.userData.age = 0; scene.add(m); markers.push(m); };
   const baseFrame = view.frame;

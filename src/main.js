@@ -23,16 +23,17 @@ function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catc
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
 const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
 
-const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
+const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, wallStart: null, wallEnd: null, delArm: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
   cmd(c) { const r = ui.game.command(0, c); if (!r.ok) hud.toast(reasonText(r.reason)); return r; },
   setSpeed(s) { ui.speed = s; }, togglePause() { ui.paused = !ui.paused; },
   startPlacing(type) {
-    ui.placing = type;
-    if (ui.touch) { const r = document.getElementById('viewport').getBoundingClientRect(), p = ui.view.pickGround(r.left + r.width / 2, r.top + r.height / 2), sz = BUILDINGS[type].size; if (p) { const cx = Math.round(p.x - sz / 2), cy = Math.round(p.y - sz / 2); ui.placeTile = { x: cx, y: cy };
+    ui.placing = type; ui.wallStart = ui.wallEnd = null;
+    if (type === 'wall') hud.toast(ui.touch ? 'Tap where the wall starts, then where it ends, then press Place' : 'Drag to draw a wall. Right-click / Esc cancels. Shift keeps placing.');
+    else if (ui.touch) { const r = document.getElementById('viewport').getBoundingClientRect(), p = ui.view.pickGround(r.left + r.width / 2, r.top + r.height / 2), sz = BUILDINGS[type].size; if (p) { const cx = Math.round(p.x - sz / 2), cy = Math.round(p.y - sz / 2); ui.placeTile = { x: cx, y: cy };
         for (let r = 0; r < 14; r++) { let found = false; for (let dy = -r; dy <= r && !found; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (canPlace(ui.game, 0, type, cx + dx, cy + dy)) { ui.placeTile = { x: cx + dx, y: cy + dy }; found = true; break; } } if (found) break; } } hud.toast('Tap or drag to position, then press Place'); }
     else hud.toast('Click to place. Right-click / Esc cancels. Shift keeps placing.');
   },
-  stopPlacing() { ui.placing = null; ui.view?.showGhost(null); },
+  stopPlacing() { ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.view?.showGhost(null); ui.view?.showGhostLine(null); },
   marker(x, y) { ui.view?.marker(x, y); } };
 window.addEventListener('orientationchange', () => setTimeout(() => app.onResize?.(), 250));
 const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.quit = () => { endMatch(); menu(); };
@@ -55,7 +56,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
-  ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
+  ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.delArm = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
   const bots = [createBot(game, 1, oppDiff)]; const botDiff = params.get('bot') || 'hard'; // difficulty of the bot that drives player 0 in autoplay/test modes
   if (params.get('autoplay') === '1' || AUTO) bots.unshift(createBot(game, 0, botDiff));
   const diffs = { 0: botDiff, 1: oppDiff };
