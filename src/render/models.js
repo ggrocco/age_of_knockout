@@ -224,7 +224,7 @@ function buildingModel(e, age = 'stone') {
   const root = new THREE.Group(), g = cached(`b:${e.type}:${e.owner}:${designOf(e.type, age).key}`, () => archGeos(e.type, e.owner, e.size, age));
   const body = new THREE.Group(); body.add(mesh(g.body)); root.add(body);
   const anim = { type: 'building', body };
-  if (g.mast) root.add(mesh(g.mast)); // flagpoles, antennas, spire tips: static, outside the body's height
+  if (g.mast) { anim.mast = mesh(g.mast); root.add(anim.mast); } // flagpoles, antennas, spire tips: outside the body's height
   if (g.extra.scaffold) { anim.scaffold = mesh(g.extra.scaffold); root.add(anim.scaffold); }
   if (g.extra.crops) { anim.crops = mesh(g.extra.crops); root.add(anim.crops); }
   if (g.extra.flag) { anim.flag = pivot(...g.extra.flagAt, g.extra.flag); root.add(anim.flag); }
@@ -341,7 +341,8 @@ export function animate(g, e, t, moving) {
     if (a.scaffold) a.scaffold.visible = !e.constructed;
     if (a.crops) { a.crops.visible = e.constructed; a.crops.scale.y = 0.35 + 0.65 * Math.min(1, e.amount / 400); }
     if (a.flag) a.flag.rotation.y = Math.sin(t * 3) * 0.35;
-    // Animated parts only show on a finished building.
+    // The mast, the flag it carries and the animated parts only show on a finished building.
+    if (a.mast) { a.mast.visible = e.constructed; if (a.flag) a.flag.visible = e.constructed; }
     for (const sp of a.spinners ?? []) { sp.p.visible = e.constructed; sp.p.rotation[sp.axis] = t * sp.speed; }
     for (const f of a.floaters ?? []) { f.p.visible = e.constructed; f.p.position.y = f.y + Math.sin(t * f.speed + f.phase) * f.amp; }
     for (const sm of a.smoke ?? []) { const k = (t * 0.35 + sm.phase) % 1; sm.p.visible = e.constructed; sm.p.position.y = sm.y + k * 0.9; sm.p.scale.setScalar(0.5 + k * 0.9); }

@@ -5,6 +5,13 @@ import { BUILDINGS } from '../../data/buildings.js';
 import { styleOf } from '../styles.js';
 import { legacyGeos } from './legacy.js';
 import { designCtx, finish } from './kit.js';
+import * as stone from './stone.js';
+import * as bronze from './bronze.js';
+import * as medieval from './medieval.js';
+import * as sail from './sail.js';
+import * as industrial from './industrial.js';
+import * as modern from './modern.js';
+import * as future from './future.js';
 
 // Today's looks that stay, byte-identical (pinned by test/fixtures/kept-buildings.json).
 export const KEPT = {
@@ -13,8 +20,9 @@ export const KEPT = {
   medieval: ['castle'],
   industrial: ['factory'],
 };
-// Per era, type → design(ctx), which draws into ctx and returns its scaffold height.
-export const DESIGNS = { stone: {}, bronze: {}, iron: {}, medieval: {}, sail: {}, industrial: {}, modern: {}, future: {} };
+// Per era, type → design(ctx), which draws into ctx and returns its scaffold height (the body's top). Each era module
+// exports one design function per building type.
+export const DESIGNS = { stone, bronze, iron: {}, medieval, sail, industrial, modern, future };
 
 // Before a building unlocks (gallery, debug) it shows its unlock-era design.
 export const designAge = (type, age) => {

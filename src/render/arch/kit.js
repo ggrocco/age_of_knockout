@@ -4,7 +4,14 @@
 import * as THREE from 'three';
 import { B, C, unit, TEAM, TEAM_DARK } from '../builder.js';
 
-const FIRE = 0xff8a2a, EMBER = 0xffc04a, BRASS = 0xc9a13a, SCAFFOLD = 0xa8823f;
+// The era designs' palette (from the prototype), on top of builder.js's C.
+export const P = {
+  hide: 0xa8875a, hideD: 0x7d5f3b, wattle: 0x9c7a4f, dirt: 0x6f6551, bone: 0xe8e0c8, fire: 0xff8a2a, ember: 0xffc04a,
+  mud: 0xc9a06a, mudD: 0xa77f4f, slate: 0x4f5a66, beam: 0x3a2a1c, plaster: 0xe8dcc0, brick: 0xa8553f, brickD: 0x6b3426,
+  white: 0xf2efe6, tile: 0xb0442e, iron: 0x4a4f55, steel: 0x8a949c, brass: 0xc9a13a, glass: 0x5f8fb0, concrete: 0xc4c2bc,
+  dark: 0x26343c, snow: 0xf4f6f7, chrome: 0xd8e2e8, neonC: 0x39f3ff, neonM: 0xff3df2, olive: 0x55603a, smoke: 0x9a9a9a,
+};
+const SCAFFOLD = 0xa8823f;
 
 export function designCtx(type, team, size, age) {
   const s = size - 0.22;
@@ -22,15 +29,15 @@ export const found = (ctx, w, d) => {
   }
 };
 export const banner = (ctx, x, z, y0, hh) => { ctx.b.cyl(0.025, hh, C.woodD, x, y0, z).box(0.02, 0.32, 0.28, ctx.t, x, y0 + hh - 0.34, z + 0.15); };
-// A 0.7-tall pole standing on y (into ctx.mast) with the team flag at its top, flush with the pole's tip.
-export const flag = (ctx, x, y, z) => {
-  ctx.mast.cyl(0.025, 0.7, C.woodD, x, y, z);
-  ctx.extra.flag = new B().box(0.025, 0.28, 0.5, ctx.t, 0, 0, 0.25).geometry(); ctx.extra.flagAt = [x, y + 0.42, z];
+// A pole `len` tall standing on y (into ctx.mast) with the team flag at its top, flush with the pole's tip.
+export const flag = (ctx, x, y, z, len = 0.7, pole = C.woodD) => {
+  ctx.mast.cyl(0.025, len, pole, x, y, z);
+  ctx.extra.flag = new B().box(0.025, 0.28, 0.5, ctx.t, 0, 0, 0.25).geometry(); ctx.extra.flagAt = [x, y + len - 0.28, z];
 };
 export const firePit = (ctx, x, z) => {
   const { b } = ctx;
   for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; b.sph(0.05, C.stoneD, x + Math.cos(a) * 0.13, 0.03, z + Math.sin(a) * 0.13); }
-  b.cone(0.08, 0.22, FIRE, x, 0.02, z, 5).cone(0.04, 0.14, EMBER, x, 0.05, z, 5);
+  b.cone(0.08, 0.22, P.fire, x, 0.02, z, 5).cone(0.04, 0.14, P.ember, x, 0.05, z, 5);
 };
 // cols × rows framed windows across width w on the wall face at z, the first row at y0, rows dy apart.
 export const windowGrid = (ctx, cols, rows, w, z, y0, dy, frame, glass, x0 = 0) => {
@@ -45,11 +52,11 @@ export const windowGrid = (ctx, cols, rows, w, z, y0, dy, frame, glass, x0 = 0) 
 export const ring = (r, tube, color, tilt = 0) => new B().add(new THREE.TorusGeometry(1, tube, 6, 40), color, 0, 0, 0, r, r, r, Math.PI / 2 + tilt, 0, 0).geometry();
 // A 12-tooth gear of radius R facing +z, with a brass hub.
 export const gear = (R, color) => {
-  const g = new B().add(unit.cyl, color, 0, 0, 0, R, 0.06, R, Math.PI / 2, 0, 0).add(unit.cyl, BRASS, 0, 0, 0.04, 0.09, 0.08, 0.09, Math.PI / 2, 0, 0);
+  const g = new B().add(unit.cyl, color, 0, 0, 0, R, 0.06, R, Math.PI / 2, 0, 0).add(unit.cyl, P.brass, 0, 0, 0.04, 0.09, 0.08, 0.09, Math.PI / 2, 0, 0);
   for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.box(0.1, 0.1, 0.07, color, Math.cos(a) * R, Math.sin(a) * R - 0.05, 0, 0, 0, a); }
   return g.geometry();
 };
-export const puff = () => new B().sph(0.12, 0x9a9a9a, 0, 0, 0).sph(0.09, 0x8a8a8a, 0.08, 0.1, 0.03).sph(0.08, 0xa8a8a8, -0.06, 0.16, -0.02).geometry();
+export const puff = () => new B().sph(0.12, P.smoke, 0, 0, 0).sph(0.09, 0x8a8a8a, 0.08, 0.1, 0.03).sph(0.08, 0xa8a8a8, -0.06, 0.16, -0.02).geometry();
 
 // Scaffolding around the footprint, sh tall: corner posts, rails every 0.6 and two diagonal braces.
 function scaffold(s, sh) {
