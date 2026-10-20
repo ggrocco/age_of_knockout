@@ -1,4 +1,5 @@
 import { findPath } from './path.js';
+import { breachTarget } from './defence.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 
@@ -22,6 +23,9 @@ function travel(game, u, goal, to) {
   return 'moving';
 }
 const stop = u => { u.order = IDLE(); u.path = null; };
+// Walled off: attack the enemy building in the way, and take up `o` again once it falls (doAttack restores `resume`).
+// travel just set a 40-tick retry for the failed path; clear it so the unit heads for the breach at once.
+const breach = (u, id, o) => { u.order = { type: 'attack', target: id, fails: 0, resume: o }; u.path = null; u.retry = 0; };
 
 export function updateUnit(game, u) {
   if (u.cd > 0) u.cd--;
@@ -36,11 +40,17 @@ export function updateUnit(game, u) {
   }
 }
 
+// A move that cannot reach its tile first settles for within 2 tiles of it. If even that fails and enemy buildings are in the
+// way, the unit breaks through them, then tries for the exact tile again (slack back to 0); otherwise it stops.
 function doMove(game, u, o) {
-  const to = { x: Math.floor(o.x), y: Math.floor(o.y) };
-  const r = travel(game, u, (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack, to);
+  const to = { x: Math.floor(o.x), y: Math.floor(o.y) }, goal = (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack;
+  const r = travel(game, u, goal, to);
   if (r === 'arrived') return stop(u);
-  if (r === 'fail') { if (o.slack < 2) { o.slack = 2; u.retry = 0; } else stop(u); }
+  if (r !== 'fail') return;
+  if (o.slack < 2) { o.slack = 2; u.retry = 0; return; }
+  const id = breachTarget(game, u, to, goal);
+  if (id === null) return stop(u);
+  o.slack = 0; breach(u, id, o);
 }
 
 function nearestResource(game, u, kind, maxDist) {
@@ -93,8 +103,22 @@ function doGather(game, u, o) {
   }
 }
 
+// The nearest building in a build queue (a wall line) that is still standing and unfinished; it is taken off the queue.
+// Finished or destroyed ones are dropped. A tie on distance goes to the earlier one in the queue.
+function nextInQueue(game, u, o) {
+  let best = null, bd = Infinity;
+  o.queue = (o.queue || []).filter(id => { const b = game.entities.get(id); return b && !b.dead && !b.constructed && b.owner === u.owner; });
+  for (const id of o.queue) { const b = game.entities.get(id), d = distPoint(u.x, u.y, b); if (d < bd) { bd = d; best = b; } }
+  if (best) o.queue = o.queue.filter(id => id !== best.id);
+  return best;
+}
+
 function doBuild(game, u, o) {
   const b = game.entities.get(o.target);
+  if (!b || b.dead || b.constructed) { // done (or gone): move on to the nearest segment left in the queue
+    const next = o.queue && nextInQueue(game, u, o);
+    if (next) { o.target = next.id; o.fails = 0; u.path = null; u.retry = 0; return; }
+  }
   if (!b || b.dead) return stop(u);
   if (b.constructed) {
     if (b.gatherType && b.amount > 0) { u.order = { type: 'gather', res: b.id, kind: 'food', phase: 'go', fails: 0 }; u.path = null; }
@@ -127,9 +151,15 @@ export function hit(game, u, t) {
   }
 }
 
+// A breach order (one with `resume`) that loses its target hands back the order it interrupted, on the next tick and with no
+// retry wait. A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap
+// the order round itself); a breach can wrap again, each layer restoring the one before. Only an attack with no breach counts fails.
 function doAttack(game, u, o) {
   const t = game.entities.get(o.target);
-  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) return stop(u);
+  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) {
+    if (!o.resume) return stop(u);
+    u.order = o.resume; u.path = null; u.retry = 0; return;
+  }
   if (distPoint(u.x, u.y, t) <= u.range + 0.1) {
     u.path = null;
     if (u.cd === 0) { u.cd = u.cooldown; hit(game, u, t); }
@@ -138,8 +168,11 @@ function doAttack(game, u, o) {
   const tt = tileOf(t), key = tt.x + ',' + tt.y;
   if (u.path && o.last !== key && (game.time + u.id) % 5 === 0) u.path = null;
   o.last = key;
-  const r = travel(game, u, goalNear(t, Math.max(0.9, u.range - 0.5)), tt);
-  if (r === 'fail' && ++o.fails > 3) stop(u);
+  const goal = goalNear(t, Math.max(0.9, u.range - 0.5)), r = travel(game, u, goal, tt);
+  if (r !== 'fail') return;
+  const id = breachTarget(game, u, tt, goal);
+  if (id !== null && id !== o.target) return breach(u, id, o);
+  if (++o.fails > 3) stop(u);
 }
 
 function aggro(game, u) {
@@ -162,8 +195,11 @@ function doRelic(game, u, o) {
     if (!r || r.holder !== null || r.stored !== null) return stop(u);
     if (Math.hypot(r.x - u.x, r.y - u.y) <= REACH) { r.holder = u.id; u.relic = r.id; o.phase = 'store'; u.path = null; return; }
     const t = { x: Math.floor(r.x), y: Math.floor(r.y) };
-    const res = travel(game, u, (x, y) => x === t.x && y === t.y, t);
-    if (res === 'fail' && ++o.fails > 3) stop(u);
+    const goal = (x, y) => x === t.x && y === t.y, res = travel(game, u, goal, t);
+    if (res !== 'fail') return;
+    const id = breachTarget(game, u, t, goal); // a relic walled in by the enemy: break through, then take up the fetch again
+    if (id !== null) return breach(u, id, o);
+    if (++o.fails > 3) stop(u);
   } else {
     if (u.relic === null) return stop(u);
     let d = null, bd = Infinity;
@@ -173,7 +209,10 @@ function doRelic(game, u, o) {
     }
     if (!d) return stop(u);
     if (bd <= REACH) { const rl = game.relics.get(u.relic); rl.holder = null; rl.stored = d.id; u.relic = null; return stop(u); }
-    const res = travel(game, u, goalNear(d, 0.95), centerOf(d));
-    if (res === 'fail' && ++o.fails > 3) stop(u);
+    const goal = goalNear(d, 0.95), to = centerOf(d), res = travel(game, u, goal, to);
+    if (res !== 'fail') return;
+    const id = breachTarget(game, u, to, goal); // the way home is walled off by the enemy: break through, then carry on home
+    if (id !== null) return breach(u, id, o);
+    if (++o.fails > 3) stop(u);
   }
 }

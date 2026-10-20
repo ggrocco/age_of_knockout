@@ -26,6 +26,8 @@ export const DESC = {
   wonder: `In the Wonder Race, keeping one standing for ${Math.round(WONDER_TICKS / 1200)} minutes wins the round.`,
   castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age.',
   factory: 'Industrial Age works that builds Field Artillery and Tanks. You need one to advance out of the Industrial Age.',
+  tower: 'Shoots the nearest enemy in range, on its own. Towers built in a later Age are tougher and hit harder. Does not count toward advancing an Age.',
+  wall: 'One-tile barrier that blocks every unit, yours too. It has no gates: leave a gap or delete it. Walls built in a later Age are tougher.',
   villager: 'Gathers food, wood, gold and stone and builds every structure. Weak in a fight.',
   clubman: 'Cheap melee infantry that fights well early and falls behind in later Ages.',
   axeman: 'Melee infantry with a heavier swing than the Clubman.',
@@ -51,6 +53,7 @@ export const DESC = {
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
   king: 'Regicide only: if your King falls, the match is lost. Keep him safe.',
   age: 'Research the next Age to unlock stronger units and buildings.',
+  delete: 'Knocks this building down at once. Nothing is refunded, and anything it was training is lost.',
 };
 
 // Cost chips: coloured dot + amount. `short` lists resources the player lacks; `compact` shortens 1000 to 1k.
@@ -86,7 +89,7 @@ export function roundTipHtml(round, capTicks = round.capTicks) {
     + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
 }
 
-// state: { kind: 'unit'|'building'|'age', id, next?, short?: string[], notes?: string[] }
+// state: { kind: 'unit'|'building'|'tech'|'age'|'delete', id, next?, short?: string[], notes?: string[] }
 export function tipHtml({ kind, id, next, short = [], notes = [] }) {
   let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
   if (kind === 'unit') {
@@ -105,6 +108,8 @@ export function tipHtml({ kind, id, next, short = [], notes = [] }) {
     const t = TECHS[id]; title = t.name; sub = `Research, ${ageTitle(t.age)}`; cost = t.cost; desc = t.desc;
     stats = row('Research time', `${t.time}s`, true);
     if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
+  } else if (kind === 'delete') {
+    title = 'Delete'; sub = 'Your selected building'; cost = {}; ic = 'delete';
   } else {
     const a = AGE_COST[next]; title = `Advance to ${ageTitle(next)}`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
     const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);

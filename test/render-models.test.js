@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { UNITS } from '../src/data/units.js';
 import { BUILDINGS } from '../src/data/buildings.js';
-import { AGES } from '../src/data/ages.js';
+import { AGES, ageIndex } from '../src/data/ages.js';
 import { buildModel, animate } from '../src/render/models.js';
 import { ERA_STYLE } from '../src/render/styles.js';
 
@@ -98,8 +98,11 @@ test('every era has a building style; the new eras look distinct', () => {
   assert.equal(new Set([...keys, 'timber', 'masonry']).size, 7);
 });
 test('buildings re-skin in every new era', () => {
-  const chain = ['iron', 'medieval', 'sail', 'industrial', 'modern', 'future'];
-  for (const type of ['town_center', 'barracks', 'house', 'castle', 'factory']) for (let i = 1; i < chain.length; i++) assert.notEqual(colorsOf(type, chain[i]), colorsOf(type, chain[i - 1]), `${type} ${chain[i]}`);
+  // Before it unlocks a building shows its unlock-era design, so each chain starts at the unlock era.
+  for (const type of ['town_center', 'barracks', 'house', 'castle', 'factory']) {
+    const chain = ['iron', 'medieval', 'sail', 'industrial', 'modern', 'future'].filter(a => ageIndex(a) >= ageIndex(BUILDINGS[type].age));
+    for (let i = 1; i < chain.length; i++) assert.notEqual(colorsOf(type, chain[i]), colorsOf(type, chain[i - 1]), `${type} ${chain[i]}`);
+  }
 });
 test('Castle and Factory have their own geometry, not the placeholder box', () => {
   for (const type of ['castle', 'factory']) { const m = buildModel({ kind: 'building', type, owner: 0, size: BUILDINGS[type].size, constructed: true, progress: 1, amount: 0 }, 'modern'); assert.ok(m.anim.body.children[0].geometry.attributes.position.count > 100, type); }

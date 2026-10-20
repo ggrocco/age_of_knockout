@@ -20,6 +20,8 @@ export const ICONS = {
   wonder: svg(`<path d="M5 20.5 12 7l7 13.5z" ${D}/><path d="M8.4 14h7.2M10.2 10.4h3.6"/><path d="M2.5 20.5h19"/><path d="M12 1.4v3.2M10.4 3h3.2"/>`),
   castle: svg(`<path d="M4 21V7.5h2.5v2h2v-2h2.5v2h2v-2h2.5v2h2v-2H20V21z" ${D}/><path d="M9.6 21v-4.2a2.4 2.4 0 0 1 4.8 0V21"/><path d="M2.5 21h19"/><path d="M12 9.5V3"/><path d="M12 3l3.4 1.3L12 5.6z" ${S}/>`),
   factory: svg(`<path d="M3 21v-9l4.5-3v3l4.5-3v3l4.5-3v12z" ${D}/><path d="M17.2 21V5.5h2.6V21"/><path d="M2 21h20"/><path d="M18.4 3.6c-.4-1.5 1.2-2.1 2.4-1.2"/><path d="M5.6 16.4h2M10.1 16.4h2M14.6 16.4h2"/>`),
+  tower: svg(`<path d="M8.5 21V10.5H7V4.5h2.4v2H11v-2h2v2h1.6v-2H17v6h-1.5V21z" ${D}/><rect x="11.3" y="12.4" width="1.4" height="3.2" rx=".5" ${S}/><path d="M10.8 21v-2.6a1.2 1.2 0 0 1 2.4 0V21"/><path d="M5.5 21h13"/>`),
+  wall: svg(`<path d="M2.6 20.5V6.5h3.2v2.4h2v-2.4H11v2.4h2V6.5h3.2v2.4h2V6.5h3.2v14z" ${D}/><path d="M2.6 12.7h18.8M2.6 16.6h18.8M9.4 8.9v3.8M15.6 8.9v3.8M6 12.7v3.9M12.4 12.7v3.9M18.6 12.7v3.9M9.4 16.6v3.9M15.6 16.6v3.9"/><path d="M1.5 20.5h21"/>`),
   // units
   villager: svg(`<circle cx="12" cy="9.3" r="3" ${D}/><path d="M8 8.4a4 4 0 0 1 8 0zM6.6 8.6h10.8"/><path d="M5.5 20.5c0-3.9 2.9-6.2 6.5-6.2s6.5 2.3 6.5 6.2z" ${D}/>`),
   clubman: svg(`<path d="M11.8 12.2c-1-2.8.6-6.6 4.2-8.4 3.2-.4 4.6 2.4 3.8 5.2-.8 2.8-4.4 4.6-8 3.2z" ${D}/><path d="M11.6 12.4 4.6 19.4"/><circle cx="15.6" cy="7.4" r=".75" ${S}/><circle cx="17.8" cy="10" r=".75" ${S}/><circle cx="18.2" cy="6" r=".75" ${S}/>`),
@@ -48,6 +50,7 @@ export const ICONS = {
   // ui
   age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${D}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
   lock: svg(`<path d="M7.6 11V8.4a4.4 4.4 0 0 1 8.8 0V11"/><rect x="5.5" y="11" width="13" height="9.5" rx="2" ${D}/><circle cx="12" cy="15.2" r="1.3" ${S}/>`),
+  delete: svg(`<path d="M6.3 7.2l1 13.3h9.4l1-13.3z" ${D}/><path d="M4 7.2h16"/><path d="M9.4 7.2V4.4a.9.9 0 0 1 .9-.9h3.4a.9.9 0 0 1 .9.9v2.8"/><path d="M10 10.6v6.6M14 10.6v6.6"/>`),
   unknown: svg(`<circle cx="12" cy="12" r="8.2" ${D}/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r=".9" ${S}/>`),
 };
 // Class fallbacks so a future unit never renders a blank tile.

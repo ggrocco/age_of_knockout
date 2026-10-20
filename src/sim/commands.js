@@ -16,7 +16,7 @@ export function canPlace(game, pid, type, x, y) {
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
   if (x < 1 || y < 1 || x + def.size > n - 1 || y + def.size > n - 1) return false;
   for (let j = y; j < y + def.size; j++) for (let i = x; i < x + def.size; i++) {
-    if (game.map.tiles[j * n + i] === 1 || game.occAt(i, j) || !p.explored[j * n + i]) return false;
+    if (game.map.tiles[j * n + i] === 1 || game.occAt(i, j) || game.reserved.has(j * n + i) || !p.explored[j * n + i]) return false;
   }
   for (const r of game.relics.values()) if (r.holder === null && r.stored === null && r.x >= x && r.x < x + def.size && r.y >= y && r.y < y + def.size) return false;
   return true;
@@ -67,6 +67,27 @@ export function execute(game, pid, cmd) {
       pay(p, def.cost);
       const b = game.addBuilding(cmd.building, pid, cmd.x, cmd.y, false);
       for (const u of us) { u.order = { type: 'build', target: b.id, fails: 0 }; u.path = null; u.retry = 0; }
+      return OK;
+    }
+    case 'wall': { // a line of wall foundations (tiles from lineTiles): each free tile is paid for and placed in order, blocked ones are skipped free
+      const def = BUILDINGS.wall, us = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager');
+      if (!us.length) return fail('no villagers');
+      if (ageIndex(def.age) > ageIndex(p.age)) return fail('age');
+      const placed = []; let short = false;
+      for (const t of Array.isArray(cmd.tiles) ? cmd.tiles : []) {
+        if (!t || !canPlace(game, pid, 'wall', t.x, t.y)) continue;
+        if (!canAfford(p, def.cost)) { short = true; break; } // out of stone: the rest of the line is not placed
+        pay(p, def.cost); placed.push(game.addBuilding('wall', pid, t.x, t.y, false).id);
+      }
+      if (!placed.length) return fail(short ? 'resources' : 'placement'); // a free tile it could not pay for, or nowhere free
+      const [target, ...rest] = placed;
+      for (const u of us) { u.order = { type: 'build', target, queue: rest.slice(), fails: 0 }; u.path = null; u.retry = 0; }
+      return { ok: true, placed: placed.length };
+    }
+    case 'delete': { // knock down one of your own buildings: no refund; anything in its training queue is lost
+      const b = game.entities.get(cmd.id);
+      if (!b || b.dead || b.kind !== 'building' || b.owner !== pid) return fail('bad target');
+      game.remove(b); game.recount();
       return OK;
     }
     case 'resign': game.result = { winner: 1 - pid, reason: 'resigned' }; return OK;

@@ -1,80 +1,10 @@
-// Procedural models with merged vertex colors (cached per type, team and architectural style).
+// Procedural models with merged vertex colors (cached per type, team and building design).
 // Limbs / arms / flags are separate animated meshes; the view draws every MODEL_MATERIAL mesh through one batch.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createModelMaterial, surfaceKind } from './materials.js';
 import { styleOf } from './styles.js';
-
-export const TEAM = [0x356bb0, 0xb84532], TEAM_DARK = [0x234779, 0x7c3027];
-const C = { skin: 0xe8b98a, hair: 0x4a3222, wood: 0x7a5230, woodD: 0x4e3320, plaster: 0xe6d8b4, stone: 0x9a9a92, stoneD: 0x6f6f68, thatch: 0xc9a24a, thatchD: 0xa8822f, dark: 0x2a2018, gold: 0xf2c230, iron: 0xb9c0c8, bronze: 0xb5803a, leather: 0x8a5a2b, cloth: 0xc9b58a, hay: 0xe0c060, marble: 0xefe9dc, green: 0x3f7f3a, red: 0xc0392b, glass: 0x6fa8c8 };
-const VC = createModelMaterial();
-export const MODEL_MATERIAL = VC;
-const unit = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(1, 10, 8), cyl: new THREE.CylinderGeometry(1, 1, 1, 10), rock: new THREE.DodecahedronGeometry(1, 0), foliage: new THREE.IcosahedronGeometry(1, 1), tor: new THREE.TorusGeometry(1, 0.08, 6, 14, Math.PI) };
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
-const prismCache = new Map();
-function prismGeo(w, h, d) { const k = [w, h, d].join(); if (!prismCache.has(k)) { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, h); s.closePath(); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); prismCache.set(k, g); } return prismCache.get(k); }
-
-class B {
-  constructor() { this.geos = []; }
-  add(geo, color, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
-    _q.setFromEuler(_e.set(rx, ry, rz)); _m.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz));
-    let g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(_m); g.deleteAttribute('uv');
-    const n = g.attributes.position.count, col = new Float32Array(n * 3); _c.set(color);
-    for (let i = 0; i < n; i++) {
-      // Subtle per-face patina; shared by each triangle's vertices to avoid seams.
-      const shade = 0.94 + ((Math.imul((i / 3 | 0) + 1, 16807) >>> 0) % 101) / 1250;
-      col[i * 3] = _c.r * shade; col[i * 3 + 1] = _c.g * shade; col[i * 3 + 2] = _c.b * shade;
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.setAttribute('surface', new THREE.BufferAttribute(new Float32Array(n).fill(surfaceKind(color)), 1)); this.geos.push(g); return this;
-  }
-  box(w, h, d, c, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) { return this.add(unit.box, c, x, y + h / 2, z, w, h, d, rx, ry, rz); }
-  cyl(r, h, c, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) { return this.add(unit.cyl, c, x, y + h / 2, z, r, h, r, rx, ry, rz); }
-  cylT(rt, rb, h, c, x = 0, y = 0, z = 0, seg = 10, rx = 0, ry = 0, rz = 0) { return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), c, x, y + h / 2, z, 1, 1, 1, rx, ry, rz); }
-  cone(r, h, c, x = 0, y = 0, z = 0, seg = 8, ry = 0) { return this.add(new THREE.ConeGeometry(r, h, seg), c, x, y + h / 2, z, 1, 1, 1, 0, ry, 0); }
-  sph(r, c, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) { return this.add(unit.sph, c, x, y, z, r * sx, r * sy, r * sz); }
-  rock(r, c, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, ry = 0) { return this.add(unit.rock, c, x, y + r * sy * 0.6, z, r * sx, r * sy, r * sz, 0, ry, 0); }
-  foliage(r, c, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0) { return this.add(unit.foliage, c, x, y + r * sy * 0.6, z, r * sx, r * sy, r * sz, 0, ry, 0); }
-  roof(w, h, d, c, x = 0, y = 0, z = 0, ry = 0) {
-    this.add(prismGeo(w, h, d), c, x, y, z, 1, 1, 1, 0, ry, 0);
-    if (![C.thatch, 0xa96342, 0x945139].includes(c)) return this;
-    const surface = new B(), slope = Math.atan2(h, w / 2), length = Math.hypot(w / 2, h);
-    const tiled = c === 0xa96342 || c === 0x945139;
-    for (const side of [-1, 1]) {
-      if (tiled) {
-        for (let row = 0; row < 6; row++) {
-          const f = (row + 0.5) / 6;
-          surface.box(length / 6 + 0.025, 0.035, d + 0.04, row % 2 ? c : 0xb7714e,
-            side * w / 2 * f, h * (1 - f) + 0.018, 0, 0, 0, -side * slope);
-          for (let zz = -d / 2 + 0.12; zz < d / 2; zz += 0.24) {
-            surface.box(length / 6, 0.052, 0.035, 0x8a4c34, side * w / 2 * f, h * (1 - f) + 0.025, zz, 0, 0, -side * slope);
-          }
-        }
-      } else {
-        for (let zz = -d / 2; zz <= d / 2; zz += 0.095) {
-          surface.box(length, 0.025, 0.025, Math.round((zz + d) * 100) % 3 ? C.thatchD : C.hay,
-            side * w / 4, h / 2 + 0.018, zz, 0, 0, -side * slope);
-        }
-        for (let row = 1; row <= 3; row++) {
-          surface.box(0.035, 0.035, d + 0.08, C.wood, side * w / 2 * row / 4, h * (1 - row / 4) + 0.04, 0);
-        }
-      }
-    }
-    const detail = surface.geometry();
-    this.add(detail, 0xffffff, x, y, z, 1, 1, 1, 0, ry);
-    // Preserve the detail's baked colors after applying its transform.
-    this.geos[this.geos.length - 1].setAttribute('color', detail.attributes.color.clone());
-    this.geos[this.geos.length - 1].setAttribute('surface', detail.attributes.surface.clone());
-    detail.dispose();
-    return this;
-  }
-  geometry() { const m = mergeGeometries(this.geos, false); for (const g of this.geos) g.dispose(); m.userData.shared = true; return m; }
-
-}
-const cache = new Map();
-const cached = (k, f) => { if (!cache.has(k)) cache.set(k, f()); return cache.get(k); };
-const mesh = g => { const m = new THREE.Mesh(g, VC); m.castShadow = m.receiveShadow = true; return m; };
-const pivot = (x, y, z, g) => { const p = new THREE.Group(); p.position.set(x, y, z); if (g) p.add(mesh(g)); return p; };
+import { B, C, unit, TEAM, TEAM_DARK, MODEL_MATERIAL, cached, mesh, pivot } from './builder.js';
+import { designOf, archGeos } from './arch/index.js';
+export { TEAM, TEAM_DARK, MODEL_MATERIAL };
 const rng = seed => { let a = (seed * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
 // ---------- humanoids ----------
@@ -287,184 +217,24 @@ function futureModel(e) {
 }
 
 // ---------- buildings ----------
-// Building geometry is cached per style, not per age: ages sharing a style (styles.js: Stone/Tool, Bronze/Iron) look identical.
+// Geometry comes from the arch registry (arch/index.js) and is cached per design key, so eras that show the same
+// design share it. buildingStyle is the legacy palette key, still used by the buildings gallery.
 export const buildingStyle = age => styleOf(age).key;
-function buildingGeos(type, team, size, age) {
-  const t = TEAM[team], td = TEAM_DARK[team], s = size - 0.22, h = s / 2, b = new B(), extra = {};
-  const st = styleOf(age), ancient = st.key === 'timber' || st.key === 'masonry', flat = st.roofForm === 'flat', roofColor = st.roof, wallColor = st.wall;
-  // A gable roof plus its ridge cap, or (flat-roofed eras) a slab with a low parapet over the same footprint.
-  const roof = (w, hh, d, x, y, z, ry = 0, ridge) => {
-    if (!flat) { b.roof(w, hh, d, roofColor, x, y, z, ry); if (ridge) ridge(); return; }
-    const X = ry ? d : w, Z = ry ? w : d; b.box(X, 0.14, Z, roofColor, x, y, z);
-    for (const k of [-1, 1]) b.box(X, 0.12, 0.07, st.trim, x, y + 0.14, z + k * Z / 2).box(0.07, 0.12, Z, st.trim, x + k * X / 2, y + 0.14, z);
-  };
-  // The era's signature detail on a building's main wall block: width X, depth Z, centre z0, wall top y (round: a tower of diameter X).
-  const eraDetail = (X, Z, z0, top, round = false) => {
-    const d = st.detail; if (!d) return;
-    if (d === 'chimney') { const cx = round ? X * 0.3 : X / 2 - 0.3, cz = z0 - (round ? X : Z) / 4; b.box(0.24, 1.1, 0.24, 0x7a3a2a, cx, top, cz).box(0.3, 0.06, 0.3, C.stoneD, cx, top + 1.1, cz); return; }
-    const ys = d === 'bands' ? [top * 0.5, top - 0.1] : d === 'window' ? [top * 0.55] : [top - 0.12], hh = d === 'window' ? 0.16 : 0.06;
-    if (round) {
-      if (d === 'crenel') for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; b.box(0.16, 0.16, 0.12, st.trim, Math.cos(a) * X / 2, top, z0 + Math.sin(a) * X / 2, 0, -a); }
-      else for (const y of ys) b.cyl(X / 2 + 0.02, hh, st.trim, 0, y, z0);
-      return;
-    }
-    const edges = [[0, -Z / 2, X, 0], [0, Z / 2, X, 0], [-X / 2, 0, Z, Math.PI / 2], [X / 2, 0, Z, Math.PI / 2]];
-    for (const [ex, ez, len, ry] of edges) {
-      if (d === 'crenel') for (let k = -len / 2 + 0.1; k <= len / 2 - 0.1; k += 0.3) b.box(0.16, 0.16, 0.12, st.trim, ry ? ex : k, top, z0 + (ry ? k : ez), 0, ry);
-      else for (const y of ys) b.box(len + 0.02, hh, 0.04, st.trim, ex, y, z0 + ez, 0, ry);
-    }
-  };
-  const door = (w, hh, z, x = 0) => { b.box(w, hh, 0.06, C.dark, x, 0.16, z).box(w + 0.1, 0.06, 0.08, C.woodD, x, 0.16 + hh, z); };
-  const win = (x, y, z, ry = 0) => { b.box(0.22, 0.22, 0.05, C.glass, x, y, z, 0, ry).box(0.28, 0.04, 0.07, C.woodD, x, y + 0.22, z, 0, ry); };
-  const found = (w, d) => {
-    b.box(w + 0.12, 0.12, d + 0.12, 0x756852, 0, 0, 0);
-    for (let x = -w / 2; x < w / 2; x += 0.32) for (const z of [-d / 2, d / 2]) {
-      b.box(0.29, 0.09, 0.16, Math.round(x * 100) % 3 ? 0xa6977b : 0xb3a487, x + 0.12, 0.09, z);
-    }
-  };
-  const posts = (w, d, hh, c = C.woodD) => { for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.1, hh, 0.1, c, x * w / 2, 0.16, z * d / 2); };
-  const banner = (x, z, y0, hh) => { b.cyl(0.025, hh, C.woodD, x, y0, z).box(0.02, 0.32, 0.28, t, x, y0 + hh - 0.34, z + 0.15); };
-  if (type === 'house') {
-    found(s, s); b.box(s - 0.1, 0.72, s - 0.1, wallColor, 0, 0.16, 0); posts(s - 0.1, s - 0.1, 0.72); b.box(s - 0.06, 0.06, s - 0.06, C.woodD, 0, 0.5, 0);
-    roof(s + 0.35, 0.75, s + 0.3, 0, 0.88, 0, 0, () => b.box(0.09, 0.07, s + 0.36, td, 0, 1.6, 0).box(0.03, 0.03, s + 0.3, C.thatchD, 0, 0.9, 0));
-    door(0.3, 0.5, (s - 0.1) / 2 + 0.02, -0.25); win(0.35, 0.5, (s - 0.1) / 2 + 0.02); b.box(0.18, 0.55, 0.18, C.stoneD, 0.5, 1.0, -0.4);
-    eraDetail(s - 0.1, s - 0.1, 0, 0.88);
-  } else if (type === 'town_center') {
-    // An ancient assembly hall: a broad roof, shaded porch and working courtyard.
-    // Team identity lives on cloth and trim rather than an entirely blue/red roof.
-    found(s, s);
-    b.box(s - 0.3, 1.05, s * 0.66, wallColor, 0, 0.16, -s * 0.12);
-    posts(s - 0.3, s * 0.66, 1.05);
-    b.box(s - 0.18, 0.1, s * 0.69, C.woodD, 0, 1.12, -s * 0.12);
-    roof(s + 0.25, 0.95, s * 0.88, 0, 1.23, -s * 0.12, 0, () => b.box(0.1, 0.1, s * 0.92, C.woodD, 0, 2.16, -s * 0.12));
-    const front = s * 0.22;
-    door(0.5, 0.83, front); win(-0.68, 0.58, front); win(0.68, 0.58, front);
-    for (const x of [-s * 0.4, -s * 0.18, s * 0.18, s * 0.4]) {
-      b.cylT(0.06, 0.09, 1.0, st.key === 'timber' ? C.woodD : st.key === 'masonry' ? C.marble : st.trim, x, 0.16, s * 0.45, 8);
-      b.box(0.2, 0.08, 0.2, C.stone, x, 0.16, s * 0.45);
-    }
-    b.box(s * 0.92, 0.08, 0.11, C.woodD, 0, 1.16, s * 0.45);
-    for (let i = 0; i < 9; i++) {
-      b.box(s / 10, 0.035, s * 0.37, i % 3 === 0 ? t : C.cloth,
-        -s * 0.4 + i * s / 10, 1.2, s * 0.35, 0.14);
-    }
-    for (let i = 0; i < 3; i++) b.box(0.9 + i * 0.14, 0.045, 0.17, C.stone, 0, 0.11 - i * 0.03, h + i * 0.13);
-    // Terracotta storage jars and stacked timber beside the entrance.
-    for (const [x, z] of [[-h + 0.18, h - 0.15], [-h + 0.48, h - 0.16]]) {
-      b.sph(0.15, 0xa56843, x, 0.27, z, 1, 1.2, 1).cyl(0.065, 0.05, C.dark, x, 0.43, z);
-    }
-    for (let i = 0; i < 3; i++) b.cyl(0.055, 0.6, C.wood, h - 0.22, 0.16 + i * 0.08, 0.1, Math.PI / 2);
-    if (st.key !== 'timber') {
-      for (const x of [-h + 0.12, h - 0.12]) for (let row = 0; row < 5; row++) {
-        b.box(0.2, 0.13, s * 0.69, ancient ? (row % 2 ? C.stone : 0xc9baa0) : (row % 2 ? st.trim : st.wall), x, 0.18 + row * 0.19, -s * 0.12);
-      }
-    }
-    eraDetail(s - 0.3, s * 0.66, -s * 0.12, 1.21);
-    b.cyl(0.025, flat ? 1.83 : 1.0, C.woodD, 0, flat ? 1.37 : 2.2, -0.4);
-    extra.flag = new B().box(0.025, 0.3, 0.55, t, 0, 0, 0.27).geometry(); extra.flagAt = [0, 2.84, -0.4];
-  } else if (type === 'granary') {
-    b.cyl(s / 2 + 0.05, 0.16, C.stone).cyl(s / 2 - 0.08, 0.85, ancient ? C.plaster : st.wall, 0, 0.16, 0);
-    if (flat) b.cyl(s / 2 + 0.1, 0.14, st.roof, 0, 1.0, 0); else b.cone(s / 2 + 0.2, 0.85, ancient ? C.thatch : st.roof, 0, 1.0, 0, 12);
-    b.cyl(s / 2 - 0.06, 0.08, t, 0, 0.72, 0);
-    door(0.3, 0.5, s / 2 - 0.08); for (const [x, z] of [[0.6, 0.7], [0.85, 0.5], [0.7, 0.4]]) b.cyl(0.12, 0.22, C.hay, x, 0.16, z).sph(0.09, C.hay, x, 0.4, z, 1, 0.6, 1);
-    b.box(0.1, 0.2, 0.1, C.woodD, 0, flat ? 1.14 : 1.8, 0).cone(0.06, 0.12, t, 0, flat ? 1.19 : 1.85, 0, 6); eraDetail(s - 0.16, 0, 0, 1.01, true);
-  } else if (type === 'storage_pit') {
-    b.box(s, 0.1, s, C.woodD, 0, 0, 0).box(s - 0.3, 0.08, s - 0.3, C.dark, 0, 0.08, 0).box(0.1, 0.9, 0.1, C.wood, -0.7, 0.1, -0.7).box(0.1, 0.9, 0.1, C.wood, 0.7, 0.1, -0.7).box(0.1, 0.6, 0.1, C.wood, -0.7, 0.1, 0.7).box(0.1, 0.6, 0.1, C.wood, 0.7, 0.1, 0.7);
-    b.box(s + 0.3, 0.07, s + 0.2, t, 0, 0.85, 0, 0.28).box(s + 0.3, 0.03, s + 0.2, ancient ? C.thatch : st.roof, 0, 0.9, 0, 0.28);
-    for (const [x, z] of [[-0.3, 0.2], [0.1, 0.45], [0.4, -0.1]]) b.box(0.24, 0.22, 0.24, C.wood, x, 0.14, z).box(0.26, 0.03, 0.26, C.woodD, x, 0.36, z);
-    b.cylT(0.13, 0.15, 0.3, C.woodD, -0.55, 0.14, 0.3).sph(0.16, C.stoneD, 0.5, 0.2, 0.4, 1, 0.5, 1).sph(0.14, C.gold, 0.15, 0.24, -0.35, 1, 0.5, 1);
-  } else if (type === 'farm') {
-    b.box(s, 0.05, s, 0x6b4a26, 0, 0, 0); for (let i = -2; i <= 2; i++) b.box(s * 0.9, 0.05, 0.11, 0x4a3018, 0, 0.05, i * 0.32);
-    b.box(0.06, 0.6, 0.06, C.wood, s / 2 - 0.1, 0.05, -s / 2 + 0.1).box(0.34, 0.05, 0.05, C.wood, s / 2 - 0.1, 0.5, -s / 2 + 0.1).box(0.16, 0.2, 0.05, t, s / 2 - 0.1, 0.28, -s / 2 + 0.1);
-    const cr = new B(); for (let i = -2; i <= 2; i++) for (let j = -3; j <= 3; j++) { cr.cone(0.06, 0.22, i % 2 ? 0x6fae2f : 0x8bc34a, j * 0.24, 0.09, i * 0.32, 5).sph(0.045, C.hay, j * 0.24, 0.32, i * 0.32); }
-    extra.crops = cr.geometry();
-  } else if (type === 'barracks') {
-    found(s, s); b.box(s - 0.2, 0.95, s - 0.3, ancient ? 0xcbb890 : st.wall, 0, 0.16, 0); posts(s - 0.2, s - 0.3, 0.95); b.box(s - 0.16, 0.08, s - 0.26, C.woodD, 0, 0.66, 0);
-    roof(s - 0.05, 0.85, s + 0.25, 0, 1.06, 0, Math.PI / 2, () => b.box(s + 0.28, 0.08, 0.09, td, 0, 1.9, 0)); eraDetail(s - 0.2, s - 0.3, 0, 1.11);
-    door(0.5, 0.7, (s - 0.3) / 2 + 0.02); for (const x of [-0.75, 0.75]) b.add(unit.cyl, C.bronze, x, 0.75, (s - 0.3) / 2 + 0.05, 0.2, 0.03, 0.2, Math.PI / 2, 0, 0).add(unit.cyl, t, x, 0.75, (s - 0.3) / 2 + 0.07, 0.13, 0.03, 0.13, Math.PI / 2, 0, 0);
-    b.box(1.0, 0.06, 0.06, C.woodD, 0, 0.55, s / 2 + 0.28); for (let i = -2; i <= 2; i++) b.cyl(0.018, 0.75, C.wood, i * 0.2, 0.16, s / 2 + 0.28).cone(0.035, 0.1, C.iron, i * 0.2, 0.9, s / 2 + 0.28, 5);
-    b.box(0.06, 0.06, 0.6, C.woodD, s / 2 - 0.1, 0.5, s / 2 + 0.28); banner(-s / 2 + 0.1, s / 2 + 0.2, 0.16, 1.4);
-  } else if (type === 'archery_range') {
-    found(s, s); posts(s - 0.3, s - 0.7, 1.05); b.box(s - 0.1, 0.09, s - 0.6, t, 0, 1.21, -0.25, 0.12).box(s - 0.1, 0.03, s - 0.6, ancient ? C.thatch : st.roof, 0, 1.3, -0.25, 0.12).box(s - 0.5, 0.7, 0.08, C.woodD, 0, 0.2, -s / 2 + 0.5);
-    for (const x of [-0.8, 0, 0.8]) { b.box(0.05, 0.6, 0.05, C.wood, x, 0.16, s / 2 - 0.15); b.add(unit.cyl, C.hay, x, 0.66, s / 2 - 0.15, 0.3, 0.06, 0.3, Math.PI / 2).add(unit.cyl, 0xffffff, x, 0.66, s / 2 - 0.12, 0.22, 0.03, 0.22, Math.PI / 2).add(unit.cyl, C.red, x, 0.66, s / 2 - 0.1, 0.15, 0.03, 0.15, Math.PI / 2).add(unit.cyl, C.gold, x, 0.66, s / 2 - 0.08, 0.06, 0.03, 0.06, Math.PI / 2); }
-    b.box(0.4, 0.3, 0.3, C.hay, -1.0, 0.16, 0.0).box(0.4, 0.3, 0.3, C.hay, -1.0, 0.46, 0.05); banner(s / 2 - 0.1, -s / 2 + 0.2, 0.16, 1.3);
-  } else if (type === 'stable') {
-    found(s, s); b.box(s - 0.2, 0.85, s - 0.4, ancient ? 0xb5854f : st.wall, 0, 0.16, -0.2); posts(s - 0.2, s - 0.4, 0.85);
-    roof(s + 0.15, 1.0, s - 0.1, 0, 1.0, -0.2, Math.PI / 2, () => b.box(s + 0.2, 0.08, 0.09, td, 0, 2.0, -0.2)); eraDetail(s - 0.2, s - 0.4, -0.2, 1.01);
-    b.box(0.6, 0.65, 0.06, C.dark, 0, 0.16, s / 2 - 0.4 + 0.02).box(0.7, 0.06, 0.08, C.woodD, 0, 0.8, s / 2 - 0.38);
-    for (const x of [-1, 1]) { b.box(0.06, 0.5, 0.06, C.wood, x * 0.9, 0.16, s / 2 - 0.1).box(0.06, 0.06, 0.7, C.wood, x * 0.9, 0.5, s / 2 - 0.45); } b.box(1.9, 0.06, 0.06, C.wood, 0, 0.5, s / 2 - 0.1).box(1.9, 0.06, 0.06, C.wood, 0, 0.3, s / 2 - 0.1);
-    b.box(0.45, 0.28, 0.3, C.hay, -1.0, 0.16, s / 2 - 0.4).box(0.3, 0.3, 0.3, C.hay, 1.0, 0.16, s / 2 - 0.5).box(0.3, 0.1, 0.3, C.wood, 0.95, 1.4, s / 2 - 0.65); banner(-s / 2 + 0.1, s / 2 - 0.1, 0.16, 1.4);
-  } else if (type === 'market') {
-    found(s, s); for (const [x, z, c1] of [[-0.7, -0.5, t], [0.7, -0.5, 0xffffff], [0, 0.6, t]]) {
-      b.box(0.9, 0.35, 0.5, C.wood, x, 0.16, z).box(0.06, 0.95, 0.06, C.woodD, x - 0.42, 0.16, z - 0.25).box(0.06, 0.95, 0.06, C.woodD, x + 0.42, 0.16, z - 0.25).box(0.06, 0.75, 0.06, C.woodD, x - 0.42, 0.16, z + 0.25).box(0.06, 0.75, 0.06, C.woodD, x + 0.42, 0.16, z + 0.25);
-      for (let i = 0; i < 4; i++) b.box(0.24, 0.04, 0.72, i % 2 ? 0xffffff : c1, x - 0.36 + i * 0.24, 0.95 - 0.02 * 0, z, 0.25);
-      for (let i = 0; i < 4; i++) b.sph(0.08, [C.red, C.gold, C.green, 0xc026d3][i], x - 0.27 + i * 0.18, 0.55, z + 0.05, 1, 0.8, 1);
-    } b.cylT(0.16, 0.18, 0.36, C.woodD, 1.0, 0.16, 0.9).cylT(0.16, 0.18, 0.36, C.woodD, 0.75, 0.16, 1.05).box(0.3, 0.26, 0.3, C.wood, -1.0, 0.16, 0.9);
-  } else if (type === 'government_center') {
-    b.box(s + 0.2, 0.14, s + 0.2, C.marble).box(s, 0.14, s, C.stone, 0, 0.14, 0);
-    b.box(s - 0.5, 1.0, s - 0.9, ancient ? C.marble : st.wall, 0, 0.28, -0.35); eraDetail(s - 0.5, s - 0.9, -0.35, 1.28);
-    for (let i = 0; i < 6; i++) b.cyl(0.11, 1.15, C.marble, -s / 2 + 0.3 + i * (s - 0.6) / 5, 0.28, s / 2 - 0.25).cyl(0.14, 0.07, C.stone, -s / 2 + 0.3 + i * (s - 0.6) / 5, 0.28, s / 2 - 0.25).cyl(0.14, 0.07, C.stone, -s / 2 + 0.3 + i * (s - 0.6) / 5, 1.36, s / 2 - 0.25);
-    b.box(s - 0.2, 0.2, 0.55, C.marble, 0, 1.43, s / 2 - 0.25).roof(s - 0.1, 0.62, 0.6, C.marble, 0, 1.63, s / 2 - 0.25, 0).roof(s - 0.5, 0.42, 0.62, t, 0, 1.68, s / 2 - 0.25, 0);
-    b.cone(0.5, 0.5, t, 0, 1.28, -0.35, 8).cone(0.14, 0.3, C.gold, 0, 1.75, -0.35, 6); banner(s / 2 - 0.05, s / 2 - 0.05, 0.28, 1.6);
-  } else if (type === 'wonder') {
-    for (let i = 0; i < 3; i++) b.box(s - i * 0.5, 0.22, s - i * 0.5, i % 2 ? C.marble : 0xd9cfb0, 0, i * 0.22, 0);
-    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, r = s * 0.36; b.cyl(0.13, 1.1, C.marble, Math.cos(a) * r, 0.66, Math.sin(a) * r).cyl(0.17, 0.08, C.stone, Math.cos(a) * r, 0.66, Math.sin(a) * r).cyl(0.17, 0.08, C.stone, Math.cos(a) * r, 1.76, Math.sin(a) * r); }
-    b.cyl(s * 0.4, 0.14, C.marble, 0, 1.84, 0);
-    for (let i = 0; i < 4; i++) b.box(s * 0.62 - i * 0.5, 0.42, s * 0.62 - i * 0.5, [C.marble, 0xd9cfb0, C.marble, 0xd9cfb0][i], 0, 1.96 + i * 0.42, 0);
-    b.cone(0.55, 0.8, C.gold, 0, 3.64, 0, 4, Math.PI / 4).cone(0.09, 0.5, C.gold, 0, 4.4, 0, 6).sph(0.11, 0xfff3a0, 0, 4.95);
-    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { b.cyl(0.05, 0.6, C.woodD, x * (s / 2 - 0.15), 0.66, z * (s / 2 - 0.15)).cylT(0.13, 0.06, 0.12, C.bronze, x * (s / 2 - 0.15), 1.26, z * (s / 2 - 0.15)).cone(0.1, 0.24, 0xff9a1f, x * (s / 2 - 0.15), 1.36, z * (s / 2 - 0.15), 6); }
-    banner(0, s / 2 - 0.05, 0.66, 1.9);
-  } else if (type === 'castle') {
-    // A keep inside a battlemented curtain wall with four corner towers; later eras re-skin the stone.
-    const cw = ancient || st.key === 'castle' ? 0x9c9a92 : st.wall, ct = ancient || st.key === 'castle' ? 0x6f6f68 : st.trim, W = s - 0.7, tw = h - 0.42;
-    found(s, s); b.box(W, 1.3, W, cw, 0, 0.16, 0).box(W + 0.06, 0.08, W + 0.06, t, 0, 1.08, 0);
-    for (const [ex, ez, ry] of [[0, -W / 2, 0], [0, W / 2, 0], [-W / 2, 0, Math.PI / 2], [W / 2, 0, Math.PI / 2]]) for (let k = -W / 2 + 0.15; k <= W / 2 - 0.15; k += 0.34) b.box(0.18, 0.18, 0.14, ct, ry ? ex : k, 1.46, ry ? k : ez, 0, ry);
-    b.box(s - 1.7, 1.1, s - 1.7, cw, 0, 1.46, -0.1); for (const x of [-0.35, 0.35]) b.box(0.08, 0.3, 0.04, C.dark, x, 1.9, -0.1 + (s - 1.7) / 2);
-    if (flat) b.box(s - 1.6, 0.12, s - 1.6, st.roof, 0, 2.56, -0.1); else for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.18, 0.18, 0.14, ct, x * (s - 1.9) / 2, 2.56, -0.1 + z * (s - 1.9) / 2);
-    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      b.cyl(0.42, 1.9, cw, x * tw, 0.16, z * tw);
-      if (flat) b.cyl(0.46, 0.12, st.roof, x * tw, 2.06, z * tw); else b.cone(0.5, 0.65, ancient ? 0x4f5a66 : st.roof, x * tw, 2.06, z * tw, 8);
-    }
-    door(0.7, 0.85, W / 2 + 0.02); for (let i = -2; i <= 2; i++) b.box(0.03, 0.85, 0.03, C.iron, i * 0.13, 0.16, W / 2 + 0.06);
-    eraDetail(s - 1.7, s - 1.7, -0.1, 2.56);
-    b.cyl(0.025, 0.9, C.woodD, 0, 2.56, -0.1); extra.flag = new B().box(0.025, 0.3, 0.55, t, 0, 0, 0.27).geometry(); extra.flagAt = [0, 3.15, -0.1];
-  } else if (type === 'factory') {
-    // A works hall with a glazed sawtooth roof and two smokestacks at the back.
-    const X = s - 0.2, Z = s - 0.3, L = Z / 3, rise = 0.42, len = Math.hypot(L, rise), tilt = Math.atan2(rise, L);
-    found(s, s); b.box(X, 1.0, Z, ancient ? 0x9a4a35 : st.wall, 0, 0.16, 0).box(X + 0.04, 0.08, Z + 0.04, t, 0, 0.9, 0);
-    for (let i = 0; i < 3; i++) {
-      const z0 = -Z / 2 + i * L;
-      b.box(X, 0.05, len, ancient ? 0x5d6468 : st.roof, 0, 1.16 + rise / 2 - 0.025, z0 + L / 2, -tilt).box(X - 0.04, rise, 0.04, C.glass, 0, 1.16, z0 + L - 0.02);
-    }
-    for (const x of [-X / 2 + 0.35, X / 2 - 0.35]) b.cyl(0.13, 2.1, 0x7a3a2a, x, 0.16, -Z / 2 + 0.25).cyl(0.16, 0.08, C.stoneD, x, 2.26, -Z / 2 + 0.25);
-    door(0.8, 0.7, Z / 2 + 0.02); win(-0.85, 0.5, Z / 2 + 0.02); win(0.85, 0.5, Z / 2 + 0.02);
-    eraDetail(X, Z, 0, 1.16); banner(X / 2 - 0.05, Z / 2 + 0.1, 0.16, 1.3);
-  } else { b.box(s, 0.8, s, C.plaster); }
-  if (['house', 'barracks', 'stable'].includes(type)) {
-    const front = type === 'house' ? (s - 0.1) / 2 + 0.012 : type === 'stable' ? s / 2 - 0.39 : (s - 0.3) / 2 + 0.012;
-    for (const side of [-1, 1]) {
-      for (let row = 0; row < 4; row++) {
-        b.box(0.2, 0.09, 0.07, st.key === 'timber' ? C.wood : st.trim,
-          side * (s / 2 - 0.18), 0.19 + row * 0.18, front);
-      }
-    }
-    b.box(s * 0.55, 0.045, 0.045, td, 0, 0.81, front + 0.04);
-  }
-  // scaffolding shown while under construction
-  const sc = new B(), sh = { house: 1.7, town_center: 3.0, granary: 1.6, storage_pit: 1.1, farm: 0.8, wonder: 5.0, castle: 3.2, factory: 2.4 }[type] ?? (type === 'government_center' ? 2.4 : 1.9), w = s / 2 + 0.12;
-  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) sc.box(0.06, sh, 0.06, 0xa8823f, x * w, 0, z * w);
-  for (let y = 0.5; y < sh; y += 0.6) for (const [x, z, ry] of [[0, -w, 0], [0, w, 0], [-w, 0, Math.PI / 2], [w, 0, Math.PI / 2]]) sc.box(w * 2, 0.05, 0.05, 0xa8823f, x, y, z, 0, ry);
-  for (const [x, z, ry] of [[0, w, 0], [w, 0, Math.PI / 2]]) sc.box(w * 2.2, 0.04, 0.04, 0xa8823f, x, sh / 2, z, 0, ry, 0.6);
-  extra.scaffold = sc.geometry();
-  return { body: b.geometry(), extra };
-}
 function buildingModel(e, age = 'stone') {
-  const root = new THREE.Group(), g = cached(`b:${e.type}:${e.owner}:${buildingStyle(age)}`, () => buildingGeos(e.type, e.owner, e.size, age));
+  const root = new THREE.Group(), g = cached(`b:${e.type}:${e.owner}:${designOf(e.type, age).key}`, () => archGeos(e.type, e.owner, e.size, age));
   const body = new THREE.Group(); body.add(mesh(g.body)); root.add(body);
   const anim = { type: 'building', body };
+  if (g.mast) { anim.mast = mesh(g.mast); root.add(anim.mast); } // flagpoles, antennas, spire tips: outside the body's height
   if (g.extra.scaffold) { anim.scaffold = mesh(g.extra.scaffold); root.add(anim.scaffold); }
   if (g.extra.crops) { anim.crops = mesh(g.extra.crops); root.add(anim.crops); }
   if (g.extra.flag) { anim.flag = pivot(...g.extra.flagAt, g.extra.flag); root.add(anim.flag); }
+  // Animated parts (gears, rings, floating plates, smoke puffs), each on its own pivot; animate() moves them.
+  const part = x => { const p = pivot(...x.at, x.geo); root.add(p); return p; };
+  for (const x of g.extra.spinners ?? []) (anim.spinners ??= []).push({ p: part(x), axis: x.axis ?? 'y', speed: x.speed ?? 1 });
+  for (const x of g.extra.floaters ?? []) (anim.floaters ??= []).push({ p: part(x), y: x.at[1], amp: x.amp ?? 0.08, speed: x.speed ?? 1.6, phase: x.phase ?? 0 });
+  for (const x of g.extra.smoke ?? []) (anim.smoke ??= []).push({ p: part(x), y: x.at[1], phase: x.phase ?? 0 });
+  // A tower's shot (muzzle flash, loosed bolt, laser): a pivot that animate() shows just after each shot.
+  if (g.extra.fire) { anim.fire = part(g.extra.fire); anim.fire.visible = false; }
   return { root, anim, shadow: e.size * 0.62, boxShadow: true };
 }
 
@@ -573,6 +343,15 @@ export function animate(g, e, t, moving) {
     if (a.scaffold) a.scaffold.visible = !e.constructed;
     if (a.crops) { a.crops.visible = e.constructed; a.crops.scale.y = 0.35 + 0.65 * Math.min(1, e.amount / 400); }
     if (a.flag) a.flag.rotation.y = Math.sin(t * 3) * 0.35;
+    // The mast, every flag and the animated parts only show on a finished building.
+    if (a.mast) a.mast.visible = e.constructed;
+    if (a.flag) a.flag.visible = e.constructed;
+    for (const sp of a.spinners ?? []) { sp.p.visible = e.constructed; sp.p.rotation[sp.axis] = t * sp.speed; }
+    for (const f of a.floaters ?? []) { f.p.visible = e.constructed; f.p.position.y = f.y + Math.sin(t * f.speed + f.phase) * f.amp; }
+    for (const sm of a.smoke ?? []) { const k = (t * 0.35 + sm.phase) % 1; sm.p.visible = e.constructed; sm.p.position.y = sm.y + k * 0.9; sm.p.scale.setScalar(0.5 + k * 0.9); }
+    // The sim sets a tower's cd to its cooldown on a shot and counts it down each tick: the shot shows for 6 ticks
+    // (0.3 s), so even the Industrial tower's 12-tick burst blinks. No cooldown (the gallery's entities): never.
+    if (a.fire) a.fire.visible = !!e.constructed && e.cooldown > 0 && e.cd > e.cooldown - 6;
   } else if (a.type === 'res') {
     const full = e.type === 'tree' ? 100 : e.type === 'berry' ? 200 : e.type === 'gold' ? 800 : 600, f = 0.55 + 0.45 * Math.min(1, e.amount / full), s = a.mesh.userData.baseScale;
     a.mesh.scale.set(s * f, s * (e.type === 'tree' ? f : 0.6 + 0.4 * f), s * f);

@@ -1,36 +1,67 @@
 import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { defenceStats } from '../data/defences.js';
 import { AGES } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
+import { updateTower, refreshDefences } from './defence.js';
 import { execute } from './commands.js';
 import { updateVision } from './vision.js';
 import { secs, rectOf, centerOf } from './util.js';
 
+// A wall foundation (an unfinished wall) does not block movement: it only reserves its tile, and occupies it once finished.
+const opensFoundation = type => BUILDINGS[type].defence === 'wall';
+
 // workRate: per-player speed of gathering, building, training, research and age-ups (a handicap, 1 = normal).
 // capTicks: round time limit, defaults to the round's own.
 export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1], capTicks = rules?.capTicks } = {}) {
-  const map = generateMap(seed, size), n = map.size, occ = new Int32Array(n * n);
+  const map = generateMap(seed, size), n = map.size, occ = new Int32Array(n * n), reserved = new Set();
   const game = {
     seed, map, rules, capTicks, time: 0, result: null, nextId: 1,
     entities: new Map(), units: new Map(), buildings: new Map(), resources: new Map(), relics: new Map(),
     players: [0, 1].map(id => ({ id, res: { food: 200, wood: 200, gold: 100, stone: 100 }, age: 'stone', ageUp: null,
       explored: new Uint8Array(n * n), visible: new Uint8Array(n * n), kills: 0, losses: 0, bdestroyed: 0, gathered: 0, pop: 0, popCap: 0, defeated: false,
       techs: new Set(), gatherMult: { food: 1, wood: 1, gold: 1, stone: 1 }, workRate: workRate[id] })),
+    reserved, // tile indices (y * size + x) held by wall foundations: walkable, but nothing else can be placed there
     occAt: (x, y) => (x < 0 || y < 0 || x >= n || y >= n) ? 1 : occ[y * n + x],
     blocked: (x, y) => occ[y * n + x] !== 0,
   };
   const mark = (e, v) => { const r = rectOf(e); for (let y = r.y0; y < r.y1; y++) for (let x = r.x0; x < r.x1; x++) occ[y * n + x] = v; };
+  const cells = e => { const r = rectOf(e), out = []; for (let y = r.y0; y < r.y1; y++) for (let x = r.x0; x < r.x1; x++) out.push(y * n + x); return out; };
+  // Open ground a unit can be put on: on the map, not water, not occupied, not a wall foundation.
+  const free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && map.tiles[y * n + x] !== 1 && !occ[y * n + x] && !reserved.has(y * n + x);
+  // The free tile whose centre is nearest (x, y), searching 8 tiles around; a tie goes to the first in row order.
+  const nearestFree = (x, y) => {
+    const cx = Math.floor(x), cy = Math.floor(y); let best = null, bd = Infinity;
+    for (let ty = cy - 8; ty <= cy + 8; ty++) for (let tx = cx - 8; tx <= cx + 8; tx++) {
+      if (!free(tx, ty)) continue;
+      const d = Math.hypot(tx + 0.5 - x, ty + 0.5 - y); if (d < bd) { bd = d; best = { x: tx + 0.5, y: ty + 0.5 }; }
+    }
+    return best || { x, y };
+  };
 
   game.addResource = r => { const e = { ...r, kind: 'resource', id: game.nextId++, dead: false }; game.entities.set(e.id, e); game.resources.set(e.id, e); mark(e, e.id); return e; };
   game.addBuilding = (type, owner, x, y, constructed) => {
-    const d = BUILDINGS[type];
-    const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp: d.hp, hp: constructed ? d.hp : 1, constructed, progress: constructed ? 1 : 0,
+    const d = BUILDINGS[type], def = d.defence ? defenceStats(d.defence, game.players[owner].age) : null, maxHp = def ? def.hp : d.hp; // defences: HP (and a tower's attack) come from the owner's era now
+    const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp, hp: constructed ? maxHp : 1, constructed, progress: constructed ? 1 : 0,
       queue: [], workers: 0, sight: d.sight, marmor: d.marmor ?? 3, parmor: d.parmor ?? 8, dead: false, gatherType: d.gatherType || null, amount: d.amount || 0 };
-    game.entities.set(e.id, e); game.buildings.set(e.id, e); mark(e, e.id);
+    if (d.defence === 'tower') Object.assign(e, { atk: def.atk, atkType: def.atkType, range: def.range, cooldown: def.cooldown, splash: def.splash || 0, bonus: null, cd: 0 });
+    game.entities.set(e.id, e); game.buildings.set(e.id, e);
+    if (!constructed && opensFoundation(type)) { for (const i of cells(e)) reserved.add(i); return e; } // units may stand on it until it is finished
+    mark(e, e.id);
     for (const u of game.units.values()) if (u.x >= x && u.x <= x + e.size && u.y >= y && u.y <= y + e.size) { const sp = game.findSpawn(e); u.x = sp.x; u.y = sp.y; u.path = null; }
     return e;
+  };
+  // A wall foundation just finished: it now occupies its tile, and any unit standing on it moves to the nearest free tile.
+  game.occupyFoundation = b => {
+    for (const i of cells(b)) reserved.delete(i);
+    mark(b, b.id);
+    const r = rectOf(b);
+    for (const u of game.units.values()) {
+      const tx = Math.floor(u.x), ty = Math.floor(u.y);
+      if (tx >= r.x0 && tx < r.x1 && ty >= r.y0 && ty < r.y1) { const t = nearestFree(u.x, u.y); u.x = t.x; u.y = t.y; u.path = null; }
+    }
   };
   game.spawnUnit = (type, owner, x, y) => {
     const d = UNITS[type];
@@ -54,7 +85,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     for (let r = 0; r <= 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
       const tx = cx + dx, ty = cy + dy;
-      if (tx >= 0 && ty >= 0 && tx < n && ty < n && map.tiles[ty * n + tx] !== 1 && !occ[ty * n + tx]) return { x: tx + 0.5, y: ty + 0.5 };
+      if (free(tx, ty)) return { x: tx + 0.5, y: ty + 0.5 }; // never onto a foundation, which would seal a dropped relic inside the wall
     }
     return { x, y };
   };
@@ -65,7 +96,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
   game.remove = e => {
     if (e.dead) return; e.dead = true;
     game.entities.delete(e.id); game.units.delete(e.id); game.buildings.delete(e.id); game.resources.delete(e.id);
-    if (e.kind === 'building' || e.kind === 'resource') mark(e, 0);
+    if (e.kind === 'building' || e.kind === 'resource') for (const i of cells(e)) { reserved.delete(i); if (occ[i] === e.id) occ[i] = 0; } // a foundation never marked its tile
     const c = centerOf(e); dropRelics(e, e.kind === 'building' ? Math.min(n - 1, Math.floor(c.x) + 0.5) : c.x, e.kind === 'building' ? Math.min(n - 1, e.y + e.size + 0.5) : c.y);
   };
   game.depleted = r => { if (r.kind === 'resource') game.remove(r); else if (r.gatherType) game.remove(r); };
@@ -79,7 +110,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
   };
   game.findSpawn = b => {
     for (let ring = 1; ring <= 3; ring++) for (let i = -ring; i < b.size + ring; i++) for (const [x, y] of [[b.x + i, b.y + b.size - 1 + ring], [b.x + i, b.y - ring], [b.x - ring, b.y + i], [b.x + b.size - 1 + ring, b.y + i]]) {
-      if (x >= 0 && y >= 0 && x < n && y < n && map.tiles[y * n + x] !== 1 && !occ[y * n + x]) return { x: x + 0.5, y: y + 0.5 };
+      if (free(x, y)) return { x: x + 0.5, y: y + 0.5 };
     }
     return { x: b.x + 0.5, y: b.y + 0.5 };
   };
@@ -105,8 +136,8 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     if (game.result) return;
     game.time++;
     for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
-    for (const b of [...game.buildings.values()]) if (!b.dead) updateBuilding(game, b);
-    for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; }
+    for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
+    for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
     for (const r of game.relics.values()) if (r.holder !== null) { const h = game.entities.get(r.holder); if (h) { r.x = h.x; r.y = h.y; } }
     game.recount();
     if (game.time % 4 === 0) updateVision(game);
@@ -134,7 +165,7 @@ function updateBuilding(game, b) {
     const w = b.workers; b.workers = 0;
     if (w > 0) {
       b.progress += Math.pow(w, 0.7) * rate / secs(BUILDINGS[b.type].buildTime); b.hp = Math.max(b.hp, b.maxHp * Math.min(1, b.progress));
-      if (b.progress >= 1) { b.constructed = true; b.hp = b.maxHp; b.progress = 1; }
+      if (b.progress >= 1) { b.constructed = true; b.hp = b.maxHp; b.progress = 1; if (opensFoundation(b.type)) game.occupyFoundation(b); }
     }
     return;
   }

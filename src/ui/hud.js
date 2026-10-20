@@ -110,7 +110,9 @@ export function createHud(ui) {
     if (ih !== infoKey) { info.innerHTML = ih; infoKey = ih; }
     // commands
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);
-    let key = `${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`;
+    // Delete acts on any own selected building, foundations too; on touch the first tap arms it for 3 s (ui.actions.delete)
+    const del = own.find(e => e.kind === 'building'), armed = !!del && ui.touch && ui.delArm?.id === del.id && performance.now() - ui.delArm.t < 3000;
+    let key = `${del ? 'D' + del.id + (armed ? 'A' : '') : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
       const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText('pop cap')] : [])];
@@ -130,6 +132,7 @@ export function createHud(ui) {
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }
       }
+      if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: armed ? 'Tap again to delete' : 'Delete', cost: {}, tint: 't-del', ok: true, extra: armed ? '' : '<span class="c">No refund</span>', cx: armed ? ' armed' : '' }));
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }
       else btns.forEach((b, i) => { const el = cmds.children[i], sm = el.querySelector('small'); el.classList.toggle('off', b.off); el.setAttribute('aria-disabled', b.off); if (sm.innerHTML !== b.small) sm.innerHTML = b.small; });
@@ -171,6 +174,7 @@ export function createHud(ui) {
     if (b.dataset.speed) ui.setSpeed(+b.dataset.speed);
     else if (b.dataset.pause) ui.togglePause();
     else if (b.dataset.resign) { if (ui.resignArmed) { ui.resignArmed = false; ui.game.command(0, { type: 'resign' }); hud.closeMenu(); } else { ui.resignArmed = true; setTimeout(() => { ui.resignArmed = false; }, 3000); if (!$('gamemenu').classList.contains('hidden')) hud.openMenu(); } }
+    else if (b.dataset.delete) { ui.actions?.delete(+b.dataset.delete); cmdKey = ''; }
     else if (b.dataset.build) ui.startPlacing(b.dataset.build);
     else if (b.dataset.train) { const n = e.shiftKey ? 5 : 1; for (let i = 0; i < n; i++) { const r = ui.cmd({ type: 'train', buildingId: +b.dataset.b, unit: b.dataset.train }); if (!r.ok) break; } cmdKey = ''; }
     else if (b.dataset.research) { ui.cmd({ type: 'research', buildingId: +b.dataset.b, tech: b.dataset.research }); cmdKey = ''; }

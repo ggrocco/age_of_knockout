@@ -11,7 +11,7 @@ export const WONDER_TICKS = 3600, RELIC_TICKS = 3600;
 export function scoreOf(game, pid) {
   const p = game.players[pid]; let units = 0, blds = 0, villagers = 0, wonders = 0;
   for (const u of game.units.values()) if (u.owner === pid) { units++; if (u.type === 'villager') villagers++; }
-  for (const b of game.buildings.values()) if (b.owner === pid && b.constructed) { if (!b.gatherType) blds++; if (b.type === 'wonder') wonders++; }
+  for (const b of game.buildings.values()) if (b.owner === pid && b.constructed) { if (!b.gatherType && b.type !== 'wall') blds++; if (b.type === 'wonder') wonders++; }
   let relics = 0; const total = game.relics.size;
   for (const r of game.relics.values()) if (game.relicOwner(r) === pid) relics++;
   let explored = 0; const ex = p.explored; for (let i = 0; i < ex.length; i++) if (ex[i]) explored++;
