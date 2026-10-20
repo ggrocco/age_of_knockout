@@ -55,8 +55,9 @@ function nearestReachable(map, reach, p) {
 export function createBot(game, pid, difficulty = 'medium') {
   const D = DIFF[difficulty], me = game.players[pid], enemy = 1 - pid, enemyStart = game.map.starts[enemy];
   // Fixed sweep points can fall in a lake; every unit sent there would search the whole map for a path, so snap them to reachable land.
-  const reach = reachableFrom(game.map, game.map.starts[pid]);
-  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => nearestReachable(game.map, reach, { x, y }))];
+  // The points are laid out for a 64-tile map and scaled to the real size.
+  const reach = reachableFrom(game.map, game.map.starts[pid]), k = game.map.size / 64;
+  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => nearestReachable(game.map, reach, { x: Math.round(x * k), y: Math.round(y * k) }))];
   const sentTo = new Map(); // unit id -> sweepIdx of the waypoint it was last sent to
   const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, think };
 

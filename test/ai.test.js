@@ -120,11 +120,15 @@ test('bot sweep waypoints are land the army can reach from its start', () => {
   }
 });
 test('an army whose sweep move fails goes on to the next waypoint instead of retrying it', () => {
-  const g = createGame({ seed: 1, rules: roundById('conquest') }), b = createBot(g, 1, 'hard');
-  b.sweep[0] = { x: 28, y: 2 }; // centre of a 5x5 lake: unreachable even with the move's 2-tile slack
-  const s = g.map.starts[1], army = [0, 1, 2, 3].map(k => g.spawnUnit('clubman', 1, s.x - 3 + k, s.y + 3));
+  const g = createGame({ seed: 1, rules: roundById('conquest') }), b = createBot(g, 0, 'hard');
+  // centre of a 5x5 patch of water: unreachable even with the move's 2-tile slack
+  const n = g.map.size, wet = (x, y) => g.map.tiles[y * n + x] === 1, deep = [];
+  for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) { let all = true; for (let j = -2; j <= 2 && all; j++) for (let i = -2; i <= 2; i++) if (!wet(x + i, y + j)) { all = false; break; } if (all) deep.push({ x, y }); }
+  assert.ok(deep.length, 'seed 1 has deep water');
+  b.sweep[0] = deep[0];
+  const s = g.map.starts[0], army = [0, 1, 2, 3].map(k => g.spawnUnit('clubman', 0, s.x - 3 + k, s.y + 3));
   b.waveActive = true; b.think();
-  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === 28.5), 'sent to the lake first');
+  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === deep[0].x + 0.5), 'sent to the lake first');
   for (let i = 0; i < 20 && army.some(u => u.order.type !== 'idle'); i++) g.tick();
   assert.ok(army.every(u => u.order.type === 'idle'), 'the move to the lake fails');
   b.think();

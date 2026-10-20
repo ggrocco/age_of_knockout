@@ -11,6 +11,8 @@ import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
+// ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
+const pickSeed = () => +params.get('seed') || 1 + Math.floor(Math.random() * 100000);
 const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
 document.body.classList.toggle('touch', TOUCH);
 const screenEl = document.getElementById('screen'), app = { tournament: null, match: null, ui: null };
@@ -126,7 +128,7 @@ async function afterMatch(won) {
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);
   document.getElementById('again').onclick = menu;
 }
-function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1), level, { noTimeLimit }); bracketScreen(); }
+function startTournament() { app.tournament = createTournament(pickSeed(), level, { noTimeLimit }); bracketScreen(); }
 
 function menu() {
   updateRoundCaps(LEVELS[level]);
@@ -152,8 +154,8 @@ function menu() {
     for (const x of document.querySelectorAll('.level .btn')) x.classList.toggle('on', x === b);
   };
   // A quick match faces the opponent that round would have in a tournament at the chosen level.
-  for (const b of document.querySelectorAll('.quick')) b.onclick = () => startMatch({ roundId: ROUNDS[+b.dataset.i].id, seed: 1, oppDiff: LEVELS[level][+b.dataset.i] });
+  for (const b of document.querySelectorAll('.quick')) b.onclick = () => startMatch({ roundId: ROUNDS[+b.dataset.i].id, seed: pickSeed(), oppDiff: LEVELS[level][+b.dataset.i] });
 }
 
-if (params.get('round')) startMatch({ roundId: ROUNDS[+params.get('round') - 1].id, seed: +(params.get('seed') || 1), oppDiff: params.get('opp') || 'medium' });
+if (params.get('round')) startMatch({ roundId: ROUNDS[+params.get('round') - 1].id, seed: pickSeed(), oppDiff: params.get('opp') || 'medium' });
 else menu();

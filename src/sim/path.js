@@ -7,7 +7,6 @@ class Heap {
   pop() { const a = this.a, top = a[0], last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { let l = 2 * i + 1, r = l + 1, m = i; if (l < a.length && a[l].f < a[m].f) m = l; if (r < a.length && a[r].f < a[m].f) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
 }
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-const MAX_EXPAND = 6000;
 // Search state is reused between calls; a slot belongs to the current search only when its stamp equals gen.
 let buf = null;
 function buffers(n) {
@@ -24,8 +23,8 @@ export function findPath(map, blocked, from, to, isGoal) {
   const { gen, seen, closed, g, prev } = buffers(n);
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };
   const open = new Heap(); const s = from.y * n + from.x; g[s] = 0; seen[s] = gen; open.push({ i: s, f: h(from.x, from.y) });
-  let expanded = 0;
-  while (open.size && expanded++ < MAX_EXPAND) {
+  let expanded = 0; const maxExpand = Math.max(6000, n * n); // a search may cover the whole map
+  while (open.size && expanded++ < maxExpand) {
     const { i } = open.pop(); if (closed[i] === gen) continue; closed[i] = gen;
     const x = i % n, y = (i / n) | 0;
     if (goal(x, y)) { const out = []; for (let k = i; k !== s; k = prev[k]) out.push({ x: k % n, y: (k / n) | 0 }); return out.reverse(); }
