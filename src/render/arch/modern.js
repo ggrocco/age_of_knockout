@@ -1,10 +1,11 @@
 // Modern Age: today's glass, steel and concrete under flat roofs, with signage, air-con units, solar panels and
 // antennas. A glass office tower with a helipad, a white cube house, corrugated steel grain bins, a container yard, a
 // greenhouse, an army base with a turning radar, a concrete shooting range, a motor pool, a supermarket, a glass
-// government block, a twisting skyscraper, a concrete bunker complex and a clean modern plant.
+// government block, a twisting skyscraper, a concrete bunker complex and a clean modern plant; for defence, a missile
+// turret with a sweeping radar and a precast concrete barrier.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, place, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM } from './kit.js';
+import { P, flag, stick, place, HOT, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx;
@@ -643,4 +644,58 @@ export function factory(ctx) {
   for (const [x, z] of [[-1.15, 1.1], [-0.75, 1.2], [0.3, 1.15]]) tree(b, x, y, z);
   b.box(0.42, 0.16, 0.06, WHITE, -0.2, y, 1.08).box(0.14, 0.1, 0.008, t, -0.2, y + 0.03, 1.114);
   return top + 0.75;
+}
+
+// ---------- Modern defences ----------
+// Tower: a missile turret. An eight-sided concrete emplacement with a team band and a steel door in a yellow frame
+// carries a steel pedestal and turret ring; on it, between trunnion plates, an olive launcher pod of six tubes (their
+// red missile noses showing) is elevated toward the field, team-marked on its side. A radar on a mast at the back
+// sweeps round (a spinner), beside a whip antenna, a generator and the flag. Its shot is a missile leaving its tube on
+// a tongue of flame, with the backblast behind the pod (extra.fire).
+export function tower(ctx) {
+  const { b, mast, t, extra } = ctx, y = 0.03, th = 0.42, ct = Math.cos(th), st = Math.sin(th);
+  b.box(1.76, y, 1.76, ASPH);
+  for (const [w, d, x, z] of [[1.6, 0.03, 0, 0.82], [0.03, 1.6, 0.82, 0]]) b.box(w, 0.006, d, YELLOW, x, y, z);
+  // The emplacement and the pedestal.
+  const et = y + 0.55;
+  b.cylT(0.74, 0.8, 0.55, CONC, 0, y, 0, 8, 0, Math.PI / 8).cylT(0.78, 0.78, 0.08, t, 0, y + 0.28, 0, 8, 0, Math.PI / 8).cylT(0.76, 0.76, 0.05, CONC_L, 0, et, 0, 8, 0, Math.PI / 8);
+  b.box(0.3, 0.38, 0.03, YELLOW, 0, y + 0.02, 0.735).box(0.24, 0.34, 0.03, STEEL_D, 0, y + 0.02, 0.745);
+  b.cylT(0.26, 0.32, 0.62, STEEL_D, 0, et + 0.05, 0, 12).add(CYL8, STEEL, 0, et + 0.71, 0, 0.42, 0.08, 0.42);
+  const ring = et + 0.75, cx = 0, cy = ring + 0.32, cz = -0.02, at = (u, v, w) => [cx + u, cy + v * ct + w * st, cz - v * st + w * ct];
+  for (const k of [-1, 1]) b.box(0.06, 0.42, 0.34, STEEL_D, k * 0.37, ring - 0.02, cz).add(CYL8, STEEL, k * 0.41, cy, cz, 0.06, 0.04, 0.06, 0, 0, Math.PI / 2);
+  // The launcher pod, its tubes and their missile noses, the team mark on its side.
+  b.add(unit.box, OLIVE, ...at(0, 0, 0), 0.66, 0.44, 0.86, -th, 0, 0).add(unit.box, OLIVE_D, ...at(0, 0.235, 0), 0.62, 0.03, 0.8, -th, 0, 0);
+  for (const u of [-0.2, 0, 0.2]) for (const v of [-0.1, 0.1]) {
+    b.add(DISC, DARK, ...at(u, v, 0.432), 0.08, 0.012, 0.08, Math.PI / 2 - th, 0, 0).add(CONE4, RED, ...at(u, v, 0.43), 0.045, 0.05, 0.045, Math.PI / 2 - th, 0, 0);
+  }
+  b.add(unit.box, t, ...at(0.332, 0.02, 0), 0.012, 0.2, 0.5, -th, 0, 0).add(unit.box, LINE, ...at(0.333, -0.13, 0), 0.012, 0.04, 0.6, -th, 0, 0);
+  // The radar mast, the antenna, a generator and the flag.
+  const rx = -0.5, rz = -0.5;
+  b.cylT(0.03, 0.045, 0.62, STEEL_D, rx, et + 0.05, rz, 8);
+  extra.spinners = [{ geo: radar(t), at: [rx, et + 0.67, rz], axis: 'y', speed: 1.4 }];
+  mast.cyl(0.008, 0.75, STEEL_L, 0.52, et + 0.05, -0.36);
+  ac(b, 0.38, et + 0.05, 0.38, 1.2);
+  flag(ctx, 0.56, et + 0.05, -0.56, 0.8, STEEL_L);
+  // The missile away on its flame, smoke in its wake, and the backblast out of the pod's rear.
+  const fire = new B(), u = 0.2, v = 0.1;
+  stick(fire, 0.05, WHITE, at(u, v, 0.78), at(u, v, 1.22), CYL8); stick(fire, 0.05, RED, at(u, v, 1.22), at(u, v, 1.36), CONE4);
+  for (const k of [-1, 1]) fire.add(unit.box, STEEL_D, ...at(u + k * 0.06, v, 0.82), 0.07, 0.01, 0.1, -th, 0, 0);
+  stick(fire, 0.1, P.fire, at(u, v, 0.78), at(u, v, 0.32), CONE4); fire.add(BALL, HOT, ...at(u, v, 0.76), 0.07, 0.07, 0.07).add(BALL, P.ember, ...at(u, v, 0.66), 0.075, 0.075, 0.075);
+  fire.add(BALL, P.smoke, ...at(u, v - 0.06, 0.46), 0.11, 0.1, 0.11);
+  fire.add(BALL, P.ember, ...at(u, v, -0.47), 0.1, 0.1, 0.1).add(BALL, P.smoke, ...at(u, v + 0.02, -0.66), 0.19, 0.16, 0.19).add(BALL, 0xb4b4b4, ...at(u - 0.16, v - 0.08, -0.8), 0.15, 0.13, 0.15);
+  extra.fire = { geo: fire.geometry(), at: [0, 0, 0] };
+  return cy + 0.45;
+}
+
+// Wall: a concrete barrier. A blast-wall block on a broad footing, its upper part set back a little, so segments in a
+// line read as separate precast units, painted with a yellow hazard band and a team band, a lighter cap and two steel
+// lifting eyes on top; its footing and lower body fill the tile edge to edge, so segments in a line close up into one
+// barrier.
+export function wall(ctx) {
+  const { b, t } = ctx, k = 0.47;
+  b.box(1, 0.08, 1, CONC_D).box(1, 0.3, 1, CONC, 0, 0.08, 0).box(2 * k, 0.5, 2 * k, CONC, 0, 0.38, 0);
+  b.box(2 * k + 0.008, 0.07, 2 * k + 0.008, YELLOW, 0, 0.44, 0).box(2 * k + 0.008, 0.06, 2 * k + 0.008, t, 0, 0.7, 0);
+  b.box(2 * k - 0.04, 0.05, 2 * k - 0.04, CONC_L, 0, 0.88, 0);
+  for (const x of [-0.22, 0.22]) b.box(0.02, 0.06, 0.02, STEEL_D, x - 0.04, 0.93, 0).box(0.02, 0.06, 0.02, STEEL_D, x + 0.04, 0.93, 0).box(0.1, 0.02, 0.02, STEEL_D, x, 0.99, 0);
+  return 1.01;
 }

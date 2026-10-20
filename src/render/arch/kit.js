@@ -131,3 +131,26 @@ export function finish(ctx, scaffoldHeight) {
   ctx.extra.scaffold = scaffold(ctx.s, scaffoldHeight);
   return { body: ctx.b.geometry(), mast: ctx.mast.geos.length ? ctx.mast.geometry() : null, extra: ctx.extra };
 }
+
+// ---------- tower shots (a tower's extra.fire: a pivot animate() shows for a moment after each shot) ----------
+// White-hot, for the cores of flashes and the shafts of loosed arrows.
+export const HOT = 0xfff3c2;
+// A streak from p to q in c, r thick (a loosed arrow, a bolt, a tracer), drawn into g, with a glowing head of radius rh
+// in glow at q (null: none).
+export const streak = (g, p, q, r, c = HOT, glow = P.fire, rh = r * 2.6) => {
+  stick(g, r, c, p, q, CYL6);
+  if (glow !== null) g.add(BALL, glow, q[0], q[1], q[2], rh, rh, rh);
+  return g;
+};
+// A muzzle flash at p, blasting along the direction d, drawn into g and scaled k: a long flame cone out of the muzzle,
+// four short prongs round it and a white-hot core.
+export const muzzleFlash = (g, p, d, k = 1) => {
+  const cross = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2], a[0] * c[1] - a[1] * c[0]];
+  const unitOf = v => { const L = Math.hypot(...v); return v.map(c => c / L); };
+  const n = unitOf(d), u = unitOf(cross(n, Math.abs(n[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), v = cross(u, n);
+  const at = (...terms) => p.map((c, i) => terms.reduce((s, [w, f]) => s + w[i] * f, c));
+  stick(g, 0.07 * k, P.fire, p, at([n, 0.34 * k]), CONE4);
+  for (const w of [u, v, u.map(c => -c), v.map(c => -c)]) stick(g, 0.03 * k, P.ember, at([n, 0.04 * k]), at([w, 0.15 * k], [n, 0.08 * k]), CONE4);
+  g.add(BALL, HOT, p[0], p[1], p[2], 0.065 * k, 0.065 * k, 0.065 * k);
+  return g;
+};

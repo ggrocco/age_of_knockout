@@ -233,6 +233,8 @@ function buildingModel(e, age = 'stone') {
   for (const x of g.extra.spinners ?? []) (anim.spinners ??= []).push({ p: part(x), axis: x.axis ?? 'y', speed: x.speed ?? 1 });
   for (const x of g.extra.floaters ?? []) (anim.floaters ??= []).push({ p: part(x), y: x.at[1], amp: x.amp ?? 0.08, speed: x.speed ?? 1.6, phase: x.phase ?? 0 });
   for (const x of g.extra.smoke ?? []) (anim.smoke ??= []).push({ p: part(x), y: x.at[1], phase: x.phase ?? 0 });
+  // A tower's shot (muzzle flash, loosed bolt, laser): a pivot that animate() shows just after each shot.
+  if (g.extra.fire) { anim.fire = part(g.extra.fire); anim.fire.visible = false; }
   return { root, anim, shadow: e.size * 0.62, boxShadow: true };
 }
 
@@ -347,6 +349,9 @@ export function animate(g, e, t, moving) {
     for (const sp of a.spinners ?? []) { sp.p.visible = e.constructed; sp.p.rotation[sp.axis] = t * sp.speed; }
     for (const f of a.floaters ?? []) { f.p.visible = e.constructed; f.p.position.y = f.y + Math.sin(t * f.speed + f.phase) * f.amp; }
     for (const sm of a.smoke ?? []) { const k = (t * 0.35 + sm.phase) % 1; sm.p.visible = e.constructed; sm.p.position.y = sm.y + k * 0.9; sm.p.scale.setScalar(0.5 + k * 0.9); }
+    // The sim sets a tower's cd to its cooldown on a shot and counts it down each tick: the shot shows for 6 ticks
+    // (0.3 s), so even the Industrial tower's 12-tick burst blinks. No cooldown (the gallery's entities): never.
+    if (a.fire) a.fire.visible = !!e.constructed && e.cooldown > 0 && e.cd > e.cooldown - 6;
   } else if (a.type === 'res') {
     const full = e.type === 'tree' ? 100 : e.type === 'berry' ? 200 : e.type === 'gold' ? 800 : 600, f = 0.55 + 0.45 * Math.min(1, e.amount / full), s = a.mesh.userData.baseScale;
     a.mesh.scale.set(s * f, s * (e.type === 'tree' ? f : 0.6 + 0.4 * f), s * f);

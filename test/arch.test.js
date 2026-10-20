@@ -5,9 +5,10 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { hashBuildings } from './tools/hash-buildings.js';
 import { designOf, DESIGNS } from '../src/render/arch/index.js';
-import { buildModel, animate } from '../src/render/models.js';
+import { buildModel, animate, MODEL_MATERIAL } from '../src/render/models.js';
 import { BUILDINGS } from '../src/data/buildings.js';
 import { AGES, ageIndex } from '../src/data/ages.js';
+import { defenceStats } from '../src/data/defences.js';
 
 test('kept designs stay byte-identical', () => {
   const want = JSON.parse(readFileSync(new URL('./fixtures/kept-buildings.json', import.meta.url)));
@@ -18,7 +19,7 @@ test('design registry: earlier eras show the unlock-era design', () => {
   assert.equal(designOf('castle', 'stone').age, 'medieval');
 });
 
-test('design registry: kept designs, era designs and the legacy fallback', () => {
+test('design registry: kept designs and era designs', () => {
   assert.equal(designOf('house', 'tool').kind, 'kept');
   assert.equal(designOf('house', 'sail').kind, 'design');
 });
@@ -254,8 +255,9 @@ const FUTURE = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', '
 test('AI Future designs differ from every other era', () => differsFromOtherEras(FUTURE, 'future'));
 test('AI Future designs: heights within the cap', () => heightsOk(FUTURE));
 test('AI Future farm: crops show once finished and shrink with the food left', () => cropsShrink('future'));
+// The Wall is the exception: walls are static (one mesh a segment, since a player can build a hundred of them).
 test('AI Future designs: every one has spinners or floaters, hidden while unfinished and moving once finished', () => {
-  for (const type of new Set([...Object.keys(DESIGNS.future), ...FUTURE])) {
+  for (const type of new Set([...Object.keys(DESIGNS.future), ...FUTURE].filter(type => type !== 'wall'))) {
     const { e, anim: a, g } = build(type, 'future', false), spinners = a.spinners ?? [], floaters = a.floaters ?? [];
     assert.ok(spinners.length + floaters.length > 0, `${type}: no spinner or floater`);
     animate(g, e, 1, false);
@@ -276,4 +278,60 @@ test('AI Future designs: within the triangle budget', () => {
     const { anim, g } = build(type, 'future'), n = tris(g) - tris(anim.scaffold);
     assert.ok(n <= (type === 'wonder' ? 15000 : 6000), `${type}: ${n} triangles`);
   }
+});
+
+// --- tower and wall designs (Task 18) ---
+// Both unlock in the Tool Age, so each has a design in every era from Tool to AI Future.
+const DEFENCES = ['tower', 'wall'];
+const tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3; }); return n; };
+// Triangles in a finished model: body, mast, flag and every animated part; not the scaffold.
+const trisOf = (type, age) => { const { anim, g } = build(type, age); return tris(g) - tris(anim.scaffold); };
+test('Tower and Wall: every era has its own shape', () => distinctAcrossEras(DEFENCES));
+test('Tower and Wall: heights within the cap', () => heightsOk(DEFENCES));
+test('Tower and Wall: every era from Tool on has its own design', () => {
+  for (const type of DEFENCES) for (const age of available(type)) assert.equal(designOf(type, age).kind, 'design', `${type}/${age}`);
+});
+// A tower can stand by the dozen and a wall segment by the hundred: 3,000 triangles a tower, 400 a segment.
+test('Tower and Wall: within the triangle budget', () => {
+  for (const [type, max] of [['tower', 3000], ['wall', 400]]) for (const age of available(type)) {
+    const n = trisOf(type, age); assert.ok(n <= max, `${type}/${age}: ${n} triangles`);
+  }
+});
+// The tower's fire part (a muzzle flash, a loosed bolt, a laser) shows for the first 6 ticks after each shot: the sim
+// sets cd = cooldown on a shot and counts it down. It uses the model material, so the batched renderer draws it, and
+// it never shows while the tower is unfinished (or, in the gallery, on an entity with no cooldown at all).
+test('a firing tower shows its fire part', () => {
+  for (const age of available('tower')) {
+    const { e, anim: a, g } = build('tower', age, false), { cooldown } = defenceStats('tower', age);
+    assert.ok(a.fire, `${age}: no fire part`);
+    a.fire.traverse(m => { if (m.isMesh) assert.equal(m.material, MODEL_MATERIAL, `${age}: the fire part is off the model material`); });
+    Object.assign(e, { cooldown, cd: cooldown - 1 });
+    animate(g, e, 1, false); assert.equal(a.fire.visible, false, `${age}: fires while unfinished`);
+    e.constructed = true; e.progress = 1;
+    animate(g, e, 1, false); assert.equal(a.fire.visible, true, `${age}: no fire just after a shot`);
+    e.cd = cooldown - 6; animate(g, e, 1, false); assert.equal(a.fire.visible, false, `${age}: still firing 6 ticks after the shot`);
+    e.cd = 0; animate(g, e, 1, false); assert.equal(a.fire.visible, false, `${age}: fires when idle`);
+    delete e.cd; delete e.cooldown; animate(g, e, 1, false); assert.equal(a.fire.visible, false, `${age}: fires with no cooldown`);
+  }
+});
+// Neighbouring segments meet, whichever way the line runs: the body fills its 1×1 tile edge to edge in x and z (and
+// nothing reaches past 0.65; the footprint test checks that). A segment is one static mesh: no animated parts, flag,
+// mast or fire part, each of which would cost a proxy and a batch instance per segment.
+test('Wall: every segment fills its tile and is static', () => {
+  for (const age of available('wall')) {
+    const { anim: a } = build('wall', age), bb = new THREE.Box3().setFromObject(a.body);
+    for (const [k, v] of [['min.x', bb.min.x], ['max.x', bb.max.x], ['min.z', bb.min.z], ['max.z', bb.max.z]]) {
+      assert.ok(Math.abs(Math.abs(v) - 0.5) < 1e-6, `wall/${age}: ${k} ${v}`);
+    }
+    for (const k of ['spinners', 'floaters', 'smoke', 'flag', 'mast', 'fire', 'crops']) assert.equal(a[k], undefined, `wall/${age} has ${k}`);
+  }
+});
+
+// --- Part 2 closeout: every building in every era ---
+const ALL = Object.keys(BUILDINGS);
+test('every building: every era has its own shape', () => distinctAcrossEras(ALL));
+test('every building: heights within the cap', () => heightsOk(ALL));
+test('every building: no era falls back to the legacy look', () => {
+  const legacy = ALL.flatMap(type => available(type).filter(age => designOf(type, age).kind === 'legacy').map(age => `${type}/${age}`));
+  assert.deepEqual(legacy, []);
 });

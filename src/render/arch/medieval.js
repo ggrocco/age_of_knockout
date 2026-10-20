@@ -1,10 +1,11 @@
 // Medieval Age: grey stone and slate, oak framing over limewashed plaster, battlements and pointed arches, beside
 // today's kept Castle (legacy.js). Half-timbered houses, a stone hall with a tall spired keep tower, a timber tithe barn,
 // a store with a treadwheel crane, strip fields with haystacks, a stone barracks behind a gatehouse, timber archery
-// butts, a stable with a hay loft, an arcaded market hall, a hall with a rose window and a gothic cathedral.
+// butts, a stable with a hay loft, an arcaded market hall, a hall with a rose window and a gothic cathedral; for
+// defence, a round castle tower with a bartizan and a battlemented curtain wall.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place, horse, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM, HORSE_HEAD, sack, barrel } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, streak, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM, HORSE_HEAD, sack, barrel } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2, D = s - 0.3;
@@ -628,4 +629,60 @@ export function wonder(ctx) {
   for (let i = 0; i < 3; i++) b.box(1.5 - i * 0.2, 0.04, 0.12, STONE_L, 0, 0.12 - (i + 1) * 0.04 + 0.04, front + 0.06 + (2 - i) * 0.06);
   flag(ctx, 0, ctop + 2.56, tcz, 0.5, C.gold);
   return ctop + 2.05;
+}
+
+// ---------- Medieval defences ----------
+// A cross-shaped arrow loop on a wall face at (x, z) facing ry, its foot at y.
+const loop = (b, x, y, z, ry, hh = 0.32) => b.box(0.045, hh, 0.03, C.dark, x, y, z, 0, ry).box(0.15, 0.045, 0.03, C.dark, x, y + hh * 0.55, z, 0, ry);
+
+// Tower: a stone castle tower. A round drum on a battered plinth, a string course and arrow loops up its camera side,
+// the parapet carried out on a ring of corbels (machicolations) and crowned with merlons; a pointed gate up two steps
+// at its foot with a team banner hung above it, a team shield on the side, and a corbelled bartizan turret with a slate
+// cone flying the flag. Its shot is a flight of crossbow quarrels from the battlements (extra.fire).
+export function tower(ctx) {
+  const { b, t, extra } = ctx, R = 0.71, y0 = 0.34, top = 2.26, n = 16;
+  b.box(1.76, 0.04, 1.76, COBBLE).cylT(0.73, 0.83, y0 - 0.04, STONE_D, 0, 0.04, 0, n);
+  b.cylT(R - 0.01, R + 0.01, top - y0, STONE, 0, y0, 0, n);
+  for (const y of [1.2, 1.9]) b.cylT(R + 0.025, R + 0.025, 0.05, STONE_D, 0, y, 0, n);
+  // The machicolations, the parapet and its merlons.
+  for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n; b.box(0.09, 0.16, 0.13, STONE_D, Math.sin(a) * 0.76, top, Math.cos(a) * 0.76, 0, a); }
+  const py = top + 0.16, pt = py + 0.3;
+  b.cylT(0.83, 0.83, 0.3, STONE, 0, py, 0, n).cylT(0.84, 0.84, 0.04, STONE_D, 0, pt - 0.04, 0, n);
+  for (let i = 0; i < 8; i++) { const a = (i + 0.5) * Math.PI / 4; b.box(0.26, 0.22, 0.13, STONE, Math.sin(a) * 0.77, pt, Math.cos(a) * 0.77, 0, a).box(0.28, 0.03, 0.15, STONE_D, Math.sin(a) * 0.77, pt + 0.22, Math.cos(a) * 0.77, 0, a); }
+  // Arrow loops on the camera side and the parapet.
+  for (const [a, y] of [[Math.PI / 4, 0.75], [Math.PI / 2, 1.4], [Math.PI / 4, 1.42], [Math.PI / 2, 0.62]]) loop(b, Math.sin(a) * (R + 0.005), y, Math.cos(a) * (R + 0.005), a);
+  for (const a of [0, Math.PI / 4, Math.PI / 2]) loop(b, Math.sin(a) * 0.835, py + 0.04, Math.cos(a) * 0.835, a, 0.2);
+  // The gate up two steps, the team banner over it, a shield on the side.
+  lancet(b, 0, y0, R + 0.004, 0.36, 0.66, 0, STONE_D); lancet(b, 0, y0, R + 0.012, 0.28, 0.58, 0, OAK);
+  b.box(0.012, 0.42, 0.02, C.dark, 0, y0, R + 0.022);
+  for (let i = 0; i < 2; i++) b.box(0.5 - i * 0.1, y0 - 0.04 - i * 0.14, 0.14, STONE_L, 0, 0.04, R + 0.18 - i * 0.12);
+  b.box(0.4, 0.04, 0.05, OAK, 0, 2.08, R + 0.03).box(0.34, 0.8, 0.014, t, 0, 1.28, R + 0.025);
+  b.box(0.04, 0.4, 0.016, C.gold, 0, 1.52, R + 0.034).box(0.2, 0.04, 0.016, C.gold, 0, 1.78, R + 0.034);
+  place(b, heater(t), R + 0.012, 1.42, 0, Math.PI / 2, 1.4);
+  // The bartizan: a corbelled turret at the back right, its slate cone flying the flag.
+  const bx = Math.sin(3 * Math.PI / 4) * 0.8, bz = Math.cos(3 * Math.PI / 4) * 0.8;
+  b.cylT(0.21, 0.06, 0.34, STONE_D, bx, 1.78, bz, 10).cylT(0.21, 0.21, pt + 0.18 - 2.12, STONE, bx, 2.12, bz, 10);
+  b.cylT(0.225, 0.225, 0.04, STONE_D, bx, pt + 0.14, bz, 10).cone(0.27, 0.5, SLATE, bx, pt + 0.18, bz, 10);
+  loop(b, bx + 0.15, pt - 0.2, bz + 0.15, Math.PI / 4, 0.2);
+  flag(ctx, bx, pt + 0.62, bz, 0.5);
+  // The quarrels, loosed between the merlons toward the camera sides.
+  const fire = new B();
+  for (const a of [0.12, Math.PI / 4, Math.PI / 2 - 0.12]) streak(fire, [Math.sin(a) * 0.86, 0.06, Math.cos(a) * 0.86], [Math.sin(a) * 1.6, -0.16, Math.cos(a) * 1.6], 0.032, undefined, P.ember, 0.08);
+  extra.fire = { geo: fire.geometry(), at: [0, pt, 0] };
+  return pt + 0.68;
+}
+
+// Wall: a castle wall with battlements. A grey stone wall on a darker plinth, a string course under the wall-walk and
+// square merlons round its top, an arrow slit in each merlon on the camera sides and team shields hung on them; it fills
+// its tile edge to edge, so segments in a line close up into one curtain wall.
+export function wall(ctx) {
+  const { b, t } = ctx, h0 = 0.12, wh = 0.7, y = h0 + wh;
+  b.box(1, h0, 1, STONE_D).box(1, wh / 2, 1, STONE, 0, h0, 0).box(0.986, wh / 2, 0.986, STONE, 0, h0 + wh / 2, 0);
+  b.box(1, 0.05, 1, STONE_D, 0, y, 0);
+  const my = y + 0.05;
+  for (const [x, z] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) b.box(0.24, 0.26, 0.24, STONE, x * 0.38, my, z * 0.38);
+  // Slits and shields sit a hair into the faces, so nothing pokes past the tile's edge.
+  for (const u of [-0.38, 0.38]) b.box(0.04, 0.15, 0.012, C.dark, u, my + 0.06, 0.494).box(0.012, 0.15, 0.04, C.dark, 0.494, my + 0.06, u);
+  place(b, heater(t), 0, 0.2, 0.484, 0, 1.3); place(b, heater(t), 0.484, 0.2, 0, Math.PI / 2, 1.3);
+  return my + 0.26;
 }

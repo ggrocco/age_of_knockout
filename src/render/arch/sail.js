@@ -2,10 +2,11 @@
 // red-tile hipped roofs, rows of white sash windows, pediments and round arches, pale Portland stone for the grander
 // work and copper for domes. A white town hall with a cupola and clock, brick townhouses, a brick warehouse with a hoist,
 // a dockside warehouse with a crane, orchard rows, a brick barracks on its parade ground, a stone shooting gallery, a
-// brick coach house, a trading house with crates and scales, a domed capitol, a lighthouse and a star fort.
+// brick coach house, a trading house with crates and scales, a domed capitol, a lighthouse and a star fort; for
+// defence, a cannon bastion and a star-fort earthwork.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, windowGrid, flag, stick, lerp, hash, place, horse, CYL6, CYL8, DISC, BALL, CONE4, ARCH, ARCH_RING, HORSE_HEAD, sack, barrel } from './kit.js';
+import { P, windowGrid, flag, stick, lerp, hash, place, horse, muzzleFlash, CYL6, CYL8, DISC, BALL, CONE4, ARCH, ARCH_RING, HORSE_HEAD, sack, barrel } from './kit.js';
 
 export function house(ctx) {
   const { b, s, td } = ctx, W = s - 0.25, D = s - 0.35;
@@ -766,4 +767,65 @@ export function castle(ctx) {
   b.box(0.2, 0.06, 0.2, STONE_D, 0.3, 0.03, 0.22).box(0.12, 0.05, 0.12, STONE, 0.3, 0.09, 0.22);
   flag(ctx, 0.3, 0.14, 0.22, 1.5, C.woodD, [0.34, 0.6]);
   return H + PH + 0.3;
+}
+
+// ---------- Age of Sail defences ----------
+// Tower: a cannon bastion. A lone arrowhead bastion pointing at the field: its battered red-brick scarp on a stone
+// plinth, a white stone cordon and a white salient angle, under a sloped turf parapet. Two heavy guns on team carriages
+// fire over the parapet (en barbette), one down each face, with round shot piled by them and a powder barrel; a stone
+// guérite keeps the salient and the flag flies from a staff behind the guns. Its shot is both guns firing: muzzle flashes
+// and powder smoke (extra.fire).
+export function tower(ctx) {
+  const { b, t, extra } = ctx, H = 1.2, PH = 0.2, k = 1.9;
+  // The trace: the salient toward the camera, the faces back to the shoulders, the flanks to the gorge.
+  const T = [[0.84, 0.84], [-0.46, 0.74], [-0.86, 0.06], [0.06, -0.86], [0.74, -0.46]], T1 = offset(T, -0.08);
+  b.box(1.76, 0.03, 1.76, GRASS);
+  loft(b, [offset(T, 0.085), offset(T, 0.07)], [0.03, 0.13], [STONE_D], { top: null });
+  cap(b, offset(T, 0.085), 0.13, STONE_D, [offset(T, 0.06)]);
+  loft(b, [offset(T, 0.06), T1], [0.13, H - 0.06], [BRICK], { top: null });
+  const s0 = offset(T, 0.06)[0];
+  stick(b, 0.035, WHITE, [s0[0], 0.13, s0[1]], [T1[0][0], H - 0.06, T1[0][1]], CYL6);
+  loft(b, [offset(T1, 0.025), offset(T1, 0.025)], [H - 0.06, H], [WHITE], { top: null });
+  cap(b, offset(T1, 0.025), H, WHITE, [T1]);
+  // The parapet: its outer face sloping back to a turf crest, its inner face plumb, round the gravel terreplein.
+  const P1 = offset(T1, -0.07), P2 = offset(T1, -0.24);
+  loft(b, [T1, P1], [H, H + PH], [GRASS_D], { top: null });
+  cap(b, P1, H + PH, GRASS, [P2]);
+  loft(b, [P2, P2], [H, H + PH], [GRASS_D], { inward: true, top: null });
+  cap(b, P2, H, GRAVEL);
+  // The guns, on timber platforms, each firing square to its face; shot and a powder barrel by them.
+  const guns = [[0.44, 0.22, 0.9963, -0.0862], [0.22, 0.44, -0.0862, 0.9963]];
+  for (const [x, z, dx, dz] of guns) { b.box(0.22, 0.02, 0.5, C.wood, x - dx * 0.04, H, z - dz * 0.04, 0, Math.atan2(dx, dz)); cannon(b, t, x, H + 0.02, z, dx, dz, k); }
+  shot(b, 0.02, H, 0.3, 0.035); shot(b, 0.3, H, 0.0, 0.035);
+  barrel(b, 0.12, H, -0.12, 0.075, 0.18);
+  // The guérite on the salient, its slit looking out.
+  const [gx, gz] = offset(T1, -0.11)[0];
+  b.cylT(0.12, 0.05, 0.16, STONE_D, gx, H - 0.16, gz, 8).cylT(0.12, 0.12, 0.34, STONE, gx, H, gz, 8).add(DOME, STONE, gx, H + 0.34, gz, 0.135, 0.12, 0.135).add(BALL, STONE_D, gx, H + 0.48, gz, 0.04, 0.04, 0.04);
+  b.box(0.04, 0.14, 0.02, C.dark, gx + 0.085, H + 0.12, gz + 0.085, 0, Math.PI / 4).box(0.09, 0.2, 0.02, t, gx - 0.06, H + 0.02, gz + 0.105, 0, -0.5);
+  flag(ctx, -0.15, H, -0.15, 1.25, C.woodD, [0.32, 0.58]);
+  // Both guns firing: a flash at each muzzle and a burst of powder smoke beyond it.
+  const fire = new B();
+  for (const [x, z, dx, dz] of guns) {
+    const m = [x + dx * 0.22 * k, H + 0.02 + 0.14 * k, z + dz * 0.22 * k], at = f => [m[0] + dx * f, m[1] + f * 0.12, m[2] + dz * f];
+    muzzleFlash(fire, m, [dx, 0, dz], 1.5);
+    fire.add(BALL, P.smoke, ...at(0.6), 0.14, 0.12, 0.14).add(BALL, 0xb4b4b4, ...at(0.82), 0.11, 0.1, 0.11).add(BALL, 0xa8a8a8, ...at(0.5).map((v, i) => i === 1 ? v + 0.12 : v), 0.1, 0.09, 0.1);
+  }
+  extra.fire = { geo: fire.geometry(), at: [0, 0, 0] };
+  return H + 0.52;
+}
+
+// Wall: a star-fort earthwork. A red-brick revetment on a stone plinth, white stone quoins at its corners and a white
+// cordon, under a turf bank whose crest stands back from the edge, so segments in a line show embrasures between them;
+// a team pennant on a pike flies from each. It fills its tile edge to edge, so segments in a line close up into one
+// rampart.
+export function wall(ctx) {
+  const { b, t } = ctx, y1 = 0.5;
+  b.box(1, 0.07, 1, STONE_D).box(1, y1 - 0.07, 1, BRICK, 0, 0.07, 0);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.09, y1 - 0.07, 0.012, WHITE, x * 0.455, 0.07, z * 0.494).box(0.012, y1 - 0.07, 0.09, WHITE, x * 0.494, 0.07, z * 0.455);
+  b.box(1, 0.05, 1, WHITE, 0, y1, 0).box(1, 0.16, 1, GRASS_D, 0, y1 + 0.05, 0).box(1, 0.015, 1, GRASS, 0, y1 + 0.21, 0);
+  const cy = y1 + 0.225;
+  b.box(0.8, 0.13, 0.8, GRASS_D, 0, cy, 0).box(0.8, 0.015, 0.8, GRASS_L, 0, cy + 0.13, 0);
+  stick(b, 0.014, C.woodD, [0.28, cy + 0.14, 0.28], [0.28, cy + 0.62, 0.28], CYL6);
+  b.box(0.012, 0.1, 0.2, t, 0.28, cy + 0.5, 0.38);
+  return cy + 0.64;
 }

@@ -2,10 +2,10 @@
 // cyan and magenta neon, domes and crystal spires, parts that hover or turn: a twisting vertical-farm tower, a cube store
 // on a glowing pedestal, hydroponic beds under grow lights, a drone bay with charging pods, a laser range with hologram
 // targets, a hover-bike dock, a holo-kiosk plaza, a glowing data core, a floating crystal megastructure, an energy-dome
-// fortress and a nanofab with floating arms.
+// fortress and a nanofab with floating arms; for defence, a laser turret under a turning ring and an energy barrier.
 import * as THREE from 'three';
 import { B, unit } from '../builder.js';
-import { P, ring, stick, hash, place, BALL, CYL6, CYL8, DISC } from './kit.js';
+import { P, ring, stick, hash, place, flag, HOT, BALL, CYL6, CYL8, DISC } from './kit.js';
 
 export function house(ctx) {
   const { b, extra, t } = ctx;
@@ -608,4 +608,56 @@ export function factory(ctx) {
   });
   extra.spinners = [{ geo: hoop(new B(), 0.48, 0.014, NC, 0, 0, 0, Math.PI / 2 + 0.28, 0, 32).geometry(), at: [cx, y + 0.78, cz], axis: 'y', speed: 0.9 }];
   return y + 1.5;
+}
+
+// ---------- AI Future defences ----------
+// Tower: a laser turret. A white hexagonal plinth edged in cyan neon carries a tapering white column, team-banded and
+// ringed with neon, up to a chrome collar and the turret head: a white pod with a dark visor and a team fin, its chrome
+// emitter (neon focusing coils, twin prongs and a glowing lens) aimed at the field and heat-sink fins behind. A magenta
+// ring turns round the head (a spinner) and a crystal hovers over it (a floater). Its shot is the laser: a beam from
+// the lens and the flare at its source (extra.fire).
+export function tower(ctx) {
+  const { b, t, extra } = ctx, y = 0.03, hy = 1.92, d = [0.447, 0, 0.894], px = [d[2], 0, -d[0]], ry = Math.atan2(d[0], d[2]);
+  const at = (f, o = 0, dy = 0) => [d[0] * f + px[0] * o, hy + dy, d[2] * f + px[2] * o];
+  b.box(1.76, y, 1.76, PAVE);
+  b.cylT(0.8, 0.86, 0.22, SNOW, 0, y, 0, 6).cylT(0.875, 0.875, 0.03, NC, 0, y + 0.13, 0, 6).cylT(0.74, 0.74, 0.03, APRON, 0, y + 0.22, 0, 6);
+  // The column, its team band and neon rings, and the collar.
+  b.cylT(0.2, 0.34, 1.25, SNOW, 0, y + 0.25, 0, 8);
+  b.cylT(0.3, 0.315, 0.12, t, 0, 0.55, 0, 8);
+  for (const [yy, r] of [[0.98, 0.265], [1.3, 0.235]]) b.cylT(r, r, 0.025, NC, 0, yy, 0, 8);
+  b.cylT(0.36, 0.22, 0.12, CHROME, 0, 1.5, 0, 12);
+  // The head: the pod, its visor and team fin, the heat sinks behind.
+  b.sph(0.4, SNOW, 0, hy, 0, 1, 0.72, 1).sph(0.405, DARK, 0, hy + 0.03, 0, 1, 0.2, 1);
+  b.box(0.05, 0.14, 0.38, t, ...at(-0.04, 0, 0.22), 0, ry);
+  for (const o of [-0.12, -0.04, 0.04, 0.12]) b.box(0.03, 0.18, 0.16, GRID, ...at(-0.42, o, -0.09), 0, ry);
+  // The emitter: barrel, coils, prongs and lens.
+  stick(b, 0.07, CHROME, at(0.3), at(0.82), CYL8);
+  for (const f of [0.46, 0.58, 0.7]) stick(b, 0.088, NC, at(f), at(f + 0.025), CYL8);
+  for (const o of [-0.1, 0.1]) stick(b, 0.022, CHROME, at(0.55, o), at(0.98, o * 0.6), CYL6);
+  stick(b, 0.06, NC, at(0.82), at(0.85), DISC);
+  flag(ctx, -0.56, y + 0.25, -0.56, 0.9, CHROME);
+  extra.spinners = [{ geo: ring(0.62, 0.025, NM, 0.35), at: [0, hy, 0], axis: 'y', speed: 1.1 }];
+  extra.floaters = [{ geo: new B().add(GEM, NC, 0, 0, 0, 0.09, 0.17, 0.09).add(GEM, t, 0, 0, 0, 0.05, 0.1, 0.05).geometry(), at: [0, hy + 0.62, 0], amp: 0.07, speed: 1.5 }];
+  // The laser: the beam out of the lens, the flare at the lens and a spark where it strikes.
+  const fire = new B(), tip = at(0.86), end = at(2.1, 0, -0.18);
+  stick(fire, 0.04, NC, tip, end, CYL6);
+  fire.add(BALL, HOT, ...tip, 0.12, 0.12, 0.12).add(BALL, NM, ...end, 0.08, 0.08, 0.08);
+  extra.fire = { geo: fire.geometry(), at: [0, 0, 0] };
+  return hy + 0.37;
+}
+
+// Wall: an energy barrier. A dark plinth with a cyan neon edge and a white deck, white emitter pylons with team caps
+// at its corners, and between them a block of humming energy, its crest edged in neon and its faces crossed by three
+// laser beams, cyan and magenta; it fills its tile edge to edge, so segments in a line close up into one barrier, the
+// beams running on from pylon to pylon.
+export function wall(ctx) {
+  const { b, t } = ctx, y0 = 0.16, top = 0.86, f = 0.44, fy = 0.76;
+  b.box(1, 0.1, 1, DARK).box(1, 0.025, 1, NC, 0, 0.1, 0).box(1, 0.035, 1, SNOW, 0, 0.125, 0);
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(0.1, top - y0, 0.1, SNOW, x * 0.45, y0, z * 0.45).box(0.1, 0.06, 0.1, t, x * 0.45, top, z * 0.45);
+  b.box(2 * f, fy - y0, 2 * f, FLUID, 0, y0, 0);
+  for (const k of [-1, 1]) {
+    b.box(2 * f, 0.02, 0.02, NC, 0, fy, k * (f - 0.01)).box(0.02, 0.02, 2 * f - 0.04, NC, k * (f - 0.01), fy, 0);
+    for (const [i, yy] of [0.3, 0.46, 0.62].entries()) { const c = i === 1 ? NM : NC; b.box(0.8, 0.025, 0.025, c, 0, yy, k * 0.475).box(0.025, 0.025, 0.8, c, k * 0.475, yy, 0); }
+  }
+  return top + 0.06;
 }
