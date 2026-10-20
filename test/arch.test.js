@@ -207,3 +207,17 @@ test('Age of Sail Wonder: the lighthouse lamp is hidden while unfinished and tur
   spinnersTurn('wonder', 'sail', 'lamp');
   assert.ok(build('wonder', 'sail').anim.spinners.every(sp => sp.axis === 'y'), 'the lamp turns about the tower');
 });
+
+// --- modern designs (Task 10) ---
+// Every type but the Town Center and House (Task 3's), the Factory included.
+const MODERN = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder', 'castle', 'factory'];
+test('Modern designs differ from every other era', () => differsFromOtherEras(MODERN, 'modern'));
+test('Modern designs: heights within the cap', () => heightsOk(MODERN));
+test('Modern farm: crops show once finished and shrink with the food left', () => cropsShrink('modern'));
+test('Modern Barracks: the radar dish is hidden while unfinished and turns once finished', () => {
+  spinnersTurn('barracks', 'modern', 'radar dish');
+  assert.ok(build('barracks', 'modern').anim.spinners.every(sp => sp.axis === 'y'), 'the radar turns about its mast');
+});
+test('Modern Wonder: the skyscraper towers over the office-tower Town Center', () => {
+  assert.ok(bodyHeight('wonder', 'modern') > bodyHeight('town_center', 'modern') + 1.5, `wonder ${bodyHeight('wonder', 'modern')}`);
+});
