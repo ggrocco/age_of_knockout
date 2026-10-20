@@ -238,3 +238,16 @@ test('disabling time limits overrides difficulty caps while keeping the bot hand
   assert.deepEqual(matchOptions(['hard', 'easy'], { noTimeLimit: true }), { workRate: [1, 1], capTicks: Infinity });
   assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
 });
+
+test('every sweep waypoint is land the army can reach', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const g = createGame({ seed, rules: roundById('deathmatch') }), n = g.map.size;
+    if (seed === 3) assert.equal(g.map.tiles[54 * n + 32], 1, 'control: seed 3 has a lake on the (32, 54) waypoint');
+    for (const pid of [0, 1]) for (const wp of createBot(g, pid, 'medium').sweep) {
+      assert.notEqual(g.map.tiles[wp.y * n + wp.x], 1, `seed ${seed}: waypoint ${wp.x},${wp.y} is not water`);
+      const from = tileOf([...g.units.values()].find(u => u.owner === pid));
+      const path = findPath(g.map, g.blocked, from, wp, (x, y) => Math.abs(x - wp.x) <= 2 && Math.abs(y - wp.y) <= 2);
+      assert.ok(path, `seed ${seed}: player ${pid} can reach waypoint ${wp.x},${wp.y}`);
+    }
+  }
+});

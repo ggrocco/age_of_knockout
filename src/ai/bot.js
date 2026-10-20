@@ -26,11 +26,22 @@ export const matchOptions = (diffs, { noTimeLimit = false } = {}) => ({
 });
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// The open land tile nearest (x, y), ties to the first found row by row; (x, y) itself when nothing is open.
+function landNear(game, x, y) {
+  const n = game.map.size; let best = { x, y }, bd = Infinity;
+  for (let ty = 0; ty < n; ty++) for (let tx = 0; tx < n; tx++) {
+    if (game.map.tiles[ty * n + tx] === 1 || game.blocked(tx, ty)) continue;
+    const d = (tx - x) ** 2 + (ty - y) ** 2; if (d < bd) { bd = d; best = { x: tx, y: ty }; }
+  }
+  return best;
+}
 
 export function createBot(game, pid, difficulty = 'medium') {
   const D = DIFF[difficulty], me = game.players[pid], enemy = 1 - pid, enemyStart = game.map.starts[enemy];
-  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => ({ x, y }))];
-  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweepIdx: 0, think };
+  // Sweep waypoints, each moved to the nearest open land tile: one in a lake can never be reached, and the sweep only moves on
+  // to the next waypoint once a unit gets there, so the whole army would stall (and repath) in front of the water.
+  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => landNear(game, x, y))];
+  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweepIdx: 0, sweep, think };
 
   // In the Wonder round, keep the wonder's cost untouched until it is placed.
   const reserved = () => (game.rules && game.rules.id === 'wonder' && !mine('buildings').some(b => b.type === 'wonder')) ? BUILDINGS.wonder.cost : null;
