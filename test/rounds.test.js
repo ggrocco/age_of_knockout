@@ -1,6 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { ROUNDS, roundById, scoreOf } from '../src/rounds/index.js';
+import { matchOptions } from '../src/ai/bot.js';
 import { ageUpProblem } from '../src/sim/commands.js';
 const G = id => createGame({ seed: 2, rules: roundById(id) });
 const wipe = (g, p) => { for (const e of [...g.units.values(), ...g.buildings.values()]) if (e.owner === p) g.remove(e); };
@@ -57,4 +58,35 @@ test('scoreOf rewards a standing Wonder; cap tiebreak picks the higher score', (
   assert.equal(scoreOf(g, 0), base + 102);
   const g2 = G('conquest'); g2.players[0].kills += 100; g2.time = g2.rules.capTicks - 1; g2.tick();
   assert.deepEqual([g2.result.winner, g2.result.reason], [0, 'time cap']);
+});
+
+test('no-time-limit matches continue past normal and relaxed deadlines in every mode', () => {
+  for (const round of ROUNDS) for (const diff of ['easy', 'medium', 'hard', 'relaxed']) {
+    const g = createGame({ seed: 2, rules: round, ...matchOptions([null, diff], { noTimeLimit: true }) });
+    assert.equal(g.capTicks, Infinity, `${round.id} ${diff}`);
+    g.players[1].kills = 1000; // A score lead must not decide an unlimited match.
+    for (const time of [round.capTicks, 48000, 120000]) {
+      g.time = time - 1; g.tick();
+      assert.equal(g.result, null, `${round.id} ${diff} at ${time}`);
+    }
+  }
+});
+test('unlimited matches still end through their victory conditions or resignation', () => {
+  for (const round of ROUNDS) {
+    const g = createGame({ seed: 2, rules: round, ...matchOptions([null, 'relaxed'], { noTimeLimit: true }) });
+    g.time = 120000;
+    if (round.id === 'regicide') g.remove(g.entities.get(g.roundState.kings[1]));
+    else if (round.id === 'wonder') { g.addBuilding('wonder', 0, 30, 30, true); g.roundState.hold[0] = g.roundState.need - 1; }
+    else if (round.id === 'relics') {
+      const tc = [...g.buildings.values()].find(b => b.owner === 0);
+      for (const r of g.relics.values()) r.stored = tc.id;
+      g.roundState.hold[0] = g.roundState.need - 1;
+    } else wipe(g, 1);
+    g.tick();
+    assert.equal(g.result.winner, 0, round.id);
+    assert.equal(g.result.reason, round.id === 'deathmatch' ? 'conquest' : round.id, round.id);
+  }
+  const g = createGame({ rules: roundById('conquest'), ...matchOptions([null, 'medium'], { noTimeLimit: true }) });
+  g.command(0, { type: 'resign' }); g.tick();
+  assert.deepEqual([g.result.winner, g.result.reason], [1, 'resigned']);
 });

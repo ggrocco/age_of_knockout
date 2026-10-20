@@ -4,7 +4,7 @@ import { BUILDINGS } from '../src/data/buildings.js';
 import { TECHS } from '../src/data/techs.js';
 import { AGES } from '../src/data/ages.js';
 import { ICONS, icon } from '../src/ui/icons.js';
-import { DESC, costHtml, tipHtml, roundTipHtml, roundTimeLabel } from '../src/ui/tips.js';
+import { DESC, costHtml, tipHtml, roundTipHtml, roundTimeLabel, roundLimitText } from '../src/ui/tips.js';
 import { ROUNDS, roundById } from '../src/rounds/index.js';
 import { createGame } from '../src/sim/game.js';
 import { matchOptions } from '../src/ai/bot.js';
@@ -117,4 +117,17 @@ test('every tip renders without throwing and never leaks "undefined"', () => {
   for (const id of Object.keys(BUILDINGS)) assert.doesNotMatch(tipHtml({ kind: 'building', id }), /undefined|NaN/, id);
   for (const id of Object.keys(TECHS)) assert.doesNotMatch(tipHtml({ kind: 'tech', id }), /undefined|NaN/, id);
   for (const a of AGES.slice(1)) assert.doesNotMatch(tipHtml({ kind: 'age', id: 'age', next: a }), /undefined|NaN/, a);
+});
+
+test('unlimited mode tips explain how to win without showing a score deadline', () => {
+  for (const round of ROUNDS) {
+    const html = roundTipHtml(round, Infinity);
+    assert.equal(roundTimeLabel(round, Infinity), 'No time limit');
+    assert.equal(roundLimitText(round, Infinity), 'No time limit');
+    assert.match(html, /No time limit/);
+    assert.match(html, /victory condition is met or a player resigns/);
+    assert.doesNotMatch(html, /Infinity|NaN|undefined|At the limit|higher score wins|exact tie/);
+  }
+  assert.match(roundTipHtml(roundById('wonder'), Infinity), /3 uninterrupted game minutes/);
+  assert.match(roundTipHtml(roundById('relics'), Infinity), /3 uninterrupted game minutes/);
 });

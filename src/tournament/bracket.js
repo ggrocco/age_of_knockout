@@ -13,12 +13,12 @@ export const LEVELS = {
 };
 export const LEVEL_NAME = { relaxed: 'Relaxed', normal: 'Normal', hard: 'Hard' };
 
-export function createTournament(seed = 1, level = 'normal') {
+export function createTournament(seed = 1, level = 'normal', { noTimeLimit = false } = {}) {
   const ramp = LEVELS[level] || LEVELS.normal;
   const rng = makeRng(seed);
   const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : ['easy', 'medium', 'hard'][rng.int(3)] }));
   const t = {
-    seed, level, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
+    seed, level, noTimeLimit, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
     get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },

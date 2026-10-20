@@ -63,7 +63,7 @@ export function createHud(ui) {
     const resHtml = ['food', 'wood', 'gold', 'stone'].map(k => `<span class="res"><i class="dot" style="background:${COLORS[k]}"></i>${Math.floor(p.res[k])}</span>`).join('');
     const ageName = ageLabel(p.age);
     const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
-    const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${round ? ' / time limit' : ''}"></span>`;
+    const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${round ? (g.capTicks === Infinity ? ' / no time limit' : ' / time limit') : ''}"></span>`;
     let html;
     if (ui.touch) html = resHtml + `<span class="res" title="Population">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span>${clockHtml}<button data-menu="open" aria-label="Menu">&#9776;</button>`;
     else html = resHtml
@@ -86,7 +86,7 @@ export function createHud(ui) {
       top.innerHTML = html; top._html = html;
       if (focusSelector) { top.querySelector(focusSelector)?.focus({ preventScroll: true }); if (!tipWasShown) hideTip(); }
     }
-    const clock = top.querySelector('.match-clock'), clockText = fmtTime(g.time) + (round ? ` / ${fmtTime(g.capTicks)}` : '');
+    const clock = top.querySelector('.match-clock'), clockText = fmtTime(g.time) + (round ? ` / ${g.capTicks === Infinity ? '∞' : fmtTime(g.capTicks)}` : '');
     if (clock.textContent !== clockText) clock.textContent = clockText;
     // info panel
     const sel = [...ui.sel].map(id => g.entities.get(id)).filter(Boolean), one = sel.length === 1 ? sel[0] : null, insp = ui.inspect && g.entities.get(ui.inspect.id);
