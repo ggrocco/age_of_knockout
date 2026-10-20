@@ -8,18 +8,25 @@ class Heap {
 }
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const MAX_EXPAND = 6000;
+// Search state is reused between calls; a slot belongs to the current search only when its stamp equals gen.
+let buf = null;
+function buffers(n) {
+  if (!buf || buf.n !== n) buf = { n, gen: 0, seen: new Uint32Array(n * n), closed: new Uint32Array(n * n), g: new Float32Array(n * n), prev: new Int32Array(n * n) };
+  if (++buf.gen === 0xffffffff) { buf.seen.fill(0); buf.closed.fill(0); buf.gen = 1; }
+  return buf;
+}
 export function findPath(map, blocked, from, to, isGoal) {
   const n = map.size;
   const goal = isGoal || ((x, y) => x === to.x && y === to.y);
   if (goal(from.x, from.y)) return [];
   const free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && map.tiles[y * n + x] !== 1 && !blocked(x, y);
   if (!isGoal && !free(to.x, to.y)) return null;
-  const g = new Float32Array(n * n).fill(Infinity), prev = new Int32Array(n * n).fill(-1), closed = new Uint8Array(n * n);
+  const { gen, seen, closed, g, prev } = buffers(n);
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };
-  const open = new Heap(); const s = from.y * n + from.x; g[s] = 0; open.push({ i: s, f: h(from.x, from.y) });
+  const open = new Heap(); const s = from.y * n + from.x; g[s] = 0; seen[s] = gen; open.push({ i: s, f: h(from.x, from.y) });
   let expanded = 0;
   while (open.size && expanded++ < MAX_EXPAND) {
-    const { i } = open.pop(); if (closed[i]) continue; closed[i] = 1;
+    const { i } = open.pop(); if (closed[i] === gen) continue; closed[i] = gen;
     const x = i % n, y = (i / n) | 0;
     if (goal(x, y)) { const out = []; for (let k = i; k !== s; k = prev[k]) out.push({ x: k % n, y: (k / n) | 0 }); return out.reverse(); }
     for (const [dx, dy] of DIRS) {
@@ -27,7 +34,7 @@ export function findPath(map, blocked, from, to, isGoal) {
       if (!free(nx, ny)) continue;
       if (dx && dy && (!free(x + dx, y) || !free(x, y + dy))) continue;
       const j = ny * n + nx, ng = g[i] + (dx && dy ? 1.414 : 1);
-      if (ng < g[j]) { g[j] = ng; prev[j] = i; open.push({ i: j, f: ng + h(nx, ny) }); }
+      if (seen[j] !== gen || ng < g[j]) { g[j] = ng; seen[j] = gen; prev[j] = i; open.push({ i: j, f: ng + h(nx, ny) }); }
     }
   }
   return null;

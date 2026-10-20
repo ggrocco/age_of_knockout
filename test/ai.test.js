@@ -5,6 +5,7 @@ import { roundById } from '../src/rounds/index.js';
 import { ageIndex } from '../src/data/ages.js';
 import { UNITS } from '../src/data/units.js';
 import { THINK_EVERY, matchOptions } from '../src/ai/bot.js';
+import { findPath } from '../src/sim/path.js';
 // Runs one bot against an idle opponent; returns the tick of its first attack wave and the tick it reached each age.
 function firstWave(roundId, diff, seed = 1) {
   const rules = roundById(roundId), g = createGame({ seed, rules, ...matchOptions([null, diff]) }), b = createBot(g, 1, diff), ev = THINK_EVERY[diff], ages = {};
@@ -108,4 +109,25 @@ test('a Medieval bot builds a Castle and advances to the Age of Sail', () => {
   assert.ok([...g.buildings.values()].some(x => x.owner === 0 && x.type === 'castle' && x.constructed), 'built a Castle');
   assert.ok(ageIndex(p.age) >= ageIndex('sail'), 'reached the Age of Sail, at ' + p.age);
   assert.ok(b.maxRejects <= 20, 'rejects ' + b.maxRejects);
+});
+test('bot sweep waypoints are land the army can reach from its start', () => {
+  for (const seed of [1058, ...Array.from({ length: 60 }, (_, i) => i + 1)]) {
+    const g = createGame({ seed }), n = g.map.size, res = new Set(g.map.resources.map(r => Math.floor(r.y) * n + Math.floor(r.x)));
+    for (const pid of [0, 1]) for (const wp of createBot(g, pid, 'medium').sweep) {
+      assert.notEqual(g.map.tiles[wp.y * n + wp.x], 1, `seed ${seed} pid ${pid}: waypoint ${wp.x},${wp.y} is water`);
+      assert.ok(findPath(g.map, (x, y) => res.has(y * n + x), g.map.starts[pid], wp) !== null, `seed ${seed} pid ${pid}: waypoint ${wp.x},${wp.y} unreachable`);
+    }
+  }
+});
+test('an army whose sweep move fails goes on to the next waypoint instead of retrying it', () => {
+  const g = createGame({ seed: 1, rules: roundById('conquest') }), b = createBot(g, 1, 'hard');
+  b.sweep[0] = { x: 28, y: 2 }; // centre of a 5x5 lake: unreachable even with the move's 2-tile slack
+  const s = g.map.starts[1], army = [0, 1, 2, 3].map(k => g.spawnUnit('clubman', 1, s.x - 3 + k, s.y + 3));
+  b.waveActive = true; b.think();
+  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === 28.5), 'sent to the lake first');
+  for (let i = 0; i < 20 && army.some(u => u.order.type !== 'idle'); i++) g.tick();
+  assert.ok(army.every(u => u.order.type === 'idle'), 'the move to the lake fails');
+  b.think();
+  const next = b.sweep[1];
+  assert.ok(army.every(u => u.order.type === 'move' && u.order.x === next.x + 0.5 && u.order.y === next.y + 0.5), JSON.stringify(army.map(u => u.order)));
 });
