@@ -39,14 +39,22 @@ export const place = (b, part, x, y, z, ry = 0, k = 1) => {
 
 // ---------- low-poly shapes for small repeated parts, centred on the origin ----------
 export const CYL6 = new THREE.CylinderGeometry(1, 1, 1, 6), BALL = new THREE.SphereGeometry(1, 6, 4), CONE4 = new THREE.ConeGeometry(1, 1, 4);
+export const CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), DISC = new THREE.CylinderGeometry(1, 1, 1, 12);
 // A square base of half-side 1 at y = -0.5 tapering to 0.7 at y = 0.5 (turf banks, plinths).
 export const FRUSTUM = new THREE.CylinderGeometry(0.7, 1, 1, 4).rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
+// ARCH: a half disc facing +z, flat side down at the origin (an arched opening's head); ARCH_RING: its half-ring frame.
+export const ARCH = new THREE.CircleGeometry(1, 8, 0, Math.PI), ARCH_RING = new THREE.TorusGeometry(1, 0.16, 4, 8, Math.PI);
 // A ramp of unit size across x, high at z = 0 and down to the ground at z = 1 (stairs, ramps, lean-to gable walls).
 export const WEDGE = (() => {
   const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(1, 0); sh.lineTo(0, 1); sh.closePath();
   const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(0.5, 0, 0);
   return g;
 })();
+// An oak barrel with iron hoops standing on y.
+export const barrel = (b, x, y, z, r = 0.07, hh = 0.17) => {
+  b.cylT(r * 0.86, r * 0.86, hh, C.wood, x, y, z, 8).cylT(r, r, hh * 0.56, C.wood, x, y + hh * 0.22, z, 8);
+  for (const f of [0.1, 0.84]) b.cylT(r * 0.9, r * 0.9, 0.018, P.iron, x, y + hh * f, z, 8);
+};
 // A sack of grain of radius r standing on y.
 export const sack = (b, x, y, z, r) => b.add(BALL, C.cloth, x, y + r * 0.9, z, r, r, r * 0.85).add(CYL6, C.leather, x, y + r * 1.8, z, r * 0.3, r * 0.4, r * 0.3);
 // A low-poly horse facing +x at the origin, with a team-coloured saddle cloth (t); for place(). HORSE_HEAD is its coat,

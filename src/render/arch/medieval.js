@@ -4,7 +4,7 @@
 // butts, a stable with a hay loft, an arcaded market hall, a hall with a rose window and a gothic cathedral.
 import * as THREE from 'three';
 import { B, C, unit } from '../builder.js';
-import { P, flag, stick, lerp, hash, place, horse, CYL6, BALL, CONE4, FRUSTUM, HORSE_HEAD, sack } from './kit.js';
+import { P, flag, stick, lerp, hash, place, horse, CYL6, CYL8, DISC, BALL, CONE4, FRUSTUM, HORSE_HEAD, sack, barrel } from './kit.js';
 
 export function house(ctx) {
   const { b, s, t } = ctx, W = s - 0.2, D = s - 0.3;
@@ -45,7 +45,6 @@ const STONE = C.stone, STONE_D = C.stoneD, STONE_L = 0xb4b1a6, SLATE = P.slate, 
 const OAK = P.beam, PLASTER = P.plaster, BOARD = 0x6e4c2c, BOARD_L = 0x84623e, STRAW = C.hay, STRAW_D = 0xc9a548;
 const YARD = 0x8a7d62, COBBLE = 0x8d887c, PAVE = 0xb3ae9f, GRASS = 0x6a8a3e, GRASS_L = 0x7e9c4c, TURF = 0x5b7a37;
 const SOIL = 0x6a5233, SOIL_L = 0x7d6440, GLASS = 0x28323c, ROPE = 0xcbb98a;
-const CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), DISC = new THREE.CylinderGeometry(1, 1, 1, 12);
 // A point on a wall face centred at (x, z) facing along ry (0: +z): u along the face, o out from it.
 const onFace = (x, z, ry) => (u, o = 0) => [x + u * Math.cos(ry) + o * Math.sin(ry), z - u * Math.sin(ry) + o * Math.cos(ry)];
 
@@ -119,11 +118,6 @@ const rose = (t, R) => {
 const haystack = (b, x, z, r = 0.17, hh = 0.44, y = 0.03) => {
   b.cylT(r * 0.94, r, hh * 0.46, STRAW, x, y, z, 8).cone(r * 1.05, hh * 0.58, STRAW_D, x, y + hh * 0.42, z, 8);
   b.cylT(r * 0.96, r * 0.96, 0.025, 0xb8953e, x, y + hh * 0.36, z, 8).cylT(0.012, 0.012, 0.1, C.woodD, x, y + hh * 0.95, z, 4);
-};
-// An oak barrel with iron hoops standing on y.
-const barrel = (b, x, y, z, r = 0.07, hh = 0.17) => {
-  b.cylT(r * 0.86, r * 0.86, hh, C.wood, x, y, z, 8).cylT(r, r, hh * 0.56, C.wood, x, y + hh * 0.22, z, 8);
-  for (const f of [0.1, 0.84]) b.cylT(r * 0.9, r * 0.9, 0.018, P.iron, x, y + hh * f, z, 8);
 };
 // A two-wheeled cart facing +x built at the origin for place(); load(c) piles its goods on the bed (top at y = 0.19).
 const cart = load => {

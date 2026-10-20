@@ -21,7 +21,9 @@ test('design registry: earlier eras show the unlock-era design', () => {
 test('design registry: kept designs, era designs and the legacy fallback', () => {
   assert.equal(designOf('house', 'tool').kind, 'kept');
   assert.equal(designOf('house', 'sail').kind, 'design');
-  assert.equal(designOf('granary', 'sail').kind, 'legacy'); // no Age of Sail Granary design yet
+  // An AI Future Granary stays legacy until Task 11 designs it; Task 11 replaces this check with "never legacy outside
+  // KEPT".
+  assert.equal(designOf('granary', 'future').kind, 'legacy');
 });
 
 // ---------- shared helpers for the per-era design tests ----------
@@ -45,10 +47,20 @@ const bodyHeight = (type, age) => new THREE.Box3().setFromObject(build(type, age
 
 const available = type => AGES.filter(a => ageIndex(a) >= ageIndex(BUILDINGS[type].age));
 const distinctAcrossEras = types => { for (const type of types) { const hs = available(type).map(a => posHash(type, a)); assert.equal(new Set(hs).size, hs.length, `${type}: two eras share a shape`); } };
-const heightsOk = types => { for (const type of types) for (const a of available(type)) assert.ok(bodyHeight(type, a) <= (type === 'wonder' ? 5.5 : 3.6), `${type}/${a} height ${bodyHeight(type, a)}`); };
+const capOf = type => type === 'wonder' ? 5.5 : 3.6;
+// Bodies still over the height cap, by era: today's looks that an era design has yet to replace (the Industrial
+// Castle's re-skin of the kept Medieval keep is 3.72 tall; Task 9 designs it). The ratchet test below keeps the list
+// exact: once one fits, drop it from here.
+const OVER_CAP = { industrial: ['castle'] };
+const heightsOk = types => {
+  for (const type of types) for (const a of available(type)) if (!OVER_CAP[a]?.includes(type)) assert.ok(bodyHeight(type, a) <= capOf(type), `${type}/${a} height ${bodyHeight(type, a)}`);
+};
 
 test('Town Center and House: every era has its own shape', () => distinctAcrossEras(['town_center', 'house']));
 test('Town Center and House: heights within the cap', () => heightsOk(['town_center', 'house']));
+test('the OVER_CAP list holds exactly the bodies still over the height cap', () => {
+  for (const [age, types] of Object.entries(OVER_CAP)) for (const type of types) assert.ok(bodyHeight(type, age) > capOf(type), `${type}/${age} now fits (${bodyHeight(type, age)}): drop it from OVER_CAP`);
+});
 
 test('animated parts: hidden until finished, then they move', () => {
   for (const [age, kinds] of [['industrial', ['smoke', 'spinners']], ['future', ['spinners', 'floaters']]]) {
@@ -101,6 +113,21 @@ const cropsShrink = age => {
   e.amount = 0; animate(g, e, 1, false);
   assert.ok(a.crops.scale.y < full, `${age}: crops did not shrink (${a.crops.scale.y} vs ${full})`);
 };
+// The design's spinners (what names them) are hidden while it is unfinished, then show and turn once it is finished.
+const spinnersTurn = (type, age, what) => {
+  const { e, anim: a, g } = build(type, age, false);
+  assert.ok(a.spinners?.length > 0, `${type}/${age}: no ${what} spinner`);
+  animate(g, e, 1, false);
+  for (const sp of a.spinners) assert.equal(sp.p.visible, false, `${age}: the ${what} shows while unfinished`);
+  e.constructed = true; e.progress = 1;
+  animate(g, e, 1, false);
+  const before = a.spinners.map(sp => sp.p.rotation[sp.axis]);
+  animate(g, e, 2, false);
+  a.spinners.forEach((sp, i) => {
+    assert.equal(sp.p.visible, true, `${age}: the ${what} is hidden once finished`);
+    assert.notEqual(sp.p.rotation[sp.axis], before[i], `${age}: the ${what} does not turn`);
+  });
+};
 // sha1 of the body's and the crops' colour buffers (built), for one owner; not the flag or mast, so a flag alone
 // doesn't count as team colour.
 const colourHash = (type, age, owner) => {
@@ -117,11 +144,14 @@ const teamColourShows = (types, age) => {
   const same = types.filter(type => colourHash(type, age, 0) === colourHash(type, age, 1));
   assert.deepEqual(same, [], `${age}: no team colour on ${same.join(', ')}`);
 };
-// The body stays on its footprint: x/z extents within size / 2, plus 0.15 for eaves (today's legacy roofs already reach
-// about 0.065 past the tile edge). overhangs lists the ones that don't.
+// The building stays on its footprint: x/z extents within size / 2, plus 0.15 for eaves (today's legacy roofs already
+// reach about 0.065 past the tile edge). The body counts, and so do the crops and every spinner and floater at rest, in
+// world space; smoke doesn't, since it rises. overhangs lists the ones that don't fit.
 const overhangs = (types, age) => types.flatMap(type => {
-  const bb = new THREE.Box3().setFromObject(build(type, age).anim.body), ext = Math.max(-bb.min.x, bb.max.x, -bb.min.z, bb.max.z);
-  const max = BUILDINGS[type].size / 2 + 0.15;
+  const { anim, g } = build(type, age), bb = new THREE.Box3();
+  g.updateMatrixWorld(true);
+  for (const o of [anim.body, anim.crops, ...[...anim.spinners ?? [], ...anim.floaters ?? []].map(x => x.p)]) if (o) bb.union(new THREE.Box3().setFromObject(o));
+  const ext = Math.max(-bb.min.x, bb.max.x, -bb.min.z, bb.max.z), max = BUILDINGS[type].size / 2 + 0.15;
   return ext <= max ? [] : [`${type}/${age} ${ext.toFixed(3)} > ${max.toFixed(3)}`];
 });
 const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), [], `${age}: off the footprint`);
@@ -129,9 +159,10 @@ const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), 
 // Every era design so far, from the registry, so later eras' designs are checked as they land.
 const designed = Object.entries(DESIGNS).map(([age, mod]) => [age, Object.keys(mod)]);
 test('every era design shows team colour', () => { for (const [age, types] of designed) teamColourShows(types, age); });
-// Designs that still overhang their footprint, by era (none since the eave allowance; Task 3's Town Centers and Houses
-// all fit within it). The ratchet below keeps the list exact: fix one, then drop it from here.
-const OVERHANG = {};
+// Designs that still overhang their footprint, by era. Task 3's Town Centers and Houses all fit within the eave
+// allowance; since spinners and floaters count too, the AI Future Town Center's orbiting rings reach 1.683 of 1.65. The
+// ratchet below keeps the list exact: fix one, then drop it from here.
+const OVERHANG = { future: ['town_center'] };
 test('every era design stays within its footprint', () => {
   for (const [age, types] of designed) withinFootprint(types.filter(type => !OVERHANG[age]?.includes(type)), age);
 });
@@ -165,17 +196,14 @@ const MEDIEVAL = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range',
 test('medieval designs differ from every other era', () => differsFromOtherEras(MEDIEVAL, 'medieval'));
 test('Medieval designs: heights within the cap', () => heightsOk(MEDIEVAL));
 test('Medieval farm: crops show once finished and shrink with the food left', () => cropsShrink('medieval'));
-test('Medieval Storage Pit: the treadwheel is hidden while unfinished and turns once finished', () => {
-  const { e, anim: a, g } = build('storage_pit', 'medieval', false);
-  assert.ok(a.spinners?.length > 0, 'no treadwheel spinner');
-  animate(g, e, 1, false);
-  for (const sp of a.spinners) assert.equal(sp.p.visible, false, 'the treadwheel shows while unfinished');
-  e.constructed = true; e.progress = 1;
-  animate(g, e, 1, false);
-  const before = a.spinners.map(sp => sp.p.rotation[sp.axis]);
-  animate(g, e, 2, false);
-  a.spinners.forEach((sp, i) => {
-    assert.equal(sp.p.visible, true, 'the treadwheel is hidden once finished');
-    assert.notEqual(sp.p.rotation[sp.axis], before[i], 'the treadwheel does not turn');
-  });
+test('Medieval Storage Pit: the treadwheel is hidden while unfinished and turns once finished', () => spinnersTurn('storage_pit', 'medieval', 'treadwheel'));
+
+// ---------- Age of Sail: every type but the Town Center and House (Task 3's) and the Factory (Industrial) ----------
+const SAIL = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder', 'castle'];
+test('Age of Sail designs differ from every other era', () => differsFromOtherEras(SAIL, 'sail'));
+test('Age of Sail designs: heights within the cap', () => heightsOk(SAIL));
+test('Age of Sail farm: crops show once finished and shrink with the food left', () => cropsShrink('sail'));
+test('Age of Sail Wonder: the lighthouse lamp is hidden while unfinished and turns once finished', () => {
+  spinnersTurn('wonder', 'sail', 'lamp');
+  assert.ok(build('wonder', 'sail').anim.spinners.every(sp => sp.axis === 'y'), 'the lamp turns about the tower');
 });

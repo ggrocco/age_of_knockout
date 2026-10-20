@@ -5,16 +5,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { B, C, unit } from '../builder.js';
-import { P, flag, firePit, stick, hash, place, horse, WEDGE, CYL6, BALL, CONE4, HORSE_HEAD, sack } from './kit.js';
+import { P, flag, firePit, stick, hash, place, horse, WEDGE, CYL6, BALL, CONE4, ARCH, ARCH_RING, HORSE_HEAD, sack } from './kit.js';
 
 // ---------- shared Iron parts ----------
 const MARBLE = C.marble, MARBLE_D = 0xd9d1bf, PLASTER = 0xd7c7a4, ASHLAR = 0xbcad8d, ASHLAR_D = 0xa39579;
 const TILE = 0xa96342, TILE_L = 0xb7714e, TILE_D = 0x8a4c34, CLAY = 0xb5693f, PAVING = 0xbfb193, SAND = 0xd2bf8e;
 const EARTH = 0x7a6346, SOIL = 0x6b5232, WALLSTONE = 0x9a8f78, OLIVE = 0x7d8c63, OLIVE_D = 0x5f6d4a, OLIVE_L = 0x9aa582, BARK = 0x5e4e3c;
 const WATER = 0x3f7fa3;
-// Low-poly shapes (ARCH: a half disc facing +z, flat side down; RING: its half-ring frame; AMPHORA: a terracotta
-// amphora 0.61 tall with two handles, foot at the origin).
-const ARCH = new THREE.CircleGeometry(1, 8, 0, Math.PI), RING = new THREE.TorusGeometry(1, 0.16, 4, 8, Math.PI);
+// AMPHORA: a terracotta amphora 0.61 tall with two handles, foot at the origin.
 const AMPHORA = (() => {
   const prof = [[0, 0], [0.03, 0.05], [0.08, 0.18], [0.1, 0.33], [0.08, 0.45], [0.035, 0.51], [0.035, 0.58], [0.05, 0.61], [0, 0.61]];
   const body = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 6).toNonIndexed();
@@ -54,7 +52,7 @@ const leanTo = (width, run, rise) => {
 // marble arch ring.
 const archway = (b, x, y, z, aw, spring, c = C.dark) => {
   const r = aw / 2;
-  b.box(aw, spring, 0.02, c, x, y, z).add(ARCH, c, x, y + spring, z + 0.011, r, r, 1).add(RING, MARBLE_D, x, y + spring, z + 0.012, r + 0.03, r + 0.03, 0.25);
+  b.box(aw, spring, 0.02, c, x, y, z).add(ARCH, c, x, y + spring, z + 0.011, r, r, 1).add(ARCH_RING, MARBLE_D, x, y + spring, z + 0.012, r + 0.03, r + 0.03, 0.25);
 };
 // A terracotta amphora standing on y (k scales it), its stopper sealed with `seal`; tipped by rx/rz it lies unsealed.
 const amphora = (b, x, y, z, k = 1, seal = null, rx = 0, rz = 0) => {
