@@ -651,3 +651,46 @@ test('a move into an enemy-walled spot breaks through, then arrives on the very 
   assert.deepEqual([Math.floor(u.x), Math.floor(u.y)], [cx, cy]);
   assert.equal(alive(walls).length, walls.length - 1);
 });
+
+// --- relic fetch breaches walls (Task 15 follow-up) ---
+// A loose relic the enemy has walled in: the fetcher's 'go' phase fails its path like any other order, so it breaches like one.
+// The relic sits on the middle tile of a closed 6 x 6 ring, i.e. in its 4 x 4 interior.
+const relicRing = owner => {
+  const g = createGame({ seed: 1 }), a = arena(g);
+  const walls = ring(g, owner, a.x + 7, a.y + 7, 6, 6), relic = g.spawnRelic(a.x + 9.5, a.y + 9.5);
+  const u = g.spawnUnit('swordsman', 0, a.x + 3.5, a.y + 9.5), to = tileOf(relic), goal = (x, y) => x === to.x && y === to.y; // doRelic's own goal
+  return { g, walls, relic, u, to, goal };
+};
+
+test('a unit sent for a walled-in relic breaks a segment, then picks the relic up', () => {
+  const { g, walls, relic, u, to, goal } = relicRing(1);
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), to, goal), null, 'control: the ring seals the relic in');
+  assert.ok(walls.includes(g.entities.get(breachTarget(g, u, to, goal))), 'and a segment of it is the way through');
+  assert.ok(g.command(0, { type: 'relic', ids: [u.id], relicId: relic.id }).ok);
+  const order = u.order;
+  g.tick();
+  const w = g.entities.get(u.order.target);
+  assert.equal(u.order.type, 'attack'); assert.ok(walls.includes(w), 'it turns on a segment of the ring'); assert.equal(w.x, walls[0].x, 'the one on its side');
+  assert.equal(u.order.fails, 0); assert.equal(u.order.resume, order, 'keeping the fetch to come back to'); assert.equal(order.type, 'relic');
+  assert.equal(order.fails, 0, 'the failed path was not counted as a try');
+  g.tick(); assert.ok(u.path, 'it heads for the wall at once, not after the 40-tick retry');
+  tickUntil(g, () => w.dead, 2000, 'the segment falls');
+  assert.equal(relic.holder, null, 'the relic is not touched meanwhile');
+  g.tick(); assert.equal(u.order, order, 'then it goes back to the fetch'); assert.equal(u.order.resume, undefined);
+  tickUntil(g, () => relic.holder !== null, 1000, 'and picks the relic up from inside the ring');
+  assert.equal(relic.holder, u.id); assert.equal(u.relic, relic.id); assert.equal(order.phase, 'store', 'carrying it home');
+  assert.equal(alive(walls).length, walls.length - 1, 'through the one segment it broke');
+});
+
+test("a relic walled in by the unit's own walls is not breached", () => {
+  const { g, walls, relic, u, to, goal } = relicRing(0);
+  assert.equal(findPath(g.map, g.blocked, tileOf(u), to, goal), null, 'control: the ring seals the relic in');
+  assert.equal(breachTarget(g, u, to, goal), null, 'your own wall is never the way through');
+  assert.ok(g.command(0, { type: 'relic', ids: [u.id], relicId: relic.id }).ok);
+  const order = u.order;
+  let ticks = 0;
+  while (u.order.type !== 'idle') { g.tick(); ticks++; assert.ok(u.order === order || u.order.type === 'idle', 'the order is never swapped for a breach'); assert.ok(ticks < 400, 'it gives up'); }
+  assert.equal(ticks, 121, 'four tries 40 ticks apart, then it stops: exactly the old behaviour');
+  for (let i = 0; i < 100; i++) g.tick();
+  assert.equal(u.order.type, 'idle'); assert.ok(walls.every(w => !w.dead && w.hp === w.maxHp), 'no wall damaged'); assert.equal(relic.holder, null);
+});

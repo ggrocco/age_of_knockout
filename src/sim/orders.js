@@ -195,8 +195,11 @@ function doRelic(game, u, o) {
     if (!r || r.holder !== null || r.stored !== null) return stop(u);
     if (Math.hypot(r.x - u.x, r.y - u.y) <= REACH) { r.holder = u.id; u.relic = r.id; o.phase = 'store'; u.path = null; return; }
     const t = { x: Math.floor(r.x), y: Math.floor(r.y) };
-    const res = travel(game, u, (x, y) => x === t.x && y === t.y, t);
-    if (res === 'fail' && ++o.fails > 3) stop(u);
+    const goal = (x, y) => x === t.x && y === t.y, res = travel(game, u, goal, t);
+    if (res !== 'fail') return;
+    const id = breachTarget(game, u, t, goal); // a relic walled in by the enemy: break through, then take up the fetch again
+    if (id !== null) return breach(u, id, o);
+    if (++o.fails > 3) stop(u);
   } else {
     if (u.relic === null) return stop(u);
     let d = null, bd = Infinity;
