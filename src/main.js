@@ -8,6 +8,7 @@ import { createHud, reasonText } from './ui/hud.js';
 import { createInput } from './ui/input.js';
 import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
+import { roundTimeLabel, TIME_LIMIT_RULE } from './ui/tips.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
@@ -45,14 +46,20 @@ function endMatch() {
   ui.view?.dispose(); ui.view = null; ui.game = null; ui.minimap = null;
 }
 
-function show(html) { screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
-function hide() { screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
+function updateRoundCaps(diffs) {
+  ui.roundCaps = Object.fromEntries(ROUNDS.map((r, i) => [r.id, matchOptions([null, diffs[i]]).capTicks ?? r.capTicks]));
+  hud.hideTip();
+}
+
+function show(html) { hud.hideTip(); screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
+function hide() { hud.hideTip(); screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 
 function startMatch({ roundId, seed, oppDiff, label, onEnd }) {
   endMatch();
   document.body.classList.add('ingame');
   const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO; // botDiff: the bot that drives player 0 in autoplay/test modes
   const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff]) });
+  ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
@@ -97,13 +104,14 @@ function bracketHtml(t) {
     if (i < t.history.length) ms = t.history[i].results.map(x => `<div class="m ${x.human ? 'cur' : ''}"><span class="${x.winner === x.a ? 'w' : ''} ${x.a === 'You' ? 'you' : ''}">${x.a}</span><span class="${x.winner === x.b ? 'w' : ''} ${x.b === 'You' ? 'you' : ''}">${x.b}</span></div>`).join('');
     else if (i === t.roundIndex && !t.over) { for (let k = 0; k < t.alive.length; k += 2) ms += `<div class="m ${k === 0 ? 'cur' : ''}"><span class="${t.alive[k].id === 0 ? 'you' : ''}">${t.alive[k].name}</span><span>${t.alive[k + 1].name}</span></div>`; }
     else ms = `<div class="m"><span>${32 >> (i + 1) === 1 ? 'Final' : (32 >> i) / 2 + ' matches'}</span></div>`;
-    return `<div class="col"><h4>Round ${i + 1}<br>${r.name}</h4>${ms}</div>`;
+    return `<div class="col"><h4 data-tip="round:${r.id}" aria-describedby="tip" tabindex="0">Round ${i + 1}<br>${r.name}</h4>${ms}</div>`;
   });
   return `<div class="bracket">${cols.join('')}</div>`;
 }
 function bracketScreen() {
   const t = app.tournament, r = t.round, o = t.opponent;
-  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
+  updateRoundCaps(LEVELS[t.level]);
+  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>Time limit: <b>${roundTimeLabel(r, ui.roundCaps[r.id])} of game time.</b> ${TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
   document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
@@ -118,6 +126,7 @@ async function afterMatch(won) {
 function startTournament() { app.tournament = createTournament(+(params.get('seed') || 1), level); bracketScreen(); }
 
 function menu() {
+  updateRoundCaps(LEVELS[level]);
   document.body.classList.remove('ingame');
   show(`<div class="card"><h1>Age of Knockout</h1><h2>A five-round elimination tournament in the spirit of Age of Empires (1997)</h2>
   <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
@@ -125,10 +134,12 @@ function menu() {
   <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager, jump to Town Center</span><b>Space, Esc</b><span>pause, cancel</span></div>`}
   <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
   <button class="btn" data-auto id="start">Begin Tournament</button><br>
-  ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" style="font-size:14px;padding:5px 12px">Quick: ${r.name}</button>`).join('')}</div>`);
+  ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" data-tip="round:${r.id}" aria-describedby="tip" style="font-size:14px;padding:5px 12px">Quick: ${r.name}<small>${roundTimeLabel(r, ui.roundCaps[r.id])} of game time</small></button>`).join('')}</div>`);
   document.getElementById('start').onclick = startTournament;
   for (const b of document.querySelectorAll('.level .btn')) b.onclick = () => {
     setLevel(b.dataset.level); document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
+    updateRoundCaps(LEVELS[level]);
+    for (const quick of document.querySelectorAll('.quick')) { const r = ROUNDS[+quick.dataset.i]; quick.querySelector('small').textContent = roundTimeLabel(r, ui.roundCaps[r.id]) + ' of game time'; }
     for (const x of document.querySelectorAll('.level .btn')) x.classList.toggle('on', x === b);
   };
   // A quick match faces the opponent that round would have in a tournament at the chosen level.
