@@ -115,7 +115,9 @@ towers and walls are not modelled and nothing here comes from the openage data. 
   same HP fraction against the new `maxHp`, a tower takes the new attack fields, and an unfinished one keeps its build
   `progress` and finishes at the new `maxHp`. Ages before Tool (only reachable by
   calling `addBuilding` directly, since the `build` command needs the Tool Age) use the Tool row.
-- **Tower**: 40 wood + 120 stone, 2x2, build time 40 s, sight 8, Tool Age. Armor is the default building 3 melee / 8 pierce.
+- **Tower**: 40 wood + 120 stone, 2x2, build time 40 s, sight 10, Tool Age. Armor is the default building 3 melee / 8 pierce.
+  Sight 10 (not 8) so the range-9 Modern and AI Future towers can see, and so shoot, to their full range in every
+  direction: vision is centred on `floor(centre)`, half a tile off the middle of the 2x2.
   The attack stats are copied onto the building entity (`atk`, `atkType`, `range`, `cooldown`, `splash` (0 when none),
   `bonus: null`, `cd: 0`) under the same names a unit uses, so the shooting code can reuse the unit damage helpers.
 
@@ -133,6 +135,10 @@ towers and walls are not modelled and nothing here comes from the openage data. 
 - **Wall**: 5 stone per 1x1 segment, build time 6 s, sight 2, Tool Age, armor 4 melee / 10 pierce (arrows barely scratch it;
   melee and siege do the work). No gates. HP by era: Tool 120, Bronze 200, Iron 300, Medieval 400, Age of Sail 450,
   Industrial 500, Modern 650, AI Future 800.
+  Placed as a line (`wall` command, from `lineTiles`: up to 64 tiles, snapped horizontal, vertical or diagonal): every free
+  tile is paid for and placed in order, tiles you cannot build on (a tree, a building, another foundation, water, fog) are
+  skipped without charge, and the line stops at the first segment you cannot pay for. An unfinished segment (foundation) does not block movement, it only
+  reserves its tile; a finished one does, and a unit standing on it is moved to the nearest free tile.
 - **`extra: true`** on both (like the Farm and Wonder): neither counts toward the age-up building requirement.
 - **Elimination and score.** Neither trains units, so neither keeps a side alive (`isEliminated` ignores them). A finished Tower
   adds to the building score like any building; Wall segments do not, so spamming walls cannot win a time-cap tiebreak.
