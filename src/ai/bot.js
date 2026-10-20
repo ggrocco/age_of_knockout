@@ -1,18 +1,19 @@
 // Scripted build-order AI. Issues only game.command calls and reads game.visibleEntities/knownResources.
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { AGES, ageIndex } from '../data/ages.js';
+import { AGES, AGE_COST, ageIndex } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
+// towers: how many Towers it keeps near its Town Center from the Tool Age on.
 export const DIFF = {
-  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 18000, army: 12, attackAge: 'bronze', grace: 18000, dmWave: 20, dmArmy: 24 },
-  easy:    { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44 },
-  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44 },
-  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44 },
+  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 18000, army: 12, attackAge: 'bronze', grace: 18000, dmWave: 20, dmArmy: 24, towers: 1 },
+  easy:    { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1 },
+  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2 },
+  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3 },
 };
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
@@ -35,6 +36,12 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
   const mine = kind => [...game[kind].values()].filter(e => e.owner === pid);
   const count = type => mine('buildings').filter(b => b.type === type).length;
+  // True when paying `cost` still leaves, of each resource it spends, what the next age-up costs (from the Age of Sail on
+  // that includes stone). No reserve while an age-up is already paid for and running, or at the last age.
+  const leavesAgeUp = cost => {
+    const next = AGES[ageIndex(me.age) + 1], need = !me.ageUp && next ? AGE_COST[next].cost : {};
+    return Object.keys(cost).every(k => !cost[k] || me.res[k] - cost[k] >= (need[k] || 0));
+  };
 
   function spotNear(type, around, margin = true) {
     const def = BUILDINGS[type], c = around;
@@ -105,6 +112,9 @@ export function createBot(game, pid, difficulty = 'medium') {
       if (count('stable') < 1) tryBuild('stable', free, home);
     }
     if (ageIndex(me.age) >= 2 && count('government_center') < 1 && roundId !== 'wonder') tryBuild('government_center', free, home);
+    // Towers near the Town Center (tryBuild refuses before the Tool Age). count() includes foundations, so a lost tower is
+    // rebuilt and a slow one is not doubled. After the age-up and the era's buildings above, and never out of the next age-up.
+    if (tc && count('tower') < D.towers && leavesAgeUp(BUILDINGS.tower.cost)) tryBuild('tower', free, home);
 
     // --- research upgrades (economy first, then military; canPay respects wonder reservation)
     if (!bot.saving) for (const b of done) {
@@ -253,8 +263,18 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (!target) target = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ').sort((a, b) => dist(a, c) - dist(b, c))[0]
       || enemies.filter(e => e.kind === 'building').sort((a, b) => dist(a, c) - dist(b, c))[0]
       || enemies.filter(e => e.kind === 'unit').sort((a, b) => dist(a, c) - dist(b, c))[0];
+    // Siege goes for the defences first: a siege unit with no attack order of its own (idle, on a sweep move, or only
+    // auto-aggro on something else) takes the finished enemy tower nearest it that we can see. A commanded attack, a
+    // breach (an attack with `resume`) and an attack already on a tower are kept.
+    const towers = enemies.filter(e => e.type === 'tower' && e.constructed), onTower = new Set();
+    if (towers.length) for (const u of combat) {
+      const o = u.order, on = o.type === 'attack' ? game.entities.get(o.target) : null;
+      if (u.cls !== 'siege' || !(o.type === 'idle' || o.type === 'move' || (o.auto && on?.type !== 'tower'))) continue;
+      const t = towers.reduce((best, e) => distPoint(u.x, u.y, e) < distPoint(u.x, u.y, best) ? e : best);
+      if (cmd({ type: 'attack', ids: [u.id], targetId: t.id })) onTower.add(u.id);
+    }
     for (const u of idle) {
-      if (u.relic !== null) continue;
+      if (u.relic !== null || onTower.has(u.id)) continue;
       if (target) cmd({ type: 'attack', ids: [u.id], targetId: target.id });
       else {
         let wp = sweep[bot.sweepIdx % sweep.length];
