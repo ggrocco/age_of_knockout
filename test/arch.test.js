@@ -21,9 +21,6 @@ test('design registry: earlier eras show the unlock-era design', () => {
 test('design registry: kept designs, era designs and the legacy fallback', () => {
   assert.equal(designOf('house', 'tool').kind, 'kept');
   assert.equal(designOf('house', 'sail').kind, 'design');
-  // An AI Future Granary stays legacy until Task 11 designs it; Task 11 replaces this check with "never legacy outside
-  // KEPT".
-  assert.equal(designOf('granary', 'future').kind, 'legacy');
 });
 
 // ---------- shared helpers for the per-era design tests ----------
@@ -249,4 +246,34 @@ test('Industrial Barracks, Market, Government Center and Castle: smoke hidden wh
 test('Industrial Storage Pit: the gantry crane is hidden while unfinished and turns once finished', () => {
   spinnersTurn('storage_pit', 'industrial', 'gantry crane');
   assert.ok(build('storage_pit', 'industrial').anim.spinners.some(sp => sp.axis === 'y'), 'the crane slews about its gantry');
+});
+
+// --- future designs (Task 11) ---
+// The Town Center and House are Task 3's; these are the other eleven.
+const FUTURE = ['granary', 'storage_pit', 'farm', 'barracks', 'archery_range', 'stable', 'market', 'government_center', 'wonder', 'castle', 'factory'];
+test('AI Future designs differ from every other era', () => differsFromOtherEras(FUTURE, 'future'));
+test('AI Future designs: heights within the cap', () => heightsOk(FUTURE));
+test('AI Future farm: crops show once finished and shrink with the food left', () => cropsShrink('future'));
+test('AI Future designs: every one has spinners or floaters, hidden while unfinished and moving once finished', () => {
+  for (const type of new Set([...Object.keys(DESIGNS.future), ...FUTURE])) {
+    const { e, anim: a, g } = build(type, 'future', false), spinners = a.spinners ?? [], floaters = a.floaters ?? [];
+    assert.ok(spinners.length + floaters.length > 0, `${type}: no spinner or floater`);
+    animate(g, e, 1, false);
+    for (const x of [...spinners, ...floaters]) assert.equal(x.p.visible, false, `${type}: a part shows while unfinished`);
+    e.constructed = true; e.progress = 1;
+    animate(g, e, 1, false);
+    const spins = spinners.map(x => x.p.rotation[x.axis]), floats = floaters.map(x => x.p.position.y);
+    animate(g, e, 2, false);
+    for (const x of [...spinners, ...floaters]) assert.equal(x.p.visible, true, `${type}: a part hidden once finished`);
+    spinners.forEach((x, i) => assert.notEqual(x.p.rotation[x.axis], spins[i], `${type}: spinner ${i} still`));
+    floaters.forEach((x, i) => assert.notEqual(x.p.position.y, floats[i], `${type}: floater ${i} still`));
+  }
+});
+// The triangle budget, crops and animated parts included: 6,000 a building, 15,000 for the Wonder.
+test('AI Future designs: within the triangle budget', () => {
+  const tris = o => { let n = 0; o.traverse(m => { if (m.isMesh) n += (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3; }); return n; };
+  for (const type of FUTURE) {
+    const { anim, g } = build(type, 'future'), n = tris(g) - tris(anim.scaffold);
+    assert.ok(n <= (type === 'wonder' ? 15000 : 6000), `${type}: ${n} triangles`);
+  }
 });
