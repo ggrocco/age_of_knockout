@@ -111,8 +111,9 @@ The **Tower** and the **Wall** (`defences.js`, entries in `buildings.js`) are in
 towers and walls are not modelled and nothing here comes from the openage data. Every number is a game-tuned guess.
 
 - **Era scaling.** `addBuilding` gives a new defence the stats of its owner's era (`defenceStats(type, owner age)`).
-  Re-scaling existing defences in place when their owner advances is a separate step (see
-  `docs/superpowers/specs/2026-10-19-era-architecture-and-defences-design.md`). Ages before Tool (only reachable by
+  When the owner advances, `refreshDefences` (`src/sim/defence.js`) upgrades every existing tower and wall of theirs in place:
+  same HP fraction against the new `maxHp`, a tower takes the new attack fields, and an unfinished one keeps its build
+  `progress` and finishes at the new `maxHp`. Ages before Tool (only reachable by
   calling `addBuilding` directly, since the `build` command needs the Tool Age) use the Tool row.
 - **Tower**: 40 wood + 120 stone, 2x2, build time 40 s, sight 8, Tool Age. Armor is the default building 3 melee / 8 pierce.
   The attack stats are copied onto the building entity (`atk`, `atkType`, `range`, `cooldown`, `splash` (0 when none),

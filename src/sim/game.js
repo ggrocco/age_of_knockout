@@ -5,6 +5,7 @@ import { defenceStats } from '../data/defences.js';
 import { AGES } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
+import { updateTower, refreshDefences } from './defence.js';
 import { execute } from './commands.js';
 import { updateVision } from './vision.js';
 import { secs, rectOf, centerOf } from './util.js';
@@ -105,8 +106,8 @@ export function createGame({ seed = 1, rules = null, size = 64 } = {}) {
     if (game.result) return;
     game.time++;
     for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
-    for (const b of [...game.buildings.values()]) if (!b.dead) updateBuilding(game, b);
-    for (const p of game.players) if (p.ageUp && --p.ageUp.remaining <= 0) { p.age = p.ageUp.to; p.ageUp = null; }
+    for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
+    for (const p of game.players) if (p.ageUp && --p.ageUp.remaining <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
     for (const r of game.relics.values()) if (r.holder !== null) { const h = game.entities.get(r.holder); if (h) { r.x = h.x; r.y = h.y; } }
     game.recount();
     if (game.time % 4 === 0) updateVision(game);
