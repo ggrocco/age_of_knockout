@@ -26,10 +26,39 @@ export const matchOptions = (diffs, { noTimeLimit = false } = {}) => ({
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// Tiles reachable on foot from start on the bare map: water and the map's starting resources block, buildings don't.
+function reachableFrom(map, start) {
+  const n = map.size, blocked = new Uint8Array(n * n), seen = new Uint8Array(n * n);
+  for (let i = 0; i < n * n; i++) blocked[i] = map.tiles[i] === 1 ? 1 : 0;
+  for (const r of map.resources) blocked[Math.floor(r.y) * n + Math.floor(r.x)] = 1;
+  const queue = [start.y * n + start.x]; seen[queue[0]] = 1;
+  for (let k = 0; k < queue.length; k++) {
+    const i = queue[k], x = i % n, y = (i / n) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, j = ny * n + nx;
+      if (nx >= 0 && ny >= 0 && nx < n && ny < n && !seen[j] && !blocked[j]) { seen[j] = 1; queue.push(j); }
+    }
+  }
+  return seen;
+}
+// Nearest tile (by square rings) in the reachable set.
+function nearestReachable(map, reach, p) {
+  const n = map.size;
+  for (let r = 0; r < n; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const x = p.x + dx, y = p.y + dy;
+    if (x >= 0 && y >= 0 && x < n && y < n && reach[y * n + x]) return { x, y };
+  }
+  return p;
+}
+
 export function createBot(game, pid, difficulty = 'medium') {
   const D = DIFF[difficulty], me = game.players[pid], enemy = 1 - pid, enemyStart = game.map.starts[enemy];
-  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => ({ x, y }))];
-  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweepIdx: 0, think };
+  // Fixed sweep points can fall in a lake; every unit sent there would search the whole map for a path, so snap them to reachable land.
+  const reach = reachableFrom(game.map, game.map.starts[pid]);
+  const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => nearestReachable(game.map, reach, { x, y }))];
+  const sentTo = new Map(); // unit id -> sweepIdx of the waypoint it was last sent to
+  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, think };
 
   // In the Wonder round, keep the wonder's cost untouched until it is placed.
   const reserved = () => (game.rules && game.rules.id === 'wonder' && !mine('buildings').some(b => b.type === 'wonder')) ? BUILDINGS.wonder.cost : null;
@@ -260,13 +289,16 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (!target) target = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ').sort((a, b) => dist(a, c) - dist(b, c))[0]
       || enemies.filter(e => e.kind === 'building').sort((a, b) => dist(a, c) - dist(b, c))[0]
       || enemies.filter(e => e.kind === 'unit').sort((a, b) => dist(a, c) - dist(b, c))[0];
+    let advanced = false;
     for (const u of idle) {
       if (u.relic !== null) continue;
       if (target) cmd({ type: 'attack', ids: [u.id], targetId: target.id });
       else {
         let wp = sweep[bot.sweepIdx % sweep.length];
-        if (dist(u, wp) < 4) { bot.sweepIdx++; wp = sweep[bot.sweepIdx % sweep.length]; }
-        cmd({ type: 'move', ids: [u.id], x: wp.x + 0.5, y: wp.y + 0.5 });
+        // Idle short of the waypoint it was sent to means the move failed: go on to the next one rather than
+        // re-sending it (each re-send costs a whole-map path search per unit). Skip at most one waypoint per think.
+        if (dist(u, wp) < 4 || (sentTo.get(u.id) === bot.sweepIdx && !advanced)) { bot.sweepIdx++; advanced = true; wp = sweep[bot.sweepIdx % sweep.length]; }
+        if (cmd({ type: 'move', ids: [u.id], x: wp.x + 0.5, y: wp.y + 0.5 })) sentTo.set(u.id, bot.sweepIdx);
       }
     }
   }
