@@ -93,10 +93,11 @@ export function createHud(ui) {
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span>${clockHtml}`
       + [1, 2, 4].map(s => `<button data-speed="${s}" class="${ui.speed === s ? 'on' : ''}">${s}x</button>`).join('') + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button><button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
     if (!ui.touch) html += '<button data-menu="open" aria-label="Game settings">Settings</button>';
+    let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle') idleN++;
+    const badge = document.querySelector(ui.touch ? '#touchbar [data-act=idle] .badge' : '#idlebtn .badge'), bt = idleN ? String(idleN) : ''; if (badge.textContent !== bt) badge.textContent = bt;
+    if (!ui.touch) $('idlebtn').classList.toggle('has', idleN > 0);
     if (ui.touch) {
       const objEl = $('objective'), otxt = round ? `${round.name}: ${obj}` : ''; if (objEl.textContent !== otxt) objEl.textContent = otxt;
-      let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle') idleN++;
-      const badge = document.querySelector('#touchbar [data-act=idle] .badge'), bt = idleN ? String(idleN) : ''; if (badge.textContent !== bt) badge.textContent = bt;
       document.querySelector('#touchbar [data-act=box]').classList.toggle('on', !!ui.boxMode);
       $('placebar').classList.toggle('hidden', !ui.placing); document.body.classList.toggle('placing', !!ui.placing);
     }
