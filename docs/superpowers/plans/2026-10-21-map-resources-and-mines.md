@@ -81,7 +81,7 @@ test('mid-map gold and stone between the bases', () => {
   for (let seed = 1; seed <= 30; seed++) {
     const m = generateMap(seed), [a, b] = m.starts;
     for (const type of ['gold', 'stone']) {
-      const mid = m.resources.filter(r => r.type === type && Math.hypot(r.x - a.x, r.y - a.y) > 18 && Math.hypot(r.x - b.x, r.y - b.y) > 18);
+      const mid = m.resources.filter(r => r.type === type && Math.hypot(r.x - a.x, r.y - a.y) > 16 && Math.hypot(r.x - b.x, r.y - b.y) > 16);
       assert.ok(mid.length >= 8, `${type} mid ${seed}: ${mid.length}`);
       assert.ok(mid.every(r => r.amount > (type === 'gold' ? 800 : 600)), 'mid piles richer');
     }
@@ -105,14 +105,14 @@ Expected: FAIL (`orePatches` is undefined).
 - **Home patch:** gold, 4×3 tiles (room for 2 Mines), its centre 12-16 tiles from `s0` at a random angle, outside the
   `home` radius 8. Retry the angle up to 100 times.
 - **Mid patches (per half, mirrored by `patch`):** 2 gold (5×4, reserve 3000) and 1 quarry (5×4, reserve 2500).
-  Each centre is a random point with `far(x, y)` true, 18-34 tiles from `s0`, and closer to `s0` than to `s1` (so the
+  Each centre is a random point with `far(x, y)` true, 20-34 tiles from `s0`, and closer to `s0` than to `s1` (so the
   mirror lands in the other half). Next to each one, place a cluster of 5 mirrored piles of the matching type
   (gold 1200, stone 900) on free land touching the rectangle's border, using `place`.
 - **Forests:** raise the scattered-forest count from `size*size/600` to `size*size/480`.
 - `connected`: no change is needed, since ore tiles count as open (`tiles !== 1`). Confirm the retry loop still
   finds a valid map for seeds 1-200 (Step 4).
-- Return `orePatches` from `build` (through `generateMap`). Filter it like `resources` if a relic spot clear could
-  touch it. Simpler: keep relic spots off ore by placing patches with `far`, which already excludes the centre radius 9.
+- Return `orePatches` from `build` (through `generateMap`). Relic spots stay off ore because patches use `far`, which
+  excludes the centre radius 9; assert it in the test (no relic spot tile is 2 or 3).
 
 - [ ] **Step 4: Run the map tests and the 200-seed validity check**
 
@@ -211,10 +211,10 @@ Expected: FAIL (`ore.js` doesn't exist).
   `accept` requires every tile and every mirror tile to be `tiles === 0`, unoccupied (`game.occAt === 0`), not
   `reserved`, more than 13 tiles from both starts, and not overlapping its mirror. Write the tiles, `patchAt` and
   two twin entries with new ids (`max id + 1`), and `terrainVersion++`.
-- `orders.js`: `doGather` work phase calls `drawFrom` instead of subtracting directly, and a building being worked
-  gets `res.digging = (res.digging || 0) + 1`. Wait: `updateBuilding` resets it, so use a per-tick counter
-  `res.gatherers++`, then copy it in `updateBuilding` (`b.digging = b.gatherers; b.gatherers = 0`). Units update
-  before buildings, so the count is fresh. `nearestResource` considers own constructed buildings whose
+- `orders.js`: `doGather` work phase calls `drawFrom` instead of subtracting directly, and increments
+  `res.gatherers` when `res.kind === 'building'`. `updateBuilding` copies it out and clears it
+  (`b.digging = b.gatherers || 0; b.gatherers = 0`). Units update before buildings in `tick`, so `digging` is this
+  tick's count. `nearestResource` considers own constructed buildings whose
   `gatherType === kind` for **every** kind, not just food. `doBuild` uses `kind: b.gatherType`.
 - `updateBuilding`: for a Mine, set `b.amount` from its patch (0 if the patch is gone) before the existing
   `amount <= 0` removal.
@@ -242,9 +242,9 @@ git commit -m "feat(sim): ore patches with shared reserves and the Mine building
 **Interfaces:**
 - Consumes: `mirroredSpot` and `oreRng` from Task 2.
 - Produces: `updateRespawn(game)`, called from `game.tick` when `game.time % RESPAWN_EVERY === 0`
-  (`RESPAWN_EVERY = secs(30)`). `game.pileStart = { gold, stone }`, the summed starting pile amounts recorded in
-  `initOre` after the initial resources are added (so `initOre` must run after that, or it records them in a
-  separate `recordPileStart(game)`; pick one and keep `createGame` in order). `game.lastRespawn = { gold, stone }`
+  (`RESPAWN_EVERY = secs(30)`). `game.pileStart = { gold, stone }`, the summed starting pile amounts recorded by
+  `recordPileStart(game)`, which `createGame` calls after the initial resources are added (`initOre` runs before
+  them). `game.lastRespawn = { gold, stone }`
   holds the tick of the last spawn.
 
 - [ ] **Step 1: Write the failing tests**
