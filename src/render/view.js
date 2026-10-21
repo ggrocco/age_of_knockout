@@ -93,7 +93,7 @@ export function createView(container, game) {
     terrain.setQuality(preset); view.resize();
   };
   view.pan = (dx, dz) => { view.focus.x = Math.max(0, Math.min(N, view.focus.x + dx)); view.focus.z = Math.max(0, Math.min(N, view.focus.z + dz)); };
-  view.setZoom = z => { view.zoom = Math.max(6, Math.min(34, z)); };
+  view.setZoom = z => { view.zoom = Math.max(3, Math.min(34, z)); }; // 3 lets a phone close in to ~7 tiles across in portrait
   view.centerOn = (x, y) => { view.focus.set(x, 0, y); };
 
   // terrain

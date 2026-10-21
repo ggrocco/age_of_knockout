@@ -143,7 +143,7 @@ body.touch #bottom { position: absolute; inset: 0; height: auto; padding: 0; bac
 body.touch #bottom > * { pointer-events: auto; }
 body.touch #minimap-wrap { position: absolute; left: calc(var(--sal) + 8px); bottom: calc(var(--sab) + 8px); width: 150px; height: 92px; border-width: 1px; opacity: .92; }
 body.touch #minimap { width: 100%; height: 100%; touch-action: none; }
-body.touch #info { position: absolute; left: calc(var(--sal) + 168px); bottom: calc(var(--sab) + 8px); width: min(36vw, 250px); min-width: 0; max-height: 92px; padding: 6px 9px; background: #1a130ccc; border: 1px solid #c8a05299; border-radius: 6px; font-size: 12px; line-height: 1.3; }
+body.touch #info { position: absolute; left: calc(var(--sal) + 168px); bottom: calc(var(--sab) + 8px); width: min(36vw, 250px); min-width: 0; max-height: min(160px, 40vh); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 6px 9px; background: #1a130ccc; border: 1px solid #c8a05299; border-radius: 6px; font-size: 12px; line-height: 1.3; }
 body.touch #info h3 { font-size: 14px; margin: 0 0 2px; } body.touch #info .bar { width: 100%; height: 6px; margin: 2px 0 3px; } body.touch #info small { display: none; }
 /* Tile counts are data-driven (13 buildings, 10 Barracks units): the panel grows up from the bottom and scrolls from its top, so no tile is pushed out of reach. */
 body.touch #cmds { position: absolute; right: calc(var(--sar) + 8px); bottom: calc(var(--sab) + 8px); top: auto; max-height: calc(100% - 84px - var(--sat) - var(--sab)); width: 246px; grid-template-columns: 1fr 1fr; grid-auto-rows: 48px; gap: 6px; align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -184,7 +184,7 @@ body.touch .keys { grid-template-columns: 1fr; gap: 1px; text-align: center; } b
 @media (orientation: portrait) {
   body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(66px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
   body.touch #objective { font-size: 11px; }
-  body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 76px; }
+  body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 132px; }
   body.touch.has-cmds #info { bottom: calc(var(--sab) + 66px); }
   body.touch #cmds { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 8px); top: auto; width: auto; height: 56px; display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; align-items: stretch; touch-action: pan-x; }
   body.touch #cmds .tile { flex: 0 0 128px; height: 56px; }
