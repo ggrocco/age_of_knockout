@@ -53,7 +53,7 @@ export const DESC = {
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
   king: 'Regicide only: if your King falls, the match is lost. Keep him safe.',
   age: 'Research the next Age to unlock stronger units and buildings.',
-  delete: 'Knocks this building down at once. Nothing is refunded, and anything it was training is lost.',
+  delete: 'Asks you to confirm before removing this building. Nothing is refunded, and queued training or research is lost.',
 };
 
 // Cost chips: coloured dot + amount. `short` lists resources the player lacks; `compact` shortens 1000 to 1k.

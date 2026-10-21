@@ -1,6 +1,7 @@
 import { makeRng } from '../sim/rng.js';
 import { ROUNDS } from '../rounds/index.js';
 import { simulateMatch } from './sim.js';
+import { DEFAULT_TIME_LIMIT } from '../time-limit.js';
 
 export const NAMES = ['You', 'Ramses', 'Hammurabi', 'Sargon', 'Nebuchadnezzar', 'Darius', 'Xerxes', 'Cyrus', 'Leonidas', 'Pericles', 'Alexander', 'Ptolemy',
   'Hannibal', 'Scipio', 'Caesar', 'Augustus', 'Attila', 'Boudica', 'Shalmaneser', 'Tiglath', 'Ashurbanipal', 'Thutmose', 'Akhenaten', 'Minos',
@@ -13,12 +14,12 @@ export const LEVELS = {
 };
 export const LEVEL_NAME = { relaxed: 'Relaxed', normal: 'Normal', hard: 'Hard' };
 
-export function createTournament(seed = 1, level = 'normal', { noTimeLimit = false } = {}) {
+export function createTournament(seed = 1, level = 'normal', { noTimeLimit = false, timeLimit = noTimeLimit ? 0 : DEFAULT_TIME_LIMIT } = {}) {
   const ramp = LEVELS[level] || LEVELS.normal;
   const rng = makeRng(seed);
   const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : ['easy', 'medium', 'hard'][rng.int(3)] }));
   const t = {
-    seed, level, noTimeLimit, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
+    seed, level, timeLimit, noTimeLimit: timeLimit === 0, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
     get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },

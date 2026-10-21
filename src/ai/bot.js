@@ -5,6 +5,7 @@ import { AGES, AGE_COST, ageIndex } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
+import { parseTimeLimit } from '../time-limit.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
@@ -19,10 +20,11 @@ export const DIFF = {
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
 // createGame options for a match between these bot difficulties (null = a human player): each bot's handicap,
-// and the longest time limit any of them asks for (undefined keeps the round's own).
-export const matchOptions = (diffs, { noTimeLimit = false } = {}) => ({
+// and the chosen time limit, otherwise the longest bot cap (undefined keeps the round's own).
+export const matchOptions = (diffs, { noTimeLimit = false, timeLimit } = {}) => ({
   workRate: diffs.map(d => DIFF[d]?.work ?? 1),
-  capTicks: noTimeLimit ? Infinity : Math.max(0, ...diffs.map(d => DIFF[d]?.cap ?? 0)) || undefined,
+  capTicks: parseTimeLimit(timeLimit) !== null ? (Number(timeLimit) === 0 ? Infinity : Number(timeLimit) * 1200)
+    : noTimeLimit ? Infinity : Math.max(0, ...diffs.map(d => DIFF[d]?.cap ?? 0)) || undefined,
 });
 const SHARE = { food: 0.35, wood: 0.35, gold: 0.2, stone: 0.1 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
