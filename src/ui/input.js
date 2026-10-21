@@ -185,8 +185,12 @@ export function createInput(ui) {
     const p = pts(e);
     if (p.length >= 2 && TT.pinch) {
       const [a, b] = p, d = Math.hypot(a.x - b.x, a.y - b.y), c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (d > 8 && TT.pinch.d > 8) { ui.view.setZoom(ui.view.zoom * TT.pinch.d / d); ui.view.refreshCamera(); }
-      panBy(TT.pinch.c, c); TT.pinch = { d, c }; return;
+      // zoom about the pinch centre: the world point under the fingers stays under them
+      const v = ui.view, anchor = v.pickGround(TT.pinch.c.x, TT.pinch.c.y);
+      if (d > 8 && TT.pinch.d > 8) { v.setZoom(v.zoom * TT.pinch.d / d); v.refreshCamera(); }
+      const now = v.pickGround(c.x, c.y);
+      if (anchor && now) { v.pan(anchor.x - now.x, anchor.y - now.y); v.refreshCamera(); }
+      TT.pinch = { d, c }; return;
     }
     if (p.length !== 1 || !TT.start) return;
     const cur = p[0];

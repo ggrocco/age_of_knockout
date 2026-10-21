@@ -73,6 +73,11 @@ const ROUND_INFO = {
   relics: { icon: 'villager', goal: `Control all 5 relics for ${RELIC_TICKS / 1200} uninterrupted game minutes. Carry them with units or store them in a Town Center or Government Center. Losing control of any relic resets the countdown. You can also win by eliminating the enemy empire.` },
 };
 
+// A production queue as "Villager x2, Scout": same units grouped in first-queued order, so a full queue fits a phone's info panel.
+export const queueText = queue => {
+  const n = new Map(); for (const q of queue) n.set(q.unit, (n.get(q.unit) || 0) + 1);
+  return [...n].map(([u, c]) => UNITS[u].name + (c > 1 ? ` ×${c}` : '')).join(', ');
+};
 export const roundTimeLabel = (round, capTicks = round.capTicks) => capTicks === Infinity ? 'No time limit' : `${capTicks / 1200} minutes`;
 export const roundLimitText = (round, capTicks = round.capTicks) => roundTimeLabel(round, capTicks) + (capTicks === Infinity ? '' : ' of game time');
 export const TIME_LIMIT_RULE = 'If no one wins before the limit, the higher score wins.';

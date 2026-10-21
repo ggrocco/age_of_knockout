@@ -4,7 +4,7 @@ import { BUILDINGS } from '../src/data/buildings.js';
 import { TECHS } from '../src/data/techs.js';
 import { AGES } from '../src/data/ages.js';
 import { ICONS, icon } from '../src/ui/icons.js';
-import { DESC, costHtml, tipHtml, roundTipHtml, roundTimeLabel, roundLimitText } from '../src/ui/tips.js';
+import { DESC, costHtml, tipHtml, roundTipHtml, roundTimeLabel, roundLimitText, queueText } from '../src/ui/tips.js';
 import { wallPlan } from '../src/ui/input.js';
 import { ROUNDS, roundById } from '../src/rounds/index.js';
 import { createGame } from '../src/sim/game.js';
@@ -193,4 +193,11 @@ test('unlimited mode tips explain how to win without showing a score deadline', 
   }
   assert.match(roundTipHtml(roundById('wonder'), Infinity), /3 uninterrupted game minutes/);
   assert.match(roundTipHtml(roundById('relics'), Infinity), /3 uninterrupted game minutes/);
+});
+
+test('queueText groups queued units by type in first-queued order', () => {
+  const q = units => units.map(unit => ({ unit, remaining: 100 }));
+  assert.equal(queueText(q(['villager'])), 'Villager');
+  assert.equal(queueText(q(['villager', 'villager', 'villager'])), 'Villager ×3');
+  assert.equal(queueText(q(['clubman', 'villager', 'clubman'])), `${UNITS.clubman.name} ×2, Villager`);
 });
