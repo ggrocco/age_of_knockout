@@ -35,13 +35,18 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets it (default `hard`) |
 | `?autotour=1` | Whole tournament on autopilot, clicking through every screen |
 | `?level=relaxed\|normal\|hard` | Tournament difficulty (else the saved menu pick, else Normal) |
-| `?noTimeLimit=1\|0` | Override the saved No time limit checkbox |
+| `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
+| `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the phone/touch layout |
 | `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
 
 `window.__app` exposes the live app; `window.__app.match.game` is the running sim.
+
+Building deletion (Delete tile and Delete/Backspace shortcuts) always opens an explicit Cancel/Delete dialog on
+desktop and touch. The match pauses while it is open and restores its previous pause state on close. The shared
+`requestBuildingDeletion` in `src/ui/input.js` rechecks the match and target before issuing the delete command.
 
 ## Architecture
 
@@ -54,8 +59,9 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up).
   Keep it DOM-free and deterministic so the headless runner and tests work.
 - `src/rounds/index.js`: per-round rules. `check(game)` returns null or `{winner, reason}`; rounds have a tick cap
-  plus a score tiebreak (`scoreOf`). The menu's No time limit option sets `capTicks: Infinity` for human matches;
-  off-screen bracket matches keep finite caps so resolution always terminates.
+  plus a score tiebreak (`scoreOf`). The menu's time-limit slider sets human matches to 0–120 minutes (default 25),
+  with 0 setting `capTicks: Infinity`; off-screen bracket matches keep finite mode/difficulty caps so resolution
+  always terminates. `src/time-limit.js` reads the saved/URL preference and preserves the former checkbox choice.
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
   drives `?autoplay`.

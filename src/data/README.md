@@ -11,6 +11,9 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
 - Wonder requires Bronze Age (spec's round setup starts players rich; original needs Iron).
 - Catapult trains at the Government Center (no Siege Workshop in the subset).
 - King exists only for Regicide (not trainable).
+- Human match deadlines are a game setting: 0–120 whole minutes (default 25 in every mode/difficulty); 0 disables
+  the score deadline. This replaces the fixed 20/25/40-minute human caps and is not an AoE1-derived rule. Off-screen
+  bracket matches retain those finite caps; Wonder and relic countdowns keep their normal durations.
 - The Wonder does not count toward the age-up building requirement (flagged `extra`, like the Farm): it is a
   victory building, so leaving Bronze needs only the Government Center.
 
