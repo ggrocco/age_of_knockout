@@ -2,64 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+The project guide (commands, URL params, architecture, what-else-to-update checklist, browser-testing rule,
+deployment) is shared with other agents in `AGENTS.md`, imported here. Edit shared guidance there, not here.
 
-No build step, bundler or linter. Plain ES modules; three.js is resolved by the import map in `index.html` straight from `node_modules`.
+@AGENTS.md
 
-```
-npm install
-npm start                                   # node serve.js, then open http://localhost:8000/
-npm test                                    # node --test test/*.test.js
-node --test test/econ.test.js               # single test file
-node --test --test-name-pattern="<name>" test/*.test.js   # single test
-node test/bot-sim.js 12                     # bot-vs-bot termination check (12 seeds x 5 rounds)
-docker compose up -d --build                # nginx image, served on :8080
-docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
-```
+## Claude Code specifics
 
-Buildings-by-era design page: `http://localhost:8000/buildings.html` (`?team=1`, `?scale=true`). It renders every building in every age with the game's own models, and its rows and columns come straight from `src/data`, so new ages and buildings show up on reload with no page edits.
+Browser verification (the required step in AGENTS.md "Testing in the browser"):
 
-Useful URL params: `?round=1..5&opp=relaxed|easy|medium|hard&seed=N&speed=N` (no `seed` = a random map and start position), `?level=relaxed|normal|hard` (tournament difficulty, else the menu pick saved in localStorage), `&autoplay=1` (bot plays your side), `?autotour=1` (whole tournament on autopilot), `?noTimeLimit=1|0` (override the saved main-menu time-limit choice), `?touch=1` (force phone layout), `&fps=N` (frame cap, default 60; 30 while paused or on the result card), `&quality=balanced|high|ultra`. `window.__app` exposes the live game.
+1. Start the server with `preview_start` (name `my-age`, defined in `.claude/launch.json`: `node serve.js 8000`).
+   Don't run it via Bash.
+2. Drive the page with the built-in browser tools (`mcp__Claude_Browser__*`), not the Chrome extension unless asked:
+   `navigate` to `http://localhost:8000/?...`, `computer` screenshot, `read_console_messages` (must be free of
+   errors), `javascript_tool` for state (`window.__app.match.game` is the live sim).
+3. Phone layout: `?touch=1` plus `resize_window` to 402x874 and 874x402; reset the viewport with preset `desktop`
+   afterwards.
+4. In a worktree, port 8000 may already be served from another checkout. Before trusting a screenshot, `curl` a file
+   you changed from the server and diff it against your copy.
 
-## Architecture
-
-A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI; five rounds, each a different win condition.
-
-- `src/sim` — the game itself: **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (game.js) owns all state (entities/units/buildings/resources/relics Maps, occupancy grid); the player and the bot both act only through `commands.js` `execute`, and per-unit behaviour lives in `orders.js`. Keep it DOM-free and deterministic so the headless runner and tests work.
-- `src/rounds/index.js` — per-round rules: `check(game)` returns null or `{winner, reason}`; rounds normally have a tick cap plus a score tiebreak (`scoreOf`). The main-menu No time limit option sets `capTicks: Infinity` for human matches; off-screen bracket matches keep finite caps so resolution always terminates.
-- `src/ai/bot.js` — the bot (easy/medium/hard); it is given the enemy start location. Also drives `?autoplay`.
-- `src/tournament` — bracket and a headless match runner (`sim.js`), used by tests and `test/bot-sim.js`.
-- `src/render`, `src/ui`, `src/main.js` — Three.js view (procedural, vertex-colour-baked models in `render/models.js`), HUD, desktop + touch input, tournament flow. Reads sim state; never mutates it except via commands.
-  Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`); the per-entity meshes stay in the scene graph on layer 1 as unrendered proxies that `animate()` and picking use, and blob shadows are one `InstancedMesh`. A new model part only needs that material to be batched.
-- `src/gallery` — the `buildings.html` design page. `rows.js` (DOM-free, tested) builds the building × age grid from the data tables. `main.js` renders each cell with `render/models.js` under the game's light rig. Building looks come from `buildingStyle` in `models.js`: Stone/Tool are timber, Bronze and every later age (new ones included) masonry. A new age only gets its own look if you add a style there, which changes the game and this page alike.
-- `src/data` — unit/building/age tables. Values are **unverified approximations** of AoE1 (see `src/data/README.md`); deviations from the original (Farm added, Wonder needs Bronze, Catapult at Government Center, no Temple/Priest) are recorded there and in `progress.md`.
-
-Tests cover the sim, rounds, bot and bracket headlessly (Node test runner); the renderer/UI has no automated tests and was only checked via screenshots/emulation.
-
-## Testing in the browser (required)
-
-`npm test` is headless and never touches `src/render`, `src/ui`, `src/main.js`, `styles.css` or `index.html`. **Always verify your change in a real browser before calling it done** — not just when it is "UI work". A sim/data change that adds or alters something the player can see or click (a unit, building, age, HUD label, round rule) also needs a browser check that it appears and works. Run `npm test` too, but it is not a substitute.
-
-How:
-
-1. Start the server with `preview_start` (name `my-age`, defined in `.claude/launch.json`: `node serve.js 8000`). Don't run it via Bash.
-2. Drive the page with the built-in browser tools (`mcp__Claude_Browser__*`), not the Chrome extension unless asked: `navigate` to `http://localhost:8000/?...`, `computer` screenshot, `read_console_messages` (must be free of errors), `javascript_tool` for state.
-3. Screenshot the actual thing you changed, look at it, and check the console. If nothing on screen changed, suspect a stale module cache and hard-reload before debugging.
-4. In your final message, say what you verified in the browser and what you could not.
-
-Shortcuts (URL params are listed under Commands; `window.__app.match.game` is the live sim):
-
-- Skip the menus: `?round=3&opp=easy&seed=1`. Fast-forward with `&speed=8`; `&autoplay=1` lets the bot play your side to reach later ages and bigger armies.
-- Jump to state instead of playing there, from `javascript_tool`: `const p = __app.match.game.players[0]; p.age = 'future'; p.res = {food: 9999, wood: 9999, gold: 9999, stone: 9999};` then use the real UI (train, build, age-up button) and read the HUD.
-- Phone layout: `?touch=1` plus `resize_window` to 402x874 and 874x402; touch input needs dispatched `TouchEvent`s. Reset the viewport with preset `desktop` afterwards.
-- Whole flow: `?autotour=1` should reach a champion/eliminated screen with no console errors.
-
-## Deployment
-
-`Dockerfile` copies only `index.html`, `styles.css`, `src/` and the two three.js folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. If `index.html`'s (or `buildings.html`'s) import map or static assets change, update the Dockerfile `COPY` lines, and the smoke-test paths in `Jenkinsfile`. The Dockerfile's `test` stage (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
-
-`Jenkinsfile` builds the `test` target, runs the unit tests (JUnit to `reports/junit.xml`) and `bot-sim.js 12` in it, then builds the nginx image and smoke-tests it from inside the container. It only needs the docker CLI on the agent; it never pushes or deploys.
-
-## Project docs
-
-Design specs and plans live in `docs/superpowers/{specs,plans}`; `progress.md` is the running ledger of rulings, known gaps and deferred minor issues — check it before assuming something is a bug.
+Built-in browser screenshots are returned to you, not saved. To put a screenshot in the repo (e.g. for
+`docs/screenshots/`), capture it with a tool that writes files, such as the Chrome DevTools MCP `take_screenshot`
+with `filePath`, or a headless Chrome driven over CDP (`Page.captureScreenshot`).
