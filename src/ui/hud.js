@@ -53,6 +53,28 @@ export function createHud(ui) {
   document.addEventListener('click', hideTip);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
   window.addEventListener('resize', hideTip);
+  const deleteDialog = $('delete-confirmation'); let deleteRequest = null;
+  const finishDelete = () => {
+    const request = deleteRequest; if (!request) return;
+    deleteRequest = null; ui.deleteConfirmOpen = false;
+    if (ui.game !== request.game) return;
+    ui.paused = request.wasPaused;
+    if (deleteDialog.returnValue === 'delete') request.confirm();
+    if (request.focus?.isConnected) request.focus.focus({ preventScroll: true });
+  };
+  deleteDialog.addEventListener('close', () => { if (!deleteDialog.open) finishDelete(); });
+  hud.confirmDelete = (building, confirm) => {
+    if (deleteRequest || !ui.game || ui.game.result) return;
+    hideTip();
+    deleteRequest = { game: ui.game, wasPaused: ui.paused, focus: document.activeElement, confirm };
+    ui.paused = true; ui.deleteConfirmOpen = true;
+    $('delete-title').textContent = `Delete ${BUILDINGS[building.type].name}?`;
+    deleteDialog.returnValue = 'cancel'; deleteDialog.showModal();
+  };
+  hud.cancelDelete = () => {
+    if (deleteDialog.open) deleteDialog.close('cancel');
+    finishDelete();
+  };
   hud.update = () => {
     const g = ui.game, p = g.players[0], round = g.rules;
     let obj = round ? round.desc : '';
@@ -110,9 +132,9 @@ export function createHud(ui) {
     if (ih !== infoKey) { info.innerHTML = ih; infoKey = ih; }
     // commands
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);
-    // Delete acts on any own selected building, foundations too; on touch the first tap arms it for 3 s (ui.actions.delete)
-    const del = own.find(e => e.kind === 'building'), armed = !!del && ui.touch && ui.delArm?.id === del.id && performance.now() - ui.delArm.t < 3000;
-    let key = `${del ? 'D' + del.id + (armed ? 'A' : '') : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
+    // Every selected own building, foundations too, uses the same confirmation dialog.
+    const del = own.find(e => e.kind === 'building');
+    let key = `${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
       const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText('pop cap')] : [])];
@@ -132,7 +154,7 @@ export function createHud(ui) {
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }
       }
-      if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: armed ? 'Tap again to delete' : 'Delete', cost: {}, tint: 't-del', ok: true, extra: armed ? '' : '<span class="c">No refund</span>', cx: armed ? ' armed' : '' }));
+      if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: 'Delete', cost: {}, tint: 't-del', ok: true, extra: '<span class="c">No refund</span>' }));
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }
       else btns.forEach((b, i) => { const el = cmds.children[i], sm = el.querySelector('small'); el.classList.toggle('off', b.off); el.setAttribute('aria-disabled', b.off); if (sm.innerHTML !== b.small) sm.innerHTML = b.small; });

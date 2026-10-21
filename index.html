@@ -29,6 +29,16 @@
   <div id="toast"></div>
   <div id="tip" role="tooltip"></div>
   <div id="screen" class="hidden"></div>
+  <dialog id="delete-confirmation" class="card" aria-labelledby="delete-title" aria-describedby="delete-help">
+    <form method="dialog">
+      <h2 id="delete-title">Delete building?</h2>
+      <p id="delete-help">This building will be removed. No resources are refunded, and any queued training or research is lost.</p>
+      <div class="delete-actions">
+        <button class="btn" value="cancel" autofocus>Cancel</button>
+        <button class="btn danger" value="delete">Delete building</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 <script type="module" src="src/main.js"></script>
 </body>

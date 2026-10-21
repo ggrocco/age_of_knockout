@@ -15,6 +15,16 @@ export function wallPlan(game, pid, tiles) {
   return { tiles: out, ok, count };
 }
 
+// Buttons and keyboard shortcuts share this confirmation gate. Recheck the captured match/target before deleting.
+export function requestBuildingDeletion(ui, id) {
+  const game = ui.game, building = game?.entities.get(id);
+  if (!building || building.kind !== 'building' || building.owner !== 0 || game.result) return;
+  ui.confirmDelete?.(building, () => {
+    if (ui.game !== game || game.result || game.entities.get(id) !== building || building.owner !== 0) return;
+    if (ui.cmd({ type: 'delete', id }).ok) { ui.sel.delete(id); ui.toast?.(`${BUILDINGS[building.type].name} deleted`); }
+  });
+}
+
 // Mouse + keyboard (desktop) and touch (phone) input. Both paths share selectAt/orderAt so behaviour matches.
 export function createInput(ui) {
   const el = document.getElementById('viewport'), keys = new Set(), drag = { on: false, x: 0, y: 0, moved: false }, box = document.getElementById('dragbox');
@@ -22,7 +32,7 @@ export function createInput(ui) {
   let wallDrag = null, wallCur = null; // desktop wall drag: the start tile while the button is held, and the last tile under the cursor
   const g = () => ui.game;
   const selectedUnitIds = () => [...ui.sel].filter(id => g().entities.get(id)?.kind === 'unit');
-  const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; ui.delArm = null; };
+  const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; };
   // The building the Delete tile and key act on: the first own building in the selection, finished or not (same pick as the HUD).
   const selectedBuilding = () => [...ui.sel].map(id => g().entities.get(id)).find(e => e && e.kind === 'building' && e.owner === 0) || null;
   const onScreen = u => { const p = ui.view.project(u.x, u.y), r = el.getBoundingClientRect(); return p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom; };
@@ -85,14 +95,7 @@ export function createInput(ui) {
       if (ui.placing && ui.placeTile) place(ui.placeTile);
     },
     'place-cancel'() { ui.stopPlacing(); },
-    // Desktop deletes at once. Touch arms first (the tile reads "Tap again to delete"); a second tap within 3 s deletes.
-    delete(id) {
-      const b = g().entities.get(id); if (!b || b.kind !== 'building' || b.owner !== 0) return;
-      const now = performance.now();
-      if (ui.touch && !(ui.delArm?.id === id && now - ui.delArm.t < 3000)) { ui.delArm = { id, t: now }; return; }
-      ui.delArm = null;
-      if (ui.cmd({ type: 'delete', id }).ok) { ui.sel.delete(id); ui.toast?.(`${BUILDINGS[b.type].name} deleted`); }
-    },
+    delete(id) { requestBuildingDeletion(ui, id); },
   };
 
   // ----- mouse (desktop) -----
@@ -121,7 +124,7 @@ export function createInput(ui) {
     if (ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building')) selectOwn(ent, e.shiftKey);
     else { setSel([]); ui.inspect = ent; }
   });
-  window.addEventListener('keydown', e => { shiftDown = e.shiftKey; keys.add(e.key.toLowerCase()); onKey(e); });
+  window.addEventListener('keydown', e => { if (ui.deleteConfirmOpen) return; shiftDown = e.shiftKey; keys.add(e.key.toLowerCase()); onKey(e); });
   window.addEventListener('keyup', e => { shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase()); });
   el.addEventListener('contextmenu', e => {
     e.preventDefault(); if (!ui.game) return;
@@ -136,7 +139,7 @@ export function createInput(ui) {
   function onKey(e) {
     if (!ui.game) return;
     if (e.key === 'Escape') { if (ui.placing) cancelDrag(); ui.stopPlacing(); setSel([]); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); if (!e.repeat) ui.actions.delete(b.id); } } // Backspace: the Mac "delete" key; held keys auto-repeat, so one press deletes one building
+    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); if (!e.repeat) ui.actions.delete(b.id); } } // Backspace is the Mac "delete" key; held keys must not auto-repeat requests.
     else if (e.key === '.') ui.actions.idle();
     else if (e.key.toLowerCase() === 'h') ui.actions.home();
     else if (e.key === ' ') { e.preventDefault(); ui.togglePause(); }
@@ -211,6 +214,7 @@ export function createInput(ui) {
 
   return { update(dt) {
     if (!ui.game) return;
+    if (ui.deleteConfirmOpen) { keys.clear(); return; }
     const s = 22 * dt * (ui.view.zoom / 14);
     let dx = 0, dz = 0;
     if (keys.has('a') || keys.has('arrowleft')) { dx -= 1; dz += 1; } if (keys.has('d') || keys.has('arrowright')) { dx += 1; dz -= 1; }

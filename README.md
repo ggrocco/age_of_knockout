@@ -19,9 +19,10 @@ No build step: plain ES modules, with three.js loaded through the import map in 
 
 ## How a tournament works
 
-![Main menu: difficulty picker, No time limit option, Begin Tournament and the five quick-match buttons](docs/screenshots/menu.jpg)
+![Main menu: time-limit slider, difficulty picker, Begin Tournament and five quick-match buttons](docs/screenshots/menu-time-limit.png)
 
-Pick a **difficulty** and press **Begin Tournament**, or jump straight into one game type with a **Quick** button.
+Pick a **difficulty**, set the **Time limit** slider, and press **Begin Tournament**, or jump straight into one
+game type with a **Quick** button. Both choices are saved in this browser.
 The difficulty sets the opponent for each of your five rounds:
 
 | Level | Round 1 | Round 2 | Round 3 | Round 4 | Round 5 |
@@ -45,14 +46,23 @@ played out by bots in the background.
 | 4 | Wonder Race | Build a Wonder (Bronze Age) and keep it standing for 3 minutes |
 | 5 | Capture the Relics | Hold all 5 relics in your Town Center for 3 minutes |
 
-**Time limits.** Normal and Hard allow 25 minutes of game time (Death Match: 20); Relaxed allows 40 minutes in
-every mode. If no one wins before the limit, the higher score wins. Speed controls change how quickly game time
-passes; pausing stops the clock, which shows elapsed / limit. On desktop, hover or keyboard-focus a Quick button, a
-bracket round heading, or the in-game objective or clock for a card with the mode's goal, time limit and scoring.
+**Time limits.** The slider applies to quick matches and all five of your tournament rounds, in every mode and
+difficulty, including Relaxed.
 
-Check **No time limit** in the main menu to play quick matches and your tournament rounds without a score
-deadline. The choice is saved in this browser. The clock then shows `elapsed / ∞`, and normal victory conditions,
-Wonder/relic countdowns and resigning still end a match.
+| Slider value | Match time limit |
+| --- | --- |
+| **25** (default) | 25 minutes of game time |
+| **1–120** | Choose a limit in one-minute steps, up to 2 hours |
+| **0** | No time limit |
+
+If no one wins before a finite limit, the higher score wins. Speed controls change how quickly game time passes;
+pausing stops the clock, which shows elapsed / limit. The Quick buttons and bracket show your chosen limit before
+you play. On desktop, hover or keyboard-focus a Quick button, a bracket round heading, or the in-game objective or
+clock for a card with the mode's goal, time limit and scoring.
+
+At **0**, the clock shows `elapsed / ∞`, and normal victory conditions, Wonder/relic countdowns and resigning still
+end a match. A saved choice from the former No time limit checkbox becomes 0. Off-screen AI bracket matches keep
+their finite mode/difficulty limits so the bracket always resolves.
 
 ## Playing
 
@@ -75,6 +85,10 @@ Left click / drag select (double-click: all of a type) · right click move / gat
 WASD or arrows pan, wheel zooms · `.` next idle villager, `H` Town Center, Space pause, Esc cancel · click the
 minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
 
+**Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
+the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove
+it without a refund; queued training and research are lost. Closing the dialog restores your previous pause state.
+
 ### Controls (phone / touch)
 
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
@@ -85,6 +99,9 @@ pinch-zoom and pan.
 
 Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap
 or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit.
+
+The **Delete** tile opens the same **Cancel / Delete building** confirmation as desktop, including for unfinished
+buildings, towers and walls.
 
 Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a
 real iPhone.
@@ -176,7 +193,8 @@ rendering fallback. Shaders, picking, lighting and visual quality are checked in
 | `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets its difficulty (default `hard`) |
 | `?autotour=1` | Whole tournament on autopilot |
 | `?level=relaxed\|normal\|hard` | Tournament difficulty, overriding the saved menu pick |
-| `?noTimeLimit=1\|0` | Override the saved No time limit choice |
+| `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
+| `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the touch layout |
 | `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
@@ -184,6 +202,8 @@ rendering fallback. Shaders, picking, lighting and visual quality are checked in
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,
 `?round=2&seed=3&autoplay=1&speed=8` to watch two bots race through the eras, and `?round=3&seed=1&touch=1` for the
 phone layout.
+
+For a custom deadline, use `?round=1&timeLimit=60` for a one-hour quick match or `?round=1&timeLimit=0` for no limit.
 
 ## Deploy (Docker)
 
