@@ -42,3 +42,30 @@ test('path around wall, enclosed null, same tile empty', () => {
   assert.equal(findPath(m, box, { x: 2, y: 2 }, { x: 8, y: 2 }), null);
   assert.deepEqual(findPath(m, wall, { x: 2, y: 2 }, { x: 2, y: 2 }), []);
 });
+test('ore patches: mirrored, home gold patch per player, tiles match kinds', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const m = generateMap(seed), n = m.size, byId = new Map(m.orePatches.map(p => [p.id, p]));
+    for (const p of m.orePatches) {
+      const t = byId.get(p.twin);
+      assert.equal(t.twin, p.id); assert.equal(t.kind, p.kind); assert.equal(t.reserve, p.reserve);
+      assert.deepEqual([...p.tiles].map(i => n * n - 1 - i).sort((a, b) => a - b), [...t.tiles].sort((a, b) => a - b), 'mirrored ' + seed);
+      for (const i of p.tiles) assert.equal(m.tiles[i], p.kind === 'gold' ? 2 : 3);
+    }
+    for (const s of m.starts) assert.ok(m.orePatches.some(p => p.kind === 'gold' && p.reserve === 1500
+      && p.tiles.every(i => { const d = Math.hypot(i % n - s.x, (i / n | 0) - s.y); return d >= 9 && d <= 19; })), 'home patch ' + seed);
+    assert.ok(m.orePatches.filter(p => p.kind === 'stone').length >= 2, 'quarries ' + seed);
+    const onOre = m.resources.filter(r => m.tiles[Math.floor(r.y) * n + Math.floor(r.x)] >= 2);
+    assert.equal(onOre.length, 0, 'no pile on ore ' + seed);
+    for (const r of m.relicSpots) assert.ok(m.tiles[Math.floor(r.y) * n + Math.floor(r.x)] < 2, 'relic spot off ore ' + seed);
+  }
+});
+test('mid-map gold and stone between the bases', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const m = generateMap(seed), [a, b] = m.starts;
+    for (const type of ['gold', 'stone']) {
+      const mid = m.resources.filter(r => r.type === type && Math.hypot(r.x - a.x, r.y - a.y) > 16 && Math.hypot(r.x - b.x, r.y - b.y) > 16);
+      assert.ok(mid.length >= 8, `${type} mid ${seed}: ${mid.length}`);
+      assert.ok(mid.every(r => r.amount > (type === 'gold' ? 800 : 600)), 'mid piles richer');
+    }
+  }
+});
