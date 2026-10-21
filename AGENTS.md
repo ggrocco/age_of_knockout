@@ -84,8 +84,8 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   manual data; buildings, Slinger, Spearman, age-up costs, techs, towers/walls and all AI Future content are
   **unverified or invented approximations**. `src/data/README.md` records every deviation from AoE1.
 
-Tests cover the sim, rounds, bot, bracket, data tables, render-model geometry and the gallery rows headlessly (Node
-test runner). The DOM, HUD, input, shaders and visual quality have no automated tests.
+Tests cover the sim, rounds, bot, bracket, data tables, render-model geometry, gallery rows and pure input helpers
+headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and visual quality have no automated tests.
 
 ## When you change X, also update Y
 
@@ -98,7 +98,8 @@ test runner). The DOM, HUD, input, shaders and visual quality have no automated 
 
 ## Testing in the browser (required)
 
-`npm test` is headless and never touches `src/render`, `src/ui`, `src/main.js`, `styles.css` or `index.html`.
+`npm test` is headless: it checks model geometry and pure UI/input helpers, but does not exercise the browser DOM,
+HUD, event handling, shaders, `src/main.js`, `styles.css` or `index.html`.
 **Always verify your change in a real browser before calling it done**, not just when it is "UI work". A sim/data
 change that adds or alters something the player can see or click (a unit, building, age, HUD label, round rule) also
 needs a browser check that it appears and works. Run `npm test` too, but it is not a substitute.
