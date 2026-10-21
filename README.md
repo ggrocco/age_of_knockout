@@ -72,6 +72,8 @@ You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few 
 around the centre (the opponent mirrors you). Gather food, wood, gold and stone, build houses for population, and
 **advance through nine eras**: Stone, Tool, Bronze, Iron, Medieval, Age of Sail, Industrial, Modern and AI Future.
 Each era unlocks units and buildings and changes how your buildings look.
+Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
+180 and 200 in AI Future (each house adds 4, the Town Center 10).
 
 ![Industrial Age Death Match base: brick houses with chimneys, a factory, a castle and red-brick towers](docs/screenshots/deathmatch.jpg)
 

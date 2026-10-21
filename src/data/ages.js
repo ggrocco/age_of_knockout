@@ -13,6 +13,9 @@ export const AGE_COST = {
   modern: { cost: { food: 1600, wood: 0, gold: 1300, stone: 300 }, time: 65 },
   future: { cost: { food: 1800, wood: 0, gold: 1500, stone: 400 }, time: 70 },
 };
+// Population ceiling per age: houses and Town Centers raise the cap up to this (AoE1 stops at 50 in every age).
+export const AGE_POP_LIMIT = { stone: 50, tool: 65, bronze: 80, iron: 100, medieval: 120, sail: 140, industrial: 160, modern: 180, future: 200 };
+export const popLimit = a => AGE_POP_LIMIT[a] || AGE_POP_LIMIT.stone;
 export const ageIndex = a => AGES.indexOf(a);
 export const ageLabel = a => AGE_NAME[a] || a;
 export const ageTitle = a => AGE_TITLE[a] || a;
