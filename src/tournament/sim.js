@@ -2,6 +2,7 @@
 import { createGame } from '../sim/game.js';
 import { createBot, matchOptions, THINK_EVERY as every } from '../ai/bot.js';
 import { roundById } from '../rounds/index.js';
+import { popLimit } from '../data/ages.js';
 
 export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts = {}) {
   const rules = roundById(roundId), g = createGame({ seed, rules, ...matchOptions(diffs) }), bots = [createBot(g, 0, diffs[0]), createBot(g, 1, diffs[1])];
@@ -25,7 +26,7 @@ export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts 
 function checkInvariants(g, errors) {
   for (const p of g.players) {
     for (const [k, v] of Object.entries(p.res)) { if (!Number.isFinite(v)) errors.push(`NaN resource ${k} at ${g.time}`); else if (v < -1e-6) errors.push(`negative ${k}=${v} at ${g.time}`); }
-    if (p.pop > 50) errors.push(`pop ${p.pop} > 50 at ${g.time}`);
+    if (p.pop > popLimit(p.age)) errors.push(`pop ${p.pop} > ${popLimit(p.age)} at ${g.time}`);
   }
   for (const u of g.units.values()) if (!Number.isFinite(u.x) || !Number.isFinite(u.y) || !Number.isFinite(u.hp)) { errors.push(`bad unit ${u.type}#${u.id} at ${g.time}`); break; }
 }

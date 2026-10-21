@@ -1,7 +1,7 @@
 // Scripted build-order AI. Issues only game.command calls and reads game.visibleEntities/knownResources.
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { AGES, AGE_COST, ageIndex } from '../data/ages.js';
+import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
@@ -126,7 +126,7 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- houses
     const housesBuilding = buildings.filter(b => b.type === 'house' && !b.constructed).length;
-    if (me.popCap < 50 && me.pop + 3 >= me.popCap && housesBuilding < (roundId === 'deathmatch' ? 3 : 1) && vills.length) tryBuild('house', vills, home);
+    if (me.popCap < popLimit(me.age) && me.pop + 3 >= me.popCap && housesBuilding < (roundId === 'deathmatch' ? 3 : 1) && vills.length) tryBuild('house', vills, home);
 
     // --- buildings & age
     const free = vills.filter(v => v.order.type !== 'build');

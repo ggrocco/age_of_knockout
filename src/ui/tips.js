@@ -2,7 +2,7 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageTitle } from '../data/ages.js';
+import { AGES, AGE_COST, AGE_POP_LIMIT, ageTitle } from '../data/ages.js';
 import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
@@ -14,7 +14,7 @@ const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Ca
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
   town_center: 'Your base. Trains Villagers, accepts every resource and is where you advance to the next Age.',
-  house: 'Raises your population cap. Build more when training stalls at the cap.',
+  house: `Raises your population cap, up to the limit of your Age (${AGE_POP_LIMIT.stone} in the Stone Age, ${AGE_POP_LIMIT.future} in AI Future). Build more when training stalls at the cap.`,
   granary: 'Drop-off point for food. Place it beside berries and farms to shorten trips.',
   storage_pit: 'Drop-off point for wood, gold and stone. Also researches weapon and armor upgrades.',
   farm: 'A field that holds 400 food. Villagers work it for a steady food supply.',

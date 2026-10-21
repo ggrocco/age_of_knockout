@@ -2,7 +2,7 @@ import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
-import { AGES } from '../data/ages.js';
+import { AGES, popLimit } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
 import { updateTower, refreshDefences } from './defence.js';
@@ -118,7 +118,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     for (const p of game.players) { p.pop = 0; p.popCap = 0; }
     for (const u of game.units.values()) game.players[u.owner].pop++;
     for (const b of game.buildings.values()) { const p = game.players[b.owner]; p.pop += b.queue.length; if (b.constructed) p.popCap += BUILDINGS[b.type].pop || 0; }
-    for (const p of game.players) p.popCap = Math.min(50, p.popCap);
+    for (const p of game.players) p.popCap = Math.min(popLimit(p.age), p.popCap);
   };
   game.command = (pid, cmd) => execute(game, pid, cmd);
   game.visibleEntities = pid => {

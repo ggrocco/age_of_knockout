@@ -1,7 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { canPlace, ageUpNeed } from '../src/sim/commands.js';
-import { AGES } from '../src/data/ages.js';
+import { AGES, AGE_POP_LIMIT, popLimit } from '../src/data/ages.js';
 const freeSpot = (g, p, type, skip = []) => { const t = tc(g, p); for (let r = 3; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(t.x) + dx, y = Math.floor(t.y) + dy; if (skip.some(k => Math.abs(k.x - x) < 4 && Math.abs(k.y - y) < 4)) continue; if (canPlace(g, p, type, x, y)) return { x, y }; } };
 const mine = (g, p, type) => [...g.units.values()].filter(u => u.owner === p && u.type === type);
 const tc = (g, p) => [...g.buildings.values()].find(b => b.owner === p && b.type === 'town_center');
@@ -36,6 +36,21 @@ test('train: rejected without resources or at pop cap; works otherwise', () => {
   for (let i = 0; i < 3000; i++) { g2.command(0, { type: 'train', buildingId: t2.id, unit: 'villager' }); g2.tick(); }
   assert.ok(mine(g2, 0, 'villager').length <= 10, 'pop capped at 10 without houses');
   assert.equal(g2.command(0, { type: 'train', buildingId: t2.id, unit: 'clubman' }).ok, false);
+});
+test('population cap grows with houses up to a per-age limit: 50 in Stone, 200 in AI Future', () => {
+  assert.deepEqual(Object.keys(AGE_POP_LIMIT), AGES);
+  for (let i = 1; i < AGES.length; i++) assert.ok(popLimit(AGES[i]) > popLimit(AGES[i - 1]), AGES[i] + ' raises the limit');
+  assert.equal(popLimit('stone'), 50); assert.equal(popLimit('future'), 200);
+  const g = createGame({ seed: 1 }), p = g.players[0], t = tc(g, 0);
+  for (let n = 0; n < 60; n++) { const s = freeSpot(g, 0, 'house'); if (!s) break; g.addBuilding('house', 0, s.x, s.y, true); }
+  const houses = [...g.buildings.values()].filter(b => b.owner === 0 && b.type === 'house').length, housing = 10 + 4 * houses;
+  assert.ok(housing > popLimit('iron'), `enough houses to pass several limits (${housing})`);
+  g.recount(); assert.equal(p.popCap, 50, 'Stone Age stops at 50 however many houses');
+  for (const age of AGES) { p.age = age; g.recount(); assert.equal(p.popCap, Math.min(popLimit(age), housing), age); }
+  p.age = 'stone'; p.res.food = 5000; g.recount();
+  while (p.pop < p.popCap) { g.spawnUnit('villager', 0, t.x + 4, t.y + 4); g.recount(); }
+  assert.deepEqual(g.command(0, { type: 'train', buildingId: t.id, unit: 'villager' }), { ok: false, reason: 'pop limit' }, 'at the Stone limit: advance, not more houses');
+  p.age = 'tool'; g.recount(); assert.equal(g.command(0, { type: 'train', buildingId: t.id, unit: 'villager' }).ok, true, 'the Tool Age lifts it');
 });
 test('age up requires buildings, cost, and gates units', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
