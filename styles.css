@@ -113,7 +113,7 @@ body.touch #tip { display:none; }
 #delete-confirmation .danger { border-color:var(--red); background:linear-gradient(#79362c,#4b201a); }
 #delete-confirmation .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
 .card .level { margin-top:12px; } .card .level .btn { font-size:15px; padding:5px 14px; margin:4px 3px 0; }
-.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em 0 0; font-size:14px; opacity:.85; }
+.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em auto 0; font-size:14px; opacity:.85; }
 .time-option { width:100%; max-width:400px; margin:16px auto 0; text-align:left; }
 .time-option label, .time-scale { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .time-option output { color:var(--bronze); font-variant-numeric:tabular-nums; }
