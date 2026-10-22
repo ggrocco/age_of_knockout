@@ -8,6 +8,7 @@ import { updateUnit } from './orders.js';
 import { updateTower, refreshDefences } from './defence.js';
 import { execute } from './commands.js';
 import { updateVision } from './vision.js';
+import { initOre } from './ore.js';
 import { secs, rectOf, centerOf } from './util.js';
 
 // A wall foundation (an unfinished wall) does not block movement: it only reserves its tile, and occupies it once finished.
@@ -27,6 +28,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     occAt: (x, y) => (x < 0 || y < 0 || x >= n || y >= n) ? 1 : occ[y * n + x],
     blocked: (x, y) => occ[y * n + x] !== 0,
   };
+  initOre(game); // patches, patchAt, terrainVersion, oreRng
   const mark = (e, v) => { const r = rectOf(e); for (let y = r.y0; y < r.y1; y++) for (let x = r.x0; x < r.x1; x++) occ[y * n + x] = v; };
   const cells = e => { const r = rectOf(e), out = []; for (let y = r.y0; y < r.y1; y++) for (let x = r.x0; x < r.x1; x++) out.push(y * n + x); return out; };
   // Open ground a unit can be put on: on the map, not water, not occupied, not a wall foundation.
@@ -46,6 +48,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     const d = BUILDINGS[type], def = d.defence ? defenceStats(d.defence, game.players[owner].age) : null, maxHp = def ? def.hp : d.hp; // defences: HP (and a tower's attack) come from the owner's era now
     const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp, hp: constructed ? maxHp : 1, constructed, progress: constructed ? 1 : 0,
       queue: [], workers: 0, sight: d.sight, marmor: d.marmor ?? 3, parmor: d.parmor ?? 8, dead: false, gatherType: d.gatherType || null, amount: d.amount || 0 };
+    if (d.ore) { const pt = game.patches.get(game.patchAt[y * n + x]); Object.assign(e, { patch: pt?.id ?? 0, gatherType: pt?.kind ?? 'gold', amount: pt?.reserve ?? 0, digging: 0 }); } // a Mine yields what its patch holds
     if (d.defence === 'tower') Object.assign(e, { atk: def.atk, atkType: def.atkType, range: def.range, cooldown: def.cooldown, splash: def.splash || 0, bonus: null, cd: 0 });
     game.entities.set(e.id, e); game.buildings.set(e.id, e);
     if (!constructed && opensFoundation(type)) { for (const i of cells(e)) reserved.add(i); return e; } // units may stand on it until it is finished
@@ -159,6 +162,8 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
 }
 
 function updateBuilding(game, b) {
+  if (b.patch !== undefined) b.amount = game.patches.get(b.patch)?.reserve ?? 0; // a Mine shows its patch's reserve
+  if (b.gatherType) { b.digging = b.gatherers || 0; b.gatherers = 0; } // villagers who worked it this tick (units update first)
   if (b.gatherType && b.amount <= 0) return game.remove(b);
   const rate = game.players[b.owner].workRate;
   if (!b.constructed) {
