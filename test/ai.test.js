@@ -275,3 +275,26 @@ test('disabling time limits overrides difficulty caps while keeping the bot hand
   assert.deepEqual(matchOptions(['hard', 'easy'], { noTimeLimit: true }), { workRate: [1, 1], capTicks: Infinity });
   assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
 });
+
+test('a Tool Age bot with no gold piles nearby builds a Mine on its home patch and works it', () => {
+  const g = createGame({ seed: 3, rules: roundById('conquest') }), b = createBot(g, 1, 'medium'), ev = THINK_EVERY.medium, p = g.players[1];
+  p.age = 'tool'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
+  for (const r of [...g.resources.values()]) if (r.type === 'gold') g.remove(r);
+  g.pileStart.gold = 0; // no gold piles respawn either: the patches are the only gold
+  p.explored.fill(1);
+  const s = g.map.starts[1];
+  for (let k = 0; k < 10; k++) g.spawnUnit('villager', 1, s.x - 2 + k % 5, s.y + 3 + Math.floor(k / 5));
+  let worked = null;
+  for (let i = 0; i < 6000 && !g.result; i++) {
+    g.tick(); if (i % ev === 0) b.think();
+    for (const u of g.units.values()) if (u.owner === 1 && u.order.type === 'gather' && u.order.kind === 'gold') {
+      const r = g.entities.get(u.order.res); if (r && r.type === 'mine') worked = r;
+    }
+  }
+  const mines = [...g.buildings.values()].filter(x => x.type === 'mine' && x.owner === 1 && x.constructed);
+  assert.ok(mines.length >= 1, 'a finished Mine');
+  assert.ok(worked, 'a villager gathers gold from a Mine');
+  assert.ok(mines.includes(worked) || worked.dead, 'the worked Mine is the bot\'s own');
+  const home = g.patches.get(g.patchAt[Math.floor(mines[0].y) * g.map.size + Math.floor(mines[0].x)]);
+  assert.equal(home?.kind, 'gold');
+});

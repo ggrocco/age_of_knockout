@@ -230,6 +230,13 @@ export function createBot(game, pid, difficulty = 'medium') {
     for (const b of done) if ((BUILDINGS[b.type].drops || []).includes(kind)) best = Math.min(best, distPoint(p.x, p.y, b));
     return best;
   }
+  // Top-left of the first 2x2 Mine spot on an ore patch of this kind, trying patches nearest `home` first.
+  function mineSpot(kind, home) {
+    const n = game.map.size, centre = p => p.tiles.reduce((c, i) => ({ x: c.x + (i % n + 0.5) / p.tiles.length, y: c.y + (((i / n) | 0) + 0.5) / p.tiles.length }), { x: 0, y: 0 });
+    const patches = [...game.patches.values()].filter(p => p.kind === kind && p.reserve > 0).map(p => ({ p, d: dist(centre(p), home) })).sort((a, b) => a.d - b.d);
+    for (const { p } of patches) for (const i of p.tiles) { const x = i % n, y = (i / n) | 0; if (canPlace(game, pid, 'mine', x, y)) return { x, y }; }
+    return null;
+  }
   function assign(idle, vills, tc, home, done) {
     const cnt = { food: 0, wood: 0, gold: 0, stone: 0 };
     for (const v of vills) if (v.order.type === 'gather') cnt[v.order.kind]++;
@@ -254,9 +261,19 @@ export function createBot(game, pid, difficulty = 'medium') {
           else if (me.res.wood >= 60 && tryBuild('farm', [v], home)) { cnt.food++; continue; }
         }
       }
+      if ((kind === 'gold' || kind === 'stone') && (!res || dist(res, home) > 16)) { // piles gone or far: dig a Mine
+        const mines = done.filter(b => b.type === 'mine' && b.gatherType === kind && b.amount > 0);
+        if (mines.length) { // spread out: the first with fewer than 4 gatherers, else the least worked
+          const load = m => vills.filter(u => u.order.type === 'gather' && u.order.res === m.id).length;
+          res = mines.find(m => load(m) < 4) || mines.reduce((a, b) => load(b) < load(a) ? b : a);
+        } else if (ageIndex(me.age) >= ageIndex(BUILDINGS.mine.age) && !mine('buildings').some(b => b.type === 'mine' && !b.constructed && b.gatherType === kind) && canPay(BUILDINGS.mine.cost)) {
+          const sp = mineSpot(kind, home);
+          if (sp && cmd({ type: 'build', ids: [v.id], building: 'mine', x: sp.x, y: sp.y })) { cnt[kind]++; continue; }
+        }
+      }
       if (!res) { if (kind !== 'wood') { cnt[kind] = 99; } continue; }
       // far from any dropsite -> build one there first
-      if (res.kind === 'resource' && dropDist(kind, res, done) > 10) {
+      if ((res.kind === 'resource' || res.type === 'mine') && dropDist(kind, res, done) > 10) {
         const type = kind === 'food' ? 'granary' : 'storage_pit', sp = spotNear(type, res, false);
         if (sp && !mine('buildings').some(b => !b.constructed && b.type === type) && canAfford(me, BUILDINGS[type].cost) && cmd({ type: 'build', ids: [v.id], building: type, x: sp.x, y: sp.y })) continue;
       }
