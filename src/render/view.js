@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
 import { buildModel, animate, TEAM, MODEL_MATERIAL } from './models.js';
 import { createModelBatch, PROXY_LAYER } from './batch.js';
+import { prepareCosmetics } from './cosmetics.js';
+import { createContactShadows } from './contact-shadows.js';
 import { createTerrain } from './terrain.js';
 import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } from './quality.js';
 import { viewHalfHeight } from './camera-fit.js';
@@ -53,7 +55,7 @@ export function createView(container, game) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x20271b);
-  scene.matrixWorldAutoUpdate = false; // view.frame updates world matrices once, not once per render pass
+  scene.matrixWorldAutoUpdate = false; scene.matrixAutoUpdate = false; // view.frame updates world matrices once, not once per render pass
   scene.add(new THREE.HemisphereLight(0xc9deeb, 0x776342, 1.55));
   const skyLighting = renderer.extensions.has('EXT_color_buffer_float') ? createSkyLighting(renderer) : null;
   scene.environment = skyLighting?.texture ?? null; scene.environmentIntensity = 0.4;
@@ -66,10 +68,15 @@ export function createView(container, game) {
   const N = game.map.size;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 250);
   const view = { renderer, scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
-  let effects = createLightingEffects(renderer, scene, camera, preset);
+  const batch = createModelBatch(MODEL_MATERIAL); scene.add(batch.mesh);
+  let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
+  view.revision = 0; view.invalidate = () => { view.revision++; };
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();
+  let cameraKey = '';
   function placeCamera() {
     const w = renderer.domElement.clientWidth || 1, h = renderer.domElement.clientHeight || 1, a = w / h;
+    const key = `${w},${h},${view.zoom},${view.focus.x},${view.focus.z}`;
+    if (key === cameraKey) return; cameraKey = key;
     const hh = viewHalfHeight(view.zoom, w, h); camera.left = -hh * a; camera.right = hh * a; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
     camera.position.copy(view.focus).addScaledVector(DIR, 120); camera.lookAt(view.focus); camera.updateMatrixWorld(true);
     const extent = Math.min(N, Math.max(18, hh * Math.max(1, a) * 1.4)), shadowCamera = sun.shadow.camera;
@@ -81,24 +88,24 @@ export function createView(container, game) {
   view.resize = () => {
     const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
     renderer.setPixelRatio(renderPixelRatio(w, h, window.devicePixelRatio, preset));
-    renderer.setSize(w, h, false); view.setZoom(view.zoom); placeCamera(); effects.resize(w, h); // re-clamp: the zoom-out limit depends on the size
+    renderer.setSize(w, h, false); view.setZoom(view.zoom); cameraKey = ''; placeCamera(); effects.resize(w, h); view.invalidate();
   };
   view.setQuality = name => {
     if (!validQuality(name)) return;
     sessionQuality = name; saveQuality(name, storage);
     if (name === qualityName) return;
     qualityName = name; preset = QUALITY[name]; view.quality = name;
-    effects.dispose(); effects = createLightingEffects(renderer, scene, camera, preset);
+    effects.dispose(); effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
     sun.shadow.map?.dispose(); sun.shadow.map = null;
     sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
     terrain.setQuality(preset); view.resize();
   };
-  view.pan = (dx, dz) => { view.focus.x = Math.max(0, Math.min(N, view.focus.x + dx)); view.focus.z = Math.max(0, Math.min(N, view.focus.z + dz)); };
+  view.pan = (dx, dz) => { view.focus.x = Math.max(0, Math.min(N, view.focus.x + dx)); view.focus.z = Math.max(0, Math.min(N, view.focus.z + dz)); view.invalidate(); };
   view.setZoom = z => { // 3 lets a phone close in to ~7 tiles across in portrait; a big screen's width cap must not cost zoom-out reach
     const fit = Math.min(1, viewHalfHeight(1, renderer.domElement.clientWidth, renderer.domElement.clientHeight));
-    view.zoom = Math.max(3, Math.min(34 / fit, z));
+    view.zoom = Math.max(3, Math.min(34 / fit, z)); view.invalidate();
   };
-  view.centerOn = (x, y) => { view.focus.set(x, 0, y); };
+  view.centerOn = (x, y) => { view.focus.set(x, 0, y); view.invalidate(); };
 
   // terrain
   const terrain = createTerrain(game, renderer, preset), ground = terrain.ground;
@@ -121,8 +128,7 @@ export function createView(container, game) {
   view.fogEnabled = true;
 
   // entity meshes
-  const _wq = new THREE.Quaternion(), _blob = new THREE.Matrix4(), _x = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-  const batch = createModelBatch(MODEL_MATERIAL); scene.add(batch.mesh);
+  const _wq = new THREE.Quaternion(), _x = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
   const shadowCanvas = document.createElement('canvas'); shadowCanvas.width = shadowCanvas.height = 64;
   const shadowContext = shadowCanvas.getContext('2d'), gradient = shadowContext.createRadialGradient(32, 32, 0, 32, 32, 32);
   gradient.addColorStop(0, 'rgba(20,14,6,0.38)'); gradient.addColorStop(0.45, 'rgba(20,14,6,0.18)'); gradient.addColorStop(1, 'rgba(20,14,6,0)');
@@ -130,15 +136,8 @@ export function createView(container, game) {
   const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
   const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false });
   shadowMat.userData.shared = true;
-  // Soft contact shadows for every entity, as one instanced draw; matrices are rebuilt each frame.
-  let blobs = null;
-  function blobMesh(count) {
-    if (blobs && blobs.instanceMatrix.count >= count) return blobs;
-    if (blobs) { scene.remove(blobs); blobs.dispose(); }
-    blobs = new THREE.InstancedMesh(geo.plane, shadowMat, Math.max(256, count * 2)); blobs.frustumCulled = false; blobs.raycast = noRaycast;
-    blobs.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(blobs);
-    return blobs;
-  }
+  const shadows = createContactShadows(scene, geo.plane, shadowMat, () => effects.invalidate());
+  const activeGroups = new Set(), dirtyGroups = new Set();
   let groupSeq = 0;
   function makeMesh(e) {
     const g = new THREE.Group(); g.userData = { id: e.id, kind: e.kind, owner: e.owner, hp: e.hp, seq: ++groupSeq };
@@ -146,13 +145,22 @@ export function createView(container, game) {
     const m = buildModel(e, age); g.add(m.root); g.userData.anim = m.anim; g.userData.age = age;
     g.userData.blob = new THREE.Matrix4().makeTranslation(0, 0.04, 0).multiply(_x).scale(new THREE.Vector3(m.shadow * 2.8, m.shadow * 2.8, 1));
     g.traverse(o => { if (!o.isMesh) return; if (o.material?.blending === THREE.AdditiveBlending) { o.raycast = noRaycast; return; } o.userData.gid = e.id; });
-    batch.add(g);
+    prepareCosmetics(g, e); batch.add(g);
+    if (e.kind === 'building') {
+      // Completed buildings only change with simulation/selection state. The GPU
+      // animates their flags, smoke and machinery without walking this hierarchy.
+      const update = g.updateMatrixWorld;
+      g.updateMatrixWorld = function(force) {
+        if (!force && !this.userData.matrixDirty) return;
+        this.userData.matrixDirty = false; update.call(this, true);
+      };
+    }
     return g;
   }
   function selectionRing(g) {
     const ud = g.userData; if (ud.ring) return ud.ring;
     const ring = ud.ring = new THREE.Mesh(geo.selection, overlay.ring); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05;
-    const r = ud.kind === 'building' ? ud.entity.size * 0.68 : 0.48; ring.scale.set(r, r, 1); ring.renderOrder = 3; ring.raycast = noRaycast; g.add(ring);
+    const r = ud.kind === 'building' ? ud.entity.size * 0.68 : 0.48; ring.scale.set(r, r, 1); ring.renderOrder = 3; ring.raycast = noRaycast; g.add(ring); effects.invalidate();
     return ring;
   }
   function healthBar(g) {
@@ -160,15 +168,16 @@ export function createView(container, game) {
     const e = ud.entity, bg = new THREE.Mesh(geo.plane, overlay.barBg), fg = new THREE.Mesh(geo.plane, overlay.barFg[0]), bar = new THREE.Group();
     // Overlapping bars stack per entity (background, then fill) in the order their entities appeared.
     bg.renderOrder = 4 + ud.seq * 1e-6; fg.renderOrder = bg.renderOrder + 1e-7; bg.scale.set(1, 0.14, 1); bg.raycast = fg.raycast = noRaycast; bar.add(bg, fg);
-    bar.position.y = e.kind === 'building' ? (e.gatherType ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar);
+    effects.invalidate();
+    bar.position.y = e.kind === 'building' ? (e.type === 'farm' ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar);
     return ud.bar = { bar, fg };
   }
-  const removeGroup = g => { scene.remove(g); batch.remove(g); disposeObject(g); };
+  const removeGroup = g => { scene.remove(g); activeGroups.delete(g); batch.remove(g); shadows.remove(g); disposeObject(g); effects.invalidate(); };
   const seen = new Set();
   let syncStamp = -1;
   view.selection = new Set();
-  view.sync = () => {
-    if (game.time === syncStamp) return; syncStamp = game.time; // entity set only changes on a sim tick (20/s); frames run faster
+  view.sync = (force = false) => {
+    if (!force && game.time === syncStamp) return; syncStamp = game.time; // entity set only changes on a sim tick (20/s); frames run faster
     updateFog();
     seen.clear();
     const list = [...game.visibleEntities(0), ...game.knownResources(0)];
@@ -178,20 +187,35 @@ export function createView(container, game) {
       if (g && e.kind === 'building' && g.userData.age !== game.players[e.owner].age) {
         removeGroup(g); view.groups.delete(e.id); view.pickables.splice(view.pickables.indexOf(g), 1); g = null;
       }
-      if (!g) { g = makeMesh(e); view.groups.set(e.id, g); scene.add(g); view.pickables.push(g); g.position.set(...worldPos(e)); }
+      if (!g) {
+        g = makeMesh(e); view.groups.set(e.id, g);
+        // Resource proxies are only needed for picking. Their matrices change on depletion,
+        // so keep them out of the scene's per-frame hierarchy walk.
+        if (e.kind !== 'resource') { scene.add(g); activeGroups.add(g); }
+        view.pickables.push(g); g.position.set(...worldPos(e)); effects.invalidate();
+      }
       g.userData.entity = e;
+      if (force) g.userData.stateStamp = -1;
+      if (e.kind === 'resource' && g.userData.amount !== e.amount) {
+        animate(g, e, 0, false); g.updateMatrixWorld(true);
+        batch.update(g); shadows.update(g); g.userData.amount = e.amount;
+      }
     }
     for (const [id, g] of view.groups) if (!seen.has(id) || !game.entities.has(id)) { removeGroup(g); view.groups.delete(id); const i = view.pickables.indexOf(g); if (i >= 0) view.pickables.splice(i, 1); }
   };
   const worldPos = e => e.kind === 'building' ? [e.x + e.size / 2, 0, e.y + e.size / 2] : [e.x, e.kind === 'relic' ? (e.holder !== null ? 1.35 : 0.2) : 0, e.y];
   view.frame = (dt, t) => {
     placeCamera();
-    terrain.update(t, view.fogEnabled);
-    const k = Math.min(1, dt * 16);
-    for (const g of view.groups.values()) {
+    terrain.refresh(); terrain.update(t, view.fogEnabled);
+    const k = Math.min(1, dt * 16); dirtyGroups.clear();
+    for (const g of activeGroups) {
       const e = g.userData.entity; if (!e) continue;
+      const selected = view.selection.has(e.id), ud = g.userData;
+      if (e.kind === 'building' && ud.stateStamp === game.time && ud.selected === selected && !(ud.pop > 0) && !(ud.anim.dig && e.digging > 0)) continue;
+      dirtyGroups.add(g);
+      ud.stateStamp = game.time; ud.selected = selected;
       const [x, y, z] = worldPos(e);
-      const ud = g.userData; let moving = false;
+      let moving = false;
       if (e.kind === 'unit') {
         g.position.x += (x - g.position.x) * k; g.position.z += (z - g.position.z) * k;
         const dx = x - g.position.x, dz = z - g.position.z; moving = Math.hypot(dx, dz) > 0.03;
@@ -204,27 +228,33 @@ export function createView(container, game) {
       if (e.kind === 'unit' || e.kind === 'building') { if (e.hp < ud.hp - 0.01) ud.pop = 0.12; ud.hp = e.hp; if (ud.pop > 0) { ud.pop -= dt; g.scale.setScalar(1 + Math.max(0, ud.pop) * (e.kind === 'unit' ? 1.6 : 0.25)); } else g.scale.setScalar(1); }
       animate(g, e, t, moving);
       if (e.kind === 'unit' || e.kind === 'building') {
-        const selected = view.selection.has(e.id), show = selected || e.hp < e.maxHp;
+        const show = selected || e.hp < e.maxHp;
         if (selected || ud.ring) selectionRing(g).visible = selected;
         if (show || ud.bar) { const { bar, fg } = healthBar(g); bar.visible = show; if (show) { const f = Math.max(0.001, e.hp / e.maxHp); bar.parent.getWorldQuaternion(_wq).invert(); bar.quaternion.copy(_wq).multiply(camera.quaternion); fg.scale.set(f, 0.14, 1); fg.position.x = (f - 1) / 2; fg.position.z = 0.001; fg.material = overlay.barFg[f > 0.5 ? 0 : f > 0.25 ? 1 : 2]; } }
       }
+      if (e.kind === 'building') {
+        g.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); ud.matrixDirty = true;
+      }
     }
     fog.visible = view.fogEnabled;
-    scene.updateMatrixWorld(); batch.update();
-    const shadows = blobMesh(view.groups.size); let n = 0;
-    for (const g of view.groups.values()) if (g.userData.entity) shadows.setMatrixAt(n++, _blob.multiplyMatrices(g.matrixWorld, g.userData.blob));
-    shadows.count = n; shadows.instanceMatrix.needsUpdate = true;
+    scene.updateMatrixWorld();
+    for (const g of dirtyGroups) { batch.update(g); shadows.update(g); }
+    batch.flush(t);
     renderer.info.reset(); effects.render();
   };
   // placement ghost
   const ghost = new THREE.Mesh(geo.box, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.5, depthTest: false })); ghost.visible = false; ghost.renderOrder = 5; scene.add(ghost);
-  view.showGhost = (type, tx, ty, ok) => { if (!type) { ghost.visible = false; return; } const s = BUILDINGS[type].size; ghost.visible = true; ghost.scale.set(s, 1.2, s); ghost.position.set(tx + s / 2, 0.6, ty + s / 2); ghost.material.color.setHex(ok ? 0x22c55e : 0xef4444); };
+  let ghostKey = '';
+  view.showGhost = (type, tx, ty, ok) => { const key = type ? `${type},${tx},${ty},${ok}` : ''; if (key === ghostKey) return; ghostKey = key; view.invalidate(); if (!type) { ghost.visible = false; return; } const s = BUILDINGS[type].size; ghost.visible = true; ghost.scale.set(s, 1.2, s); ghost.position.set(tx + s / 2, 0.6, ty + s / 2); ghost.material.color.setHex(ok ? 0x22c55e : 0xef4444); };
   // wall ghost line: one 1x1 box per tile (lineTiles caps a line at 64), green where okFlags[i], red elsewhere; null hides it
   const GHOST_LINE_MAX = 64, ghostOk = new THREE.Color(0x22c55e), ghostBad = new THREE.Color(0xef4444), _gm = new THREE.Matrix4();
   const ghostLine = new THREE.InstancedMesh(geo.box, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5, depthTest: false }), GHOST_LINE_MAX);
   ghostLine.visible = false; ghostLine.renderOrder = 5; ghostLine.frustumCulled = false; ghostLine.raycast = noRaycast;
   ghostLine.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ghostLine.setColorAt(0, ghostOk); scene.add(ghostLine);
+  let ghostLineKey = '';
   view.showGhostLine = (tiles, okFlags) => {
+    const key = tiles?.map((t, i) => `${t.x},${t.y},${!!okFlags?.[i]}`).join(';') || '';
+    if (key === ghostLineKey) return; ghostLineKey = key; view.invalidate();
     if (!tiles || !tiles.length) { ghostLine.visible = false; return; }
     const n = Math.min(tiles.length, GHOST_LINE_MAX);
     for (let i = 0; i < n; i++) { ghostLine.setMatrixAt(i, _gm.makeScale(1, 1.2, 1).setPosition(tiles[i].x + 0.5, 0.6, tiles[i].y + 0.5)); ghostLine.setColorAt(i, okFlags?.[i] ? ghostOk : ghostBad); }
@@ -236,11 +266,11 @@ export function createView(container, game) {
   view.pickEntity = (cx, cy) => { setRay(cx, cy); const hits = ray.intersectObjects(view.pickables, true); for (const h of hits) { const id = h.object.userData.gid; if (id !== undefined && view.groups.get(id)) return view.groups.get(id).userData.entity; } return null; };
   view.pickGround = (cx, cy) => { setRay(cx, cy); const h = ray.intersectObject(ground)[0]; return h ? { x: h.point.x, y: h.point.z } : null; };
   view.project = (x, y) => { const v = new THREE.Vector3(x, 0.4, y).project(camera), r = renderer.domElement.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; };
-  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); blobs?.dispose(); ghostLine.dispose(); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
+  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); shadows.dispose(); ghostLine.dispose(); for (const g of view.groups.values()) if (g.userData.kind === 'resource') disposeObject(g); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
   const markers = [];
-  view.marker = (x, y) => { const m = new THREE.Mesh(geo.ring, new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, side: THREE.DoubleSide, depthTest: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, y); m.renderOrder = 6; m.userData.age = 0; scene.add(m); markers.push(m); };
+  view.marker = (x, y) => { const m = new THREE.Mesh(geo.ring, new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, side: THREE.DoubleSide, depthTest: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, y); m.renderOrder = 6; m.userData.age = 0; scene.add(m); markers.push(m); effects.invalidate(); view.invalidate(); };
   const baseFrame = view.frame;
-  view.frame = (dt, t) => { for (let i = markers.length - 1; i >= 0; i--) { const m = markers[i]; m.userData.age += dt; m.scale.setScalar(0.6 + m.userData.age * 2); m.material.opacity = Math.max(0, 1 - m.userData.age * 2.2); if (m.userData.age > 0.45) { scene.remove(m); disposeObject(m); markers.splice(i, 1); } } baseFrame(dt, t); };
+  view.frame = (dt, t) => { for (let i = markers.length - 1; i >= 0; i--) { const m = markers[i]; m.userData.age += dt; m.scale.setScalar(0.6 + m.userData.age * 2); m.material.opacity = Math.max(0, 1 - m.userData.age * 2.2); if (m.userData.age > 0.45) { scene.remove(m); disposeObject(m); markers.splice(i, 1); effects.invalidate(); } } baseFrame(dt, t); };
   view.resize();
   return view;
 }

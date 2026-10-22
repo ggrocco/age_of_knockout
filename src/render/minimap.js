@@ -6,7 +6,14 @@ export function createMinimap(canvas, game, view) {
   const toWorld = (cx, cy) => { const a = (cx - W / 2) / sc, b = (cy - H / 2) / (sc * 0.5) + N; return { x: (a + b) / 2, y: (b - a) / 2 }; };
   const hex = c => '#' + c.toString(16).padStart(6, '0');
   const terrain = document.createElement('canvas'); terrain.width = W; terrain.height = H; const tctx = terrain.getContext('2d');
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const p = toCanvas(x + 0.5, y + 0.5); tctx.fillStyle = game.map.tiles[y * N + x] === 1 ? '#2b5f8c' : '#4a7a35'; tctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2 + 0.5, sc + 0.5); }
+  // Land, water, gold vein, quarry. Ore patches come and go, so the layer is redrawn whenever terrainVersion moves on.
+  const TC = ['#4a7a35', '#2b5f8c', '#8a7a3a', '#7d7d78'];
+  let terrainStamp = -1;
+  const updateTerrain = () => {
+    if (game.terrainVersion === terrainStamp) return; terrainStamp = game.terrainVersion;
+    tctx.clearRect(0, 0, W, H);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const p = toCanvas(x + 0.5, y + 0.5); tctx.fillStyle = TC[game.map.tiles[y * N + x]] ?? TC[0]; tctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2 + 0.5, sc + 0.5); }
+  };
   // Fog shading is redrawn only when vision changes (every 4 ticks), not on every minimap draw.
   const fogLayer = document.createElement('canvas'); fogLayer.width = W; fogLayer.height = H; const fctx = fogLayer.getContext('2d');
   let fogStamp = -1;
@@ -16,8 +23,12 @@ export function createMinimap(canvas, game, view) {
     for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { const i = y * N + x; if (pl.visible[i]) continue; const p = toCanvas(x + 0.5, y + 0.5); fctx.fillStyle = pl.explored[i] ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.88)'; fctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2, sc); }
   };
   const RC = { tree: '#1f4d1f', berry: '#b0208f', gold: '#facc15', stone: '#9ca3af' };
+  let drawStamp = -1, focusX, focusZ, halfX, halfY, entityCount, drawTerrainStamp;
   const mm = { draw() {
-    ctx.fillStyle = '#0a0d09'; ctx.fillRect(0, 0, W, H); ctx.drawImage(terrain, 0, 0);
+    const [hx, hy] = view.halfExtents();
+    if (drawTerrainStamp === game.terrainVersion && drawStamp === game.time && entityCount === game.entities.size && focusX === view.focus.x && focusZ === view.focus.z && halfX === hx && halfY === hy) return;
+    drawTerrainStamp = game.terrainVersion; drawStamp = game.time; entityCount = game.entities.size; focusX = view.focus.x; focusZ = view.focus.z; halfX = hx; halfY = hy;
+    updateTerrain(); ctx.fillStyle = '#0a0d09'; ctx.fillRect(0, 0, W, H); ctx.drawImage(terrain, 0, 0);
     const pl = game.players[0];
     for (const r of game.knownResources(0)) { const p = toCanvas(r.x, r.y); ctx.fillStyle = RC[r.type]; ctx.fillRect(p.x - 1, p.y - 1, 2, 2); }
     for (const e of game.visibleEntities(0)) {

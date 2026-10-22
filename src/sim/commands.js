@@ -28,8 +28,11 @@ export function canPlace(game, pid, type, x, y) {
   const def = BUILDINGS[type], n = game.map.size, p = game.players[pid];
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
   if (x < 1 || y < 1 || x + def.size > n - 1 || y + def.size > n - 1) return false;
+  // A Mine goes wholly on one patch that still holds ore; everything else only on plain land (not water, not ore).
+  const pat = def.ore ? game.patchAt[y * n + x] : 0;
+  if (def.ore && !(game.patches.get(pat)?.reserve > 0)) return false;
   for (let j = y; j < y + def.size; j++) for (let i = x; i < x + def.size; i++) {
-    if (game.map.tiles[j * n + i] === 1 || game.occAt(i, j) || game.reserved.has(j * n + i) || !p.explored[j * n + i]) return false;
+    if ((def.ore ? game.patchAt[j * n + i] !== pat : game.map.tiles[j * n + i] !== 0) || game.occAt(i, j) || game.reserved.has(j * n + i) || !p.explored[j * n + i]) return false;
   }
   for (const r of game.relics.values()) if (r.holder === null && r.stored === null && r.x >= x && r.x < x + def.size && r.y >= y && r.y < y + def.size) return false;
   return true;

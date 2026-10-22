@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createGrass } from './grass.js';
+import { bakeTerrain } from './terrain-bake.js';
 
 // Visual noise has its own seed; it never consumes the simulation's RNG.
 function hash(x, y, seed) {
@@ -7,19 +8,8 @@ function hash(x, y, seed) {
   n = Math.imul(n ^ (n >>> 13), 1274126177);
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
-function noise(x, y, seed) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  let u = x - ix, v = y - iy;
-  u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
-  const a = hash(ix, iy, seed), b = hash(ix + 1, iy, seed);
-  const c = hash(ix, iy + 1, seed), d = hash(ix + 1, iy + 1, seed);
-  return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
-}
-
 export function createTerrain(game, renderer, preset) {
-  const { size: n, tiles, starts } = game.map, scale = 24;
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = n * scale;
-  const ctx = canvas.getContext('2d'), pixels = ctx.createImageData(canvas.width, canvas.height);
+  const { size: n, tiles } = game.map;
   const waterAt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && tiles[y * n + x] === 1;
   // Distance to the opposite terrain type gives shores a sand / shallow-water fringe.
   const shore = new Float32Array(n * n).fill(4);
@@ -34,33 +24,7 @@ export function createTerrain(game, renderer, preset) {
     return (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v)
       + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
   };
-  for (let py = 0; py < canvas.height; py++) for (let px = 0; px < canvas.width; px++) {
-    const x = px / scale, y = py / scale, tile = Math.floor(y) * n + Math.floor(x);
-    const broad = noise(x * 0.22, y * 0.22, game.seed), detail = noise(x * 2.7, y * 2.7, game.seed + 9);
-    const grain = hash(px, py, game.seed + 31) - 0.5;
-    const i = (py * canvas.width + px) * 4;
-    let color;
-    if (tiles[tile] === 1) {
-      const shallow = Math.max(0, 1 - shoreAt(x, y) / 4);
-      color = [28 + shallow * 28, 68 + shallow * 38, 74 + shallow * 34];
-    } else {
-      let earth = Math.max(0, (broad - 0.52) * 2.2);
-      for (const start of starts) {
-        const distance = Math.hypot(x - start.x - 0.5, y - start.y - 0.5);
-        earth = Math.max(earth, Math.max(0, 1 - distance / 5) * 0.85);
-      }
-      const sand = Math.max(0, 1 - shoreAt(x, y) / 2) * 0.7;
-      const grass = [83 + broad * 30, 94 + broad * 30, 47 + broad * 16];
-      color = grass.map((v, c) => v * (1 - earth) + [141, 119, 80][c] * earth);
-      color = color.map((v, c) => v * (1 - sand) + [166, 150, 106][c] * sand);
-    }
-    for (let c = 0; c < 3; c++) pixels.data[i + c] = color[c] + (detail - 0.5) * 17 + grain * 13;
-    pixels.data[i + 3] = 255;
-  }
-  ctx.putImageData(pixels, 0, 0);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const baked = bakeTerrain(renderer, game.map, game.seed, shore), texture = baked.texture;
   const geometry = new THREE.PlaneGeometry(n, n);
   const micro = new Uint8Array(128 * 128 * 4);
   for (let i = 0; i < 128 * 128; i++) {
@@ -125,19 +89,21 @@ export function createTerrain(game, renderer, preset) {
   const maskData = new Uint8Array(n * n * 4), mask = new THREE.DataTexture(maskData, n, n);
   mask.magFilter = mask.minFilter = THREE.NearestFilter;
   const grass = createGrass(game, mask); grass.setCount(preset.grass);
-  let maskStamp = -1;
+  let maskStamp = -1, terrainStamp = game.terrainVersion;
   return { ground, water, grass: grass.mesh, setQuality(next) { grass.setCount(next.grass); },
+    // The small grid is uploaded only when ore patches change; pixels are repainted on the GPU.
+    refresh() { if (terrainStamp !== game.terrainVersion) { baked.refresh(game.terrainVersion); terrainStamp = game.terrainVersion; } },
     update(t, fogEnabled = true) {
       waterTime.value = t; normalTexture.offset.set(t * 0.008 % 1, t * 0.005 % 1); grass.update(t, fogEnabled);
       if (maskStamp !== game.time && (game.time % 4 === 0 || maskStamp < 0)) {
         maskStamp = game.time;
         for (let i = 0; i < n * n; i++) {
           maskData[i * 4] = game.players[0].visible[i] ? 255 : game.players[0].explored[i] ? 100 : 0;
-          maskData[i * 4 + 1] = game.occAt(i % n, i / n | 0) ? 255 : 0; maskData[i * 4 + 3] = 255;
+          maskData[i * 4 + 1] = game.occAt(i % n, i / n | 0) || tiles[i] >= 2 ? 255 : 0; maskData[i * 4 + 3] = 255; // no grass on ore either
         }
         mask.needsUpdate = true;
       }
     },
-    dispose() { texture.dispose(); bumpTexture.dispose(); normalTexture.dispose(); mask.dispose(); },
+    dispose() { baked.dispose(); bumpTexture.dispose(); normalTexture.dispose(); mask.dispose(); },
   };
 }

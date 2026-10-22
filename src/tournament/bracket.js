@@ -23,13 +23,13 @@ export function createTournament(seed = 1, level = 'normal', { noTimeLimit = fal
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
     get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },
-    // Same as resolve() but simulates one off-screen match per macrotask so a UI stays responsive.
+    // Supports either a synchronous headless runner or an asynchronous Worker runner.
     async resolveAsync(humanWon, { onProgress, simulate = simulateMatch } = {}) {
       if (!humanWon) return this.resolve(false);
       const ri = this.roundIndex, round = ROUNDS[ri], cache = new Map(), total = (this.alive.length - 2) / 2; let done = 0;
       for (let i = 2; i < this.alive.length; i += 2) {
         await new Promise(r => setTimeout(r, 0));
-        const s = this.seed * 1000 + ri * 50 + i; cache.set(s, simulate(round.id, s, [this.alive[i].difficulty, this.alive[i + 1].difficulty]));
+        const s = this.seed * 1000 + ri * 50 + i; cache.set(s, await simulate(round.id, s, [this.alive[i].difficulty, this.alive[i + 1].difficulty]));
         onProgress?.(++done, total);
       }
       return this.resolve(humanWon, (id, s) => cache.get(s));

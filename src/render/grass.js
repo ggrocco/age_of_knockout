@@ -40,7 +40,7 @@ export function createGrass(game, mask, count = 14000) {
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   for (let attempt = 0; added < count && attempt < count * 4; attempt++) {
     const x = random() * game.map.size, z = random() * game.map.size;
-    if (game.map.tiles[Math.floor(z) * game.map.size + Math.floor(x)] === 1) continue;
+    if (game.map.tiles[Math.floor(z) * game.map.size + Math.floor(x)] !== 0) continue; // no grass in water or on ore (later patches: the mask)
     // Cluster growth into meadows instead of a uniform scatter of identical blades.
     const patch = 0.5 + 0.5 * Math.sin(x * 0.68 + Math.sin(z * 0.23) * 2) * Math.sin(z * 0.57);
     if (random() > 0.18 + patch * 0.8) continue;

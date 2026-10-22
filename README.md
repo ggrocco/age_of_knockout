@@ -16,6 +16,7 @@ node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rou
 ```
 
 No build step: plain ES modules, with three.js loaded through the import map in `index.html`.
+For hardware render measurements, start the dev server and open `http://localhost:8000/test/tools/render-audit.html?quality=high`. The diagnostic reports CPU and asynchronous GPU timings, restores your saved graphics preference, and is excluded from the nginx image.
 
 ## How a tournament works
 
@@ -36,7 +37,7 @@ Relaxed opponents work at half your speed and wait 30 minutes, and until the Bro
 ![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
 Before each round the bracket shows the rules, the time limit and your opponent. The other matches in each round are
-played out by bots in the background.
+played out by bots in a background Worker so the progress screen stays responsive.
 
 | Round | Game type | Goal |
 | --- | --- | --- |
@@ -81,6 +82,16 @@ Each era also raises the population limit that houses can reach: 50 in the Stone
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
 where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
 
+**Mines and rocky ground.** The map has grey rocky ground: gold veins (yellow flecks) and quarries (grey).
+From the Tool Age a villager can build a **Mine** (100 wood, 50 stone) on one; only rocky ground will take it. Right-click
+the finished Mine with villagers and they dig gold or stone from it, carrying it to the nearest Storage Pit or Town Center.
+Every Mine on a patch draws on the patch's one shared reserve (the inspect line reads "Gold left N"). When the reserve
+runs dry the Mines collapse, the ground turns back to grass, and a fresh pair of patches of that kind appears elsewhere
+on the map, one for each side, each holding a third of what the emptied patch started with. The rocky ground thins out:
+once that third would be under 400 no new pair appears, and at most 8 gold and 4 stone patches exist at once. Loose gold and stone piles run out too: when a kind drops below a quarter of its starting
+total, new mirrored piles appear (a block for each side, away from both bases and the centre). The opponent digs Mines on
+its own half of the map when its piles run low.
+
 ### Controls (desktop)
 
 Left click / drag select (double-click: all of a type) · right click move / gather / build / attack / fetch relic ·
@@ -90,8 +101,8 @@ included; during a building placement Esc cancels it instead) · click the minim
 
 **Villagers go back to work.** Order a villager that is gathering or building to build something else and, once the
 new building is done, it returns to what it was doing: the unfinished building first (several interruptions unwind
-newest first), then the tree, mine, berries or farm it was working. A Farm it builds becomes its job at the end of
-that chain instead, as in AoE. Move, attack or gather orders replace the whole chain.
+newest first), then the tree, mine, berries or farm it was working. A Farm or Mine it builds becomes its job at the end
+of that chain instead, as in AoE. Move, attack or gather orders replace the whole chain.
 
 **Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove
@@ -190,6 +201,8 @@ rendering remains available. `test/render-models.test.js` checks every unit and 
 animation transforms, and `test/graphics-quality.test.js` covers preference handling, pixel budgets and the
 rendering fallback. Shaders, picking, lighting and visual quality are checked in a browser.
 
+Static model and contact-shadow transforms stay on the GPU until they change. Building flags, machinery, smoke and drone rotors use vertex-shader animation; terrain textures are baked on the GPU at match start and repainted there when ore patches change. Paused and result screens redraw at 10 FPS, while camera and selection changes remain responsive. Pausing freezes the animation clock. The simulation remains deterministic JavaScript at 20 ticks per second.
+
 ## URL parameters
 
 | Param | Effect |
@@ -204,7 +217,7 @@ rendering fallback. Shaders, picking, lighting and visual quality are checked in
 | `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
 | `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the touch layout |
-| `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
+| `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
 
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,

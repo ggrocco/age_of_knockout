@@ -67,6 +67,41 @@ function build(seed, size) {
     }
   };
   ring('berry', 6, 6, 8); ring('gold', 4, 9, 13); ring('stone', 3, 9, 13);
+  // Rocky ore patches (tile 2 gold vein, 3 quarry) for Mines. Each is placed with its 180-degree mirror or not at all.
+  const orePatches = [], MINE_TILE = { gold: 2, stone: 3 }, pair = (type, x, y, amount) => { // a mirrored pair of piles, both or neither
+    const q = rot(x, y);
+    if (!ok(x, y) || !ok(q.x, q.y) || (x === q.x && y === q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // also off the relic land bridge
+    place(type, x, y, amount); return true;
+  };
+  const patch = (kind, cx, cy, w, h, reserve) => {
+    const x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2), own = new Set(), mir = new Set();
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+      const q = rot(x, y);
+      if (!ok(x, y) || !ok(q.x, q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // dry, free, clear of the relic land bridge
+      own.add(key(x, y)); mir.add(key(q.x, q.y));
+    }
+    for (const i of own) if (mir.has(i)) return false;
+    const id = orePatches.length + 1, v = MINE_TILE[kind];
+    for (const i of own) tiles[i] = v;
+    for (const i of mir) tiles[i] = v;
+    orePatches.push({ id, kind, tiles: [...own], reserve, twin: id + 1 }, { id: id + 1, kind, tiles: [...mir], reserve, twin: id });
+    return { x0, y0, w, h };
+  };
+  for (let k = 0; k < 100; k++) { // home gold patch: 4x3, centre 12-16 tiles from the start, outside the open base
+    const a = rng.next() * Math.PI * 2, r = 12 + rng.next() * 4;
+    if (patch('gold', s0.x + Math.cos(a) * r, s0.y + Math.sin(a) * r, 4, 3, 1500)) break;
+  }
+  // Mid-map patches in s0's half (the mirror lands in the other), each with a cluster of 5 richer piles on its border.
+  for (const [kind, reserve, pile, amount] of [['gold', 3000, 'gold', 1200], ['gold', 3000, 'gold', 1200], ['stone', 2500, 'stone', 900]]) {
+    for (let k = 0, r; k < 200 && !r; k++) {
+      const x = rng.int(size), y = rng.int(size), d0 = dist(x, y, s0);
+      if (far(x, y) && d0 >= 20 && d0 <= 34 && d0 < dist(x, y, s1)) r = patch(kind, x, y, 5, 4, reserve);
+      if (!r) continue;
+      const edge = []; // free land touching the rectangle's border
+      for (let y = r.y0 - 1; y <= r.y0 + r.h; y++) for (let x = r.x0 - 1; x <= r.x0 + r.w; x++) if (x < r.x0 || y < r.y0 || x >= r.x0 + r.w || y >= r.y0 + r.h) edge.push([x, y]);
+      for (let t = 0, got = 0; got < 5 && t < 100; t++) { const [px, py] = edge[rng.int(edge.length)]; if (pair(pile, px, py, amount)) got++; }
+    }
+  }
   const forest = (cx, cy, r, density, clear) => { // a round, mostly solid stand of trees
     for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
       if (Math.hypot(x - cx, y - cy) <= r && rng.next() < density && clear(x, y)) place('tree', x, y, AMOUNT.tree);
@@ -74,11 +109,11 @@ function build(seed, size) {
   };
   const home = (x, y) => dist(x, y, s0) > 8; // woodlines near the start keep the TC and its build space open
   for (let c = 0; c < 3; c++) { const a = rng.next() * Math.PI * 2, r = 11 + rng.next() * 3; forest(s0.x + Math.cos(a) * r, s0.y + Math.sin(a) * r, 2.5, 0.75, home); }
-  for (let f = 0, count = Math.round(size * size / 600); f < count; f++) forest(rng.int(size), rng.int(size), 2 + rng.next() * 2.5, 0.7, far);
+  for (let f = 0, count = Math.round(size * size / 480); f < count; f++) forest(rng.int(size), rng.int(size), 2 + rng.next() * 2.5, 0.7, far);
   for (const p of bank) if (rng.next() < 0.3) forest(p.x, p.y, 0.5, 1, far);
   const c = size / 2 | 0;
   const relicSpots = [[c, c], [c - 4, c - 6], [c + 4, c + 6], [c - 6, c + 4], [c + 6, c - 4]].map(([x, y]) => ({ x: x + 0.5, y: y + 0.5 }));
   for (const r of relicSpots) { const x = Math.floor(r.x), y = Math.floor(r.y), q = rot(x, y); tiles[y * size + x] = 0; tiles[q.y * size + q.x] = 0; }
   const relicKeys = new Set(relicSpots.map(r => key(Math.floor(r.x), Math.floor(r.y))));
-  return { size, tiles, resources: resources.filter(r => !relicKeys.has(key(Math.floor(r.x), Math.floor(r.y)))), starts: [s0, s1], relicSpots };
+  return { size, tiles, resources: resources.filter(r => !relicKeys.has(key(Math.floor(r.x), Math.floor(r.y)))), starts: [s0, s1], relicSpots, orePatches };
 }

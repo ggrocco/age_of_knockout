@@ -155,7 +155,8 @@ const overhangs = (types, age) => types.flatMap(type => {
 const withinFootprint = (types, age) => assert.deepEqual(overhangs(types, age), [], `${age}: off the footprint`);
 
 // Every era design so far, from the registry, so later eras' designs are checked as they land.
-const designed = Object.entries(DESIGNS).map(([age, mod]) => [age, Object.keys(mod)]);
+// The Mine's design (mine.js) is routed by designOf, not listed in DESIGNS, so it joins every era it is available in.
+const designed = Object.entries(DESIGNS).map(([age, mod]) => [age, [...Object.keys(mod), ...(available('mine').includes(age) ? ['mine'] : [])]]);
 test('every era design shows team colour', () => { for (const [age, types] of designed) teamColourShows(types, age); });
 // Designs that still overhang their footprint, by era. Task 3's Town Centers and Houses all fit within the eave
 // allowance; since spinners and floaters count too, the AI Future Town Center's orbiting rings reach 1.683 of 1.65. The

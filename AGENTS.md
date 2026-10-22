@@ -38,7 +38,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
 | `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the phone/touch layout |
-| `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
+| `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused/results, immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
 
@@ -56,8 +56,13 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
 - `src/sim`: the game itself, **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (`game.js`) owns all
   state (entities/units/buildings/resources/relics Maps, occupancy grid). The player and the bot both act only through
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
-  rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up).
-  Keep it DOM-free and deterministic so the headless runner and tests work.
+  rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
+  `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
+  gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
+  runner and tests work.
+  - `map.tiles` is no longer fixed after generation: ore patches (tiles 2 gold vein, 3 quarry) appear and revert to
+    land (0) during play. Whatever changes `map.tiles` must bump `game.terrainVersion`; the terrain (`render/terrain.js`)
+    and the minimap (`render/minimap.js`) compare it with the version they last drew and repaint when it moves on.
 - `src/rounds/index.js`: per-round rules. `check(game)` returns null or `{winner, reason}`; rounds have a tick cap
   plus a score tiebreak (`scoreOf`). The menu's time-limit slider sets human matches to 0–120 minutes (default 25),
   with 0 setting `capTicks: Infinity`; off-screen bracket matches keep finite mode/difficulty caps so resolution
@@ -66,12 +71,15 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
   drives `?autoplay`.
 - `src/tournament`: `bracket.js` (bracket, `LEVELS` = each difficulty's five-round opponent ramp) and a headless
-  match runner (`sim.js`) used by tests and `test/bot-sim.js`.
+  match runner (`sim.js`) used by tests and `test/bot-sim.js`. Browser bracket resolution uses the same runner in a
+  module Worker (`worker.js`, managed by `async-sim.js`); no live match state crosses threads.
 - `src/render`, `src/ui`, `src/main.js`: Three.js view, HUD, desktop + touch input, tournament flow. Reads sim state;
   never mutates it except via commands.
-  - Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`); the per-entity meshes
-    stay in the scene graph on layer 1 as unrendered proxies that `animate()` and picking use, and blob shadows are
-    one `InstancedMesh`. A new model part only needs that material to be batched.
+  - Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`). Layer-1 proxies retain
+    picking and CPU pose updates; stationary resource proxies stay outside the scene hierarchy. Unchanged matrices
+    are cached, and contact shadows use stable `InstancedMesh` slots. `render/cosmetics.js` animates building effects
+    and drones in the beauty, shadow and AO shaders; the gallery keeps CPU animation. `terrain-bake.js` bakes the
+    procedural ground texture on the GPU at startup and after ore-patch changes. Pausing freezes animation time. A new model part only needs `MODEL_MATERIAL` to be batched.
   - Building looks: `render/arch/index.js` picks a design per (building, era). `DESIGNS` has one module per era
     (`arch/stone.js` … `arch/future.js`, built with `arch/kit.js`); `KEPT` lists older looks that stay byte-identical
     (pinned by `test/fixtures/kept-buildings.json`); anything else falls back to `arch/legacy.js` coloured by the

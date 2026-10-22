@@ -17,7 +17,7 @@ const shortOf = (p, cost) => RES.filter(k => cost[k] > p.res[k]);
 
 export function createHud(ui) {
   const $ = id => document.getElementById(id), top = $('topbar'), info = $('info'), cmds = $('cmds');
-  let cmdKey = '', infoKey = '';
+  let cmdKey = '', infoKey = '', updateKey = '', lastGame = null, revision = 0;
   const hud = { toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(hud._t); hud._t = setTimeout(() => t.classList.remove('show'), 2200); } };
   // Glass command tile: icon orb + name + cost. Disabled tiles use .off / aria-disabled (not [disabled]) so they still receive hover for the tooltip.
   // tile() returns a descriptor: `key` (attributes + name + lock) changes only when the tile set, its target building or a lock state changes (then the panel is rebuilt);
@@ -75,8 +75,15 @@ export function createHud(ui) {
     if (deleteDialog.open) deleteDialog.close('cancel');
     finishDelete();
   };
+  hud.invalidate = () => { revision++; };
+  hud.reset = () => { lastGame = null; updateKey = ''; cmdKey = ''; infoKey = ''; };
   hud.update = () => {
-    const g = ui.game, p = g.players[0], round = g.rules;
+    const g = ui.game;
+    if (!g) return;
+    const stamp = `${g.time}|${!!g.result}|${[...ui.sel]}|${ui.inspect?.id}|${ui.placing}|${ui.paused}|${ui.speed}|${ui.boxMode}|${ui.resignArmed}|${ui.deleteConfirmOpen}|${$('gamemenu').classList.contains('hidden')}|${revision}`;
+    if (lastGame === g && updateKey === stamp) return;
+    lastGame = g; updateKey = stamp;
+    const p = g.players[0], round = g.rules;
     // The pause modal: shown for a player pause, not while the settings menu or delete dialog (which also pause) is up.
     const pauseEl = $('pausemodal'), showPause = ui.paused && !g.result && !ui.deleteConfirmOpen && $('gamemenu').classList.contains('hidden');
     if (showPause === pauseEl.classList.contains('hidden')) { pauseEl.classList.toggle('hidden', !showPause); if (showPause) { hideTip(); pauseEl.querySelector('button').focus({ preventScroll: true }); } }
@@ -122,7 +129,7 @@ export function createHud(ui) {
     const describe = e => {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
-      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>Food left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
       // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
       const next = AGES[ageIndex(p.age) + 1];
       if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;

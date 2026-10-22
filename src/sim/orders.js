@@ -2,6 +2,7 @@ import { findPath } from './path.js';
 import { breachTarget } from './defence.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
+import { drawFrom } from './ore.js';
 
 const REACH = 1.0, CARRY = 10, RATE = { food: 0.7, wood: 0.6, gold: 0.5, stone: 0.5 };
 const IDLE = () => ({ type: 'idle' });
@@ -61,7 +62,7 @@ function nearestResource(game, u, kind, maxDist) {
   let best = null, bd = maxDist;
   const consider = e => { const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < bd) { bd = d; best = e; } };
   for (const r of game.resources.values()) if (RES_KIND[r.type] === kind && r.amount > 0) consider(r);
-  if (kind === 'food') for (const b of game.buildings.values()) if (b.owner === u.owner && b.constructed && b.gatherType === 'food' && b.amount > 0) consider(b);
+  for (const b of game.buildings.values()) if (b.owner === u.owner && b.constructed && b.gatherType === kind && b.amount > 0) consider(b); // own Farms and Mines
   return best;
 }
 function nearestDrop(game, u, kind) {
@@ -91,9 +92,9 @@ function doGather(game, u, o) {
   } else if (o.phase === 'work') {
     const p = game.players[u.owner], rate = RATE[kind] * DT * p.gatherMult[kind] * p.workRate;
     if (u.carry.type !== kind) u.carry = { type: kind, amount: 0 };
-    const take = Math.min(rate, res.amount); res.amount -= take; u.carry.amount += take; game.players[u.owner].gathered += take;
-    if (res.amount <= 0) game.depleted(res);
-    if (u.carry.amount >= CARRY || res.amount <= 0) { o.phase = 'drop'; u.path = null; }
+    if (res.kind === 'building') res.gatherers = (res.gatherers || 0) + 1;
+    const take = drawFrom(game, res, rate); u.carry.amount += take; game.players[u.owner].gathered += take; // removes an empty pile/Farm, exhausts a Mine's patch
+    if (u.carry.amount >= CARRY || res.amount <= 0 || res.dead) { o.phase = 'drop'; u.path = null; }
   } else { // drop
     if (u.carry.amount <= 0) { o.phase = 'go'; return; }
     const d = nearestDrop(game, u, u.carry.type);
@@ -125,9 +126,9 @@ function doBuild(game, u, o) {
   }
   if (!b || b.dead) return endBuild(u, o);
   if (b.constructed) {
-    if (b.gatherType && b.amount > 0) { // a finished farm is the last job in the chain: interrupted builds first, then farm it
+    if (b.gatherType && b.amount > 0) { // a finished farm or mine is the last job in the chain: interrupted builds first, then work it
       let last = o; while (last.resume?.type === 'build') last = last.resume;
-      last.resume = { type: 'gather', res: b.id, kind: 'food', phase: 'go', fails: 0 }; // in place of any gather it interrupted
+      last.resume = { type: 'gather', res: b.id, kind: b.gatherType, phase: 'go', fails: 0 }; // in place of any gather it interrupted
     }
     return endBuild(u, o);
   }
