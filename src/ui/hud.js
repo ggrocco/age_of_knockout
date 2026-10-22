@@ -77,6 +77,9 @@ export function createHud(ui) {
   };
   hud.update = () => {
     const g = ui.game, p = g.players[0], round = g.rules;
+    // The pause modal: shown for a player pause, not while the settings menu or delete dialog (which also pause) is up.
+    const pauseEl = $('pausemodal'), showPause = ui.paused && !g.result && !ui.deleteConfirmOpen && $('gamemenu').classList.contains('hidden');
+    if (showPause === pauseEl.classList.contains('hidden')) { pauseEl.classList.toggle('hidden', !showPause); if (showPause) { hideTip(); pauseEl.querySelector('button').focus({ preventScroll: true }); } }
     let obj = round ? round.desc : '';
     const st = g.roundState;
     if (round && round.id === 'wonder') obj = `Wonder countdown - you ${fmtTime(st.hold[0])}/${fmtTime(WONDER_TICKS)} | enemy ${fmtTime(st.hold[1])}/${fmtTime(WONDER_TICKS)}`;
@@ -129,7 +132,7 @@ export function createHud(ui) {
     else if (sel.length) { const c = {}; for (const e of sel) c[nameOf(e)] = (c[nameOf(e)] || 0) + 1; ih = `<h3>${sel.length} selected</h3>` + Object.entries(c).map(([k, v]) => `${v} x ${k}`).join('<br>'); }
     else if (insp) ih = describe(insp);
     else if (ui.inspect && ui.inspect.kind === 'resource') ih = `<h3>${ui.inspect.type}</h3>`;
-    else ih = `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}<br><br><small>Left-click / drag to select. Right-click to order. WASD pans, wheel zooms.</small>`;
+    else ih = `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}<br><br><small>Left-click / drag to select. Right-click to order. WASD or Space + drag pans, wheel zooms. Esc pauses.</small>`;
     if (ih !== infoKey) { info.innerHTML = ih; infoKey = ih; }
     // commands
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);

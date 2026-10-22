@@ -169,6 +169,12 @@ body.touch #gamemenu:not(.hidden) { display: flex; position: absolute; inset: 0;
 body.touch #gamemenu .card { padding: 16px; max-width: 320px; } body.touch #gamemenu .btn { display: block; width: 100%; height: 48px; margin: 8px 0 0; font-size: 16px; } body.touch #gamemenu .row { display: flex; gap: 8px; } body.touch #gamemenu .row .btn { margin-top: 8px; }
 body.touch #gamemenu .btn.on { outline: 2px solid var(--ok); }
 #gamemenu:not(.hidden) { display:flex; position:absolute; inset:0; z-index:12; background:#000b; align-items:center; justify-content:center; }
+#pausemodal:not(.hidden) { display:flex; position:absolute; inset:0; z-index:11; background:#0008; align-items:center; justify-content:center; }
+#pausemodal .card { max-width:380px; padding:20px 24px; }
+#pausemodal h2 { font-size:32px; letter-spacing:.08em; text-transform:uppercase; }
+#pausemodal .btn { min-width:160px; min-height:44px; }
+#pausemodal .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
+#viewport.grab { cursor:grab; } #viewport.grabbing { cursor:grabbing; }
 #gamemenu .card { max-width:420px; max-height:90dvh; overflow:auto; padding:20px; }
 #gamemenu .btn.on { outline:2px solid var(--ok); }
 #gamemenu .graphics { margin:18px 0 0; padding:12px 0 0; border:0; border-top:1px solid #c8a05266; }
