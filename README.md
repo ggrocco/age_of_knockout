@@ -88,6 +88,11 @@ WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (ba
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
 
+**Villagers go back to work.** Order a villager that is gathering or building to build something else and, once the
+new building is done, it returns to what it was doing: the unfinished building first (several interruptions unwind
+newest first), then the tree, mine, berries or farm it was working. A Farm it builds becomes its job at the end of
+that chain instead, as in AoE. Move, attack or gather orders replace the whole chain.
+
 **Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove
 it without a refund; queued training and research are lost. Closing the dialog restores your previous pause state.
