@@ -1,7 +1,8 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { canPlace } from '../src/sim/commands.js';
-import { drawFrom, spawnPatchPair, PATCH_CAP } from '../src/sim/ore.js';
+import { drawFrom, spawnPatchPair, updateRespawn, PATCH_CAP, RESPAWN_EVERY } from '../src/sim/ore.js';
+import { secs } from '../src/sim/util.js';
 
 const villagers = (g, p) => [...g.units.values()].filter(u => u.owner === p && u.type === 'villager');
 const centre = (g, patch) => { const n = g.map.size; let x = 0, y = 0; for (const i of patch.tiles) { x += i % n + 0.5; y += Math.floor(i / n) + 0.5; } return { x: x / patch.tiles.length, y: y / patch.tiles.length }; };
@@ -129,4 +130,84 @@ test('finishing a Mine sends its builders to gather gold, not food', () => {
   assert.equal(m.constructed, true);
   g.tick();
   assert.equal(v.order.type, 'gather'); assert.equal(v.order.kind, 'gold'); assert.equal(v.order.res, m.id);
+});
+
+const piles = (g, kind) => [...g.resources.values()].filter(r => r.type === kind);
+const sumOf = (g, kind) => piles(g, kind).reduce((s, r) => s + r.amount, 0);
+const dropPiles = (g, kind) => { for (const r of piles(g, kind)) g.remove(r); };
+const tileOfPile = (g, r) => Math.floor(r.y) * g.map.size + Math.floor(r.x);
+const nearCentre = (g, i) => { const n = g.map.size, mid = (n - 1) / 2; return Math.hypot(i % n - mid, Math.floor(i / n) - mid) <= 8; };
+const tickTo = (g, time) => { while (g.time < time) g.tick(); };
+
+test('piles respawn mirrored once below 25% of the start, with a cooldown', () => {
+  const g = createGame({ seed: 3 }), n = g.map.size;
+  assert.ok(g.pileStart.gold > 0 && g.pileStart.stone > 0);
+  // Plentiful: nothing appears at the boundary.
+  const gold0 = piles(g, 'gold').length, stone0 = piles(g, 'stone').length;
+  tickTo(g, RESPAWN_EVERY);
+  assert.equal(piles(g, 'gold').length, gold0); assert.equal(piles(g, 'stone').length, stone0);
+  // Just above the threshold still counts as plentiful.
+  dropPiles(g, 'gold'); g.addResource({ type: 'gold', x: 0.5, y: 0.5, amount: 0.25 * g.pileStart.gold });
+  g.time = 2 * RESPAWN_EVERY - 1; g.tick(); assert.equal(piles(g, 'gold').length, 1, 'at exactly 25% nothing spawns');
+  dropPiles(g, 'gold'); // every gold pile gone: well below 25%
+  tickTo(g, 3 * RESPAWN_EVERY - 1); assert.equal(piles(g, 'gold').length, 0, 'only on the boundary');
+  g.tick();
+  const gold = piles(g, 'gold');
+  assert.equal(gold.length, 8, 'a 2x2 block and its mirror');
+  const at = new Set(gold.map(r => tileOfPile(g, r)));
+  for (const r of gold) {
+    const i = tileOfPile(g, r);
+    assert.equal(r.amount, 800);
+    assert.equal(g.map.tiles[i], 0, 'plain land, not ore or water');
+    assert.ok(at.has(n * n - 1 - i), 'mirror tile holds a pile');
+    assert.equal(g.occAt(i % n, Math.floor(i / n)), r.id);
+  }
+  assert.equal(g.lastRespawn.gold, 3 * RESPAWN_EVERY);
+  assert.equal(piles(g, 'stone').length, stone0, 'stone not low');
+  // Cooldown: still far below the start (3200 < 25%), yet nothing for secs(120), then another cluster.
+  tickTo(g, 3 * RESPAWN_EVERY + secs(120) - RESPAWN_EVERY);
+  assert.equal(piles(g, 'gold').length, 8, 'cooldown');
+  assert.ok(sumOf(g, 'gold') < 0.25 * g.pileStart.gold);
+  tickTo(g, 3 * RESPAWN_EVERY + secs(120));
+  assert.equal(piles(g, 'gold').length, 16, 'cooldown over');
+});
+
+test('respawned piles and patches keep clear of the centre and the starts', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const g = createGame({ seed });
+    for (let k = 0; k < 6; k++) {
+      dropPiles(g, 'gold'); dropPiles(g, 'stone'); g.lastRespawn = { gold: -Infinity, stone: -Infinity };
+      const before = new Set([...g.resources.keys()]);
+      updateRespawn(g);
+      for (const r of g.resources.values()) if (!before.has(r.id)) {
+        const i = tileOfPile(g, r);
+        assert.ok(!nearCentre(g, i), `seed ${seed}: pile at tile ${i} within 8 of the centre`);
+        for (const s of g.map.starts) assert.ok(Math.hypot(r.x - 0.5 - s.x, r.y - 0.5 - s.y) > 13);
+      }
+    }
+    for (let k = 0; k < 6; k++) { // patches: free the cap by clearing, then respawn
+      g.patches.clear();
+      const known = new Set(g.patches.keys());
+      if (!spawnPatchPair(g, 'gold', 1500)) continue;
+      for (const p of g.patches.values()) if (!known.has(p.id)) for (const i of p.tiles) assert.ok(!nearCentre(g, i), `seed ${seed}: patch tile ${i} within 8 of the centre`);
+    }
+  }
+});
+
+test('respawn is deterministic for a seed', () => {
+  const run = () => { const g = createGame({ seed: 7 }); dropPiles(g, 'gold'); dropPiles(g, 'stone'); tickTo(g, 2 * RESPAWN_EVERY);
+    return ['gold', 'stone'].map(k => piles(g, k).map(r => [r.x, r.y, r.amount])); };
+  const a = run(), b = run();
+  assert.ok(a[0].length > 0 && a[1].length > 0);
+  assert.deepEqual(a, b);
+});
+
+test('a crowded map makes respawn give up quietly', () => {
+  const g = createGame({ seed: 3 }), n = g.map.size;
+  dropPiles(g, 'gold'); dropPiles(g, 'stone');
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (g.map.tiles[y * n + x] === 0 && !g.occAt(x, y)) g.addResource({ type: 'tree', x: x + 0.5, y: y + 0.5, amount: 100 });
+  const count = g.resources.size;
+  assert.doesNotThrow(() => updateRespawn(g));
+  assert.equal(g.resources.size, count);
+  assert.equal(g.lastRespawn.gold, -Infinity, 'no cooldown started without a spawn');
 });

@@ -1,8 +1,12 @@
 import { makeRng } from './rng.js';
+import { secs } from './util.js';
 // Ore patches (map tiles 2 gold vein, 3 quarry): Mines stand on them and share each patch's reserve. An emptied patch
 // reverts to land and a fresh mirrored pair of its kind appears elsewhere, until PATCH_CAP patches are alive.
 export const PATCH_CAP = 12;
 const ORE_TILE = { gold: 2, stone: 3 }, RESPAWN = { gold: 1500, stone: 1250 }; // half the mid-map reserves
+// Loose gold and stone piles: when a kind's piles fall below LOW_PILES of its starting total a mirrored cluster appears.
+export const RESPAWN_EVERY = secs(30), PILE_COOLDOWN = secs(120), LOW_PILES = 0.25, PILE_AMOUNT = { gold: 800, stone: 600 };
+const KINDS = ['gold', 'stone'], CENTRE_CLEAR = 8; // CENTRE_CLEAR: keep off the relic land bridge, like map generation
 
 export function initOre(game) {
   const n = game.map.size;
@@ -53,12 +57,18 @@ export function mirroredSpot(game, w, h, accept) {
   return null;
 }
 
+// accept(x, y) for mirroredSpot: dry, empty, unreserved plain land more than 13 tiles from both starts and clear of the centre.
+function openLand(game) {
+  const n = game.map.size, mid = (n - 1) / 2, starts = game.map.starts;
+  return (x, y) => { const i = y * n + x; return game.map.tiles[i] === 0 && game.occAt(x, y) === 0 && !game.reserved.has(i)
+    && starts.every(s => Math.hypot(x - s.x, y - s.y) > 13) && Math.hypot(x - mid, y - mid) > CENTRE_CLEAR; };
+}
+
 // A mirrored pair of fresh 4x3 patches on dry, empty land well away from both starts. False at the cap or with no room.
 export function spawnPatchPair(game, kind, reserve) {
   if (game.patches.size + 2 > PATCH_CAP) return false;
-  const n = game.map.size, starts = game.map.starts;
-  const accept = (x, y) => { const i = y * n + x; return game.map.tiles[i] === 0 && game.occAt(x, y) === 0 && !game.reserved.has(i) && starts.every(s => Math.hypot(x - s.x, y - s.y) > 13); };
-  const spot = mirroredSpot(game, 4, 3, accept);
+  const n = game.map.size;
+  const spot = mirroredSpot(game, 4, 3, openLand(game));
   if (!spot) return false;
   const own = [];
   for (let y = spot.y; y < spot.y + 3; y++) for (let x = spot.x; x < spot.x + 4; x++) own.push(y * n + x);
@@ -68,4 +78,26 @@ export function spawnPatchPair(game, kind, reserve) {
   for (const p of [a, b]) { game.patches.set(p.id, p); for (const i of p.tiles) { game.map.tiles[i] = ORE_TILE[kind]; game.patchAt[i] = p.id; } }
   game.terrainVersion++;
   return true;
+}
+
+const pileSum = (game, kind) => { let sum = 0; for (const r of game.resources.values()) if (r.type === kind) sum += r.amount; return sum; };
+
+// createGame calls this once the map's piles are in: the totals the respawn threshold is measured against.
+export function recordPileStart(game) {
+  game.pileStart = { gold: pileSum(game, 'gold'), stone: pileSum(game, 'stone') };
+  game.lastRespawn = { gold: -Infinity, stone: -Infinity };
+}
+
+// For each kind whose loose piles have run below LOW_PILES of the start (and not within PILE_COOLDOWN of its last
+// respawn): a 2x2 block of piles and its 180-degree mirror on open land. Gives up quietly if the map has no room.
+export function updateRespawn(game) {
+  for (const kind of KINDS) {
+    if (pileSum(game, kind) >= LOW_PILES * game.pileStart[kind] || game.time - game.lastRespawn[kind] < PILE_COOLDOWN) continue;
+    const spot = mirroredSpot(game, 2, 2, openLand(game));
+    if (!spot) continue;
+    const n = game.map.size;
+    for (let y = spot.y; y < spot.y + 2; y++) for (let x = spot.x; x < spot.x + 2; x++)
+      for (const [px, py] of [[x, y], [n - 1 - x, n - 1 - y]]) game.addResource({ type: kind, x: px + 0.5, y: py + 0.5, amount: PILE_AMOUNT[kind] });
+    game.lastRespawn[kind] = game.time;
+  }
 }

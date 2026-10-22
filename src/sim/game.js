@@ -8,7 +8,7 @@ import { updateUnit } from './orders.js';
 import { updateTower, refreshDefences } from './defence.js';
 import { execute } from './commands.js';
 import { updateVision } from './vision.js';
-import { initOre } from './ore.js';
+import { initOre, recordPileStart, updateRespawn, RESPAWN_EVERY } from './ore.js';
 import { secs, rectOf, centerOf } from './util.js';
 
 // A wall foundation (an unfinished wall) does not block movement: it only reserves its tile, and occupies it once finished.
@@ -140,6 +140,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     game.time++;
     for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
     for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
+    if (game.time % RESPAWN_EVERY === 0) updateRespawn(game);
     for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
     for (const r of game.relics.values()) if (r.holder !== null) { const h = game.entities.get(r.holder); if (h) { r.x = h.x; r.y = h.y; } }
     game.recount();
@@ -151,6 +152,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
 
   // initial state
   for (const r of map.resources) game.addResource(r);
+  recordPileStart(game);
   for (const [i, s] of map.starts.entries()) {
     const tc = game.addBuilding('town_center', i, s.x - 1, s.y - 1, true);
     for (let k = 0; k < 3; k++) { const sp = game.findSpawn(tc); const u = game.spawnUnit('villager', i, sp.x, sp.y); }
