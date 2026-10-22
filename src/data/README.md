@@ -20,6 +20,12 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
 - A villager pulled off gathering or another build to construct something goes back to that job when it is done
   (unfinished buildings newest first, then its resource); AoE1 builders go idle after anything but a Farm. A finished
   Farm or Mine is still worked by its builder, after any unfinished buildings in the chain.
+- **Repair** (`REPAIR_COST`, `repairCost` in `buildings.js`; `doRepair` in `src/sim/orders.js`, `repairBuilding` in
+  `src/sim/game.js`): villagers put a finished building's lost HP back at the speed they would build it (one villager
+  restores full HP in the build time, crews scale like construction), paying half the build cost for full HP, bit by bit
+  and in proportion to the HP restored. When a resource the building costs runs out, the repair stops there. Rate and
+  cost are invented (AoE2-style) and not checked against AoE1. Any finished building can be repaired except Farms and
+  Mines, which right-click gathers instead (the `repair` command itself accepts them).
 - The Wonder does not count toward the age-up building requirement (flagged `extra`, like the Farm): it is a
   victory building, so leaving Bronze needs only the Government Center.
 

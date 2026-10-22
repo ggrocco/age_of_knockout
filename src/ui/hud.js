@@ -1,5 +1,5 @@
 import { UNITS } from '../data/units.js';
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, repairCost } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
 import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
@@ -9,7 +9,8 @@ import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.
 import { QUALITY } from '../render/quality.js';
 
 const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', 'pop limit': 'Population limit of this Age reached - advance to raise it', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
-  'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center' };
+  'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center',
+  'nothing to repair': 'Nothing to repair' };
 export const reasonText = r => REASONS[r] || r;
 const fmtTime = t => { const s = Math.floor(t / 20); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const tintOf = d => !d.cls ? 't-bld' : d.age === 'future' ? 't-fut' : d.cls === 'civ' ? 't-civ' : d.cls === 'siege' ? 't-siege' : 't-mil';
@@ -130,6 +131,10 @@ export function createHud(ui) {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
       if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}${e.maxAmount ? ' / ' + e.maxAmount : ''}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building' && e.owner === 0 && e.constructed && !e.gatherType && e.hp < e.maxHp) { // what villagers would pay to make it whole
+        const rc = repairCost(e.type, e.maxHp - e.hp, e.maxHp), rcr = Object.fromEntries(Object.entries(rc).map(([k, v]) => [k, Math.ceil(v)]));
+        s += `<br>Repair: ${costHtml(rcr, shortOf(p, rcr), true)}${ui.touch ? '' : ' <small>(right-click with villagers)</small>'}`;
+      }
       // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
       const next = AGES[ageIndex(p.age) + 1];
       if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;

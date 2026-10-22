@@ -39,6 +39,9 @@ export function createInput(ui) {
   const onScreen = u => { const p = ui.view.project(u.x, u.y), r = el.getBoundingClientRect(); return p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom; };
   const tileForPlacing = (cx, cy) => { const p = ui.view.pickGround(cx, cy); if (!p) return null; const s = BUILDINGS[ui.placing].size; return { x: Math.round(p.x - s / 2), y: Math.round(p.y - s / 2) }; };
 
+  // Own, finished and damaged: villagers ordered onto it repair it (a Farm or Mine is gathered from instead).
+  const repairable = t => t && t.kind === 'building' && t.owner === 0 && t.constructed && !t.gatherType && t.hp < t.maxHp;
+
   // ----- shared logic -----
   // Left-click / tap on an own entity: select, double-click selects all of that type on screen.
   function selectOwn(ent, additive) {
@@ -55,6 +58,7 @@ export function createInput(ui) {
     if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && t.gatherType && t.constructed) return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && !t.constructed) return ui.cmd({ type: 'construct', ids: vids, targetId: t.id });
+    if (vids.length && repairable(t)) return ui.cmd({ type: 'repair', ids: vids, targetId: t.id });
     if (t && t.kind === 'relic') return ui.cmd({ type: 'relic', ids, relicId: t.id });
     if (gp) return ui.cmd({ type: 'move', ids, x: gp.x, y: gp.y });
     return null;
@@ -180,7 +184,7 @@ export function createInput(ui) {
     if (ui.placing) return setPlaceTile(x, y);
     const ent = ui.view.pickEntity(x, y), gp = ui.view.pickGround(x, y), ids = selectedUnitIds();
     const own = ent && ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building');
-    const helps = own && ent.kind === 'building' && ids.some(id => g().entities.get(id).type === 'villager') && (!ent.constructed || (ent.gatherType && ent.constructed));
+    const helps = own && ent.kind === 'building' && ids.some(id => g().entities.get(id).type === 'villager') && (!ent.constructed || (ent.gatherType && ent.constructed) || repairable(ent));
     if (own && !helps) return selectOwn(ent, false);
     if (ids.length) { const r = orderAt(ent, gp, ids); if (r && r.ok && gp) ui.marker(gp.x, gp.y); return; }
     setSel([]); if (ent) ui.inspect = ent;

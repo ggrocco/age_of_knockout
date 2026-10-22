@@ -313,7 +313,7 @@ export function animate(g, e, t, moving) {
     const k = moving ? Math.sin(t * (a.type === 'horse' ? 14 : 11) + e.id) : 0;
     if (a.type === 'human') { a.legL.rotation.x = k * 0.7; a.legR.rotation.x = -k * 0.7; }
     else for (let i = 0; i < 4; i++) a.legs[i].rotation.x = (i % 3 === 0 ? k : -k) * 0.8;
-    const o = e.order, attacking = o.type === 'attack' && e.cd > e.cooldown - 8, working = o.type === 'gather' && o.phase === 'work' || o.type === 'build' && !moving;
+    const o = e.order, attacking = o.type === 'attack' && e.cd > e.cooldown - 8, working = o.type === 'gather' && o.phase === 'work' || (o.type === 'build' || o.type === 'repair') && !moving;
     if (a.armL) a.armL.rotation.x = moving ? -k * 0.6 : 0.05 * Math.sin(t * 2 + e.id);
     if (a.armR) {
       if (attacking) a.armR.rotation.x = -1.7 + (e.cd - (e.cooldown - 8)) * -0.2;
@@ -321,7 +321,7 @@ export function animate(g, e, t, moving) {
       else a.armR.rotation.x = moving ? k * 0.6 : 0;
     }
     if (a.tools) { // villager tool follows the job
-      const kind = o.type === 'build' ? 'hammer' : o.type === 'gather' ? (o.kind === 'wood' ? 'axe' : o.kind === 'food' ? 'basket' : 'pick') : null;
+      const kind = o.type === 'build' || o.type === 'repair' ? 'hammer' : o.type === 'gather' ? (o.kind === 'wood' ? 'axe' : o.kind === 'food' ? 'basket' : 'pick') : null;
       for (const [n, m] of Object.entries(a.tools)) m.visible = n === kind;
       if (a.sack) a.sack.visible = e.carry.amount > 0.5 && o.type === 'gather';
     }
