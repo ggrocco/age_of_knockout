@@ -138,8 +138,9 @@ folders the import map references (`node_modules/three/build`, `.../examples/jsm
 it, then builds the nginx image and smoke-tests it from inside the container. It only needs the docker CLI on the
 agent; it never pushes or deploys.
 
-`.github/workflows/pages.yml` deploys the same file set to GitHub Pages (https://ggrocco.github.io/my_age/) on every
-push to `main`, after `npm test`. Pages serves from a `/my_age/` sub-path, so page and module URLs must stay relative.
+`.github/workflows/pages.yml` deploys the same file set to GitHub Pages (https://ggrocco.github.io/age_of_knockout/) on
+every push to `main`, after `npm test`. Pages serves from a `/age_of_knockout/` sub-path, so page and module URLs must
+stay relative.
 
 ## Project docs
 
