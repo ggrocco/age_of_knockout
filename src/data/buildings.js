@@ -21,3 +21,12 @@ export const BUILDINGS = {
   wall:              { name: 'Wall', hp: WALL_HP.tool, cost: c(0, 0, 0, 5), size: 1, buildTime: 6, age: 'tool', sight: 2, extra: true, defence: 'wall', marmor: 4, parmor: 10 },
   wonder:            { name: 'Wonder', hp: 1500, cost: c(0, 1000, 1000, 1000), size: 4, buildTime: 200, age: 'bronze', sight: 6, extra: true },
 };
+// Repairing (invented, AoE2-style): villagers put a finished building's lost HP back at the speed they would build it,
+// and full repair costs this share of its build cost, paid as the HP goes back on.
+export const REPAIR_COST = 0.5;
+// What putting `hp` HP back on a building of `type` with `maxHp` costs.
+export const repairCost = (type, hp, maxHp) => Object.fromEntries(Object.entries(BUILDINGS[type].cost).map(([k, v]) => [k, v * REPAIR_COST * hp / maxHp]));
+// Damage slows a building's production (invented): it trains and researches at its share of full HP, never below
+// DAMAGED_MIN_SPEED, and is back to full speed once repaired.
+export const DAMAGED_MIN_SPEED = 0.25;
+export const workSpeed = b => Math.max(DAMAGED_MIN_SPEED, Math.min(1, b.hp / b.maxHp));

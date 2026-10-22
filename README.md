@@ -97,7 +97,7 @@ its own half of the map when its piles run low.
 
 ### Controls (desktop)
 
-Left click / drag select (double-click: all of a type) · right click move / gather / build / attack / fetch relic ·
+Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic ·
 WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager, `H` Town Center · hold Space and drag
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
@@ -106,6 +106,13 @@ included; during a building placement Esc cancels it instead) · click the minim
 new building is done, it returns to what it was doing: the unfinished building first (several interruptions unwind
 newest first), then the tree, mine, berries or farm it was working. A Farm or Mine it builds becomes its job at the end
 of that chain instead, as in AoE. Move, attack or gather orders replace the whole chain.
+
+**Repair a building:** select villagers and right-click (tap on touch) one of your finished, damaged buildings. They
+put its HP back as fast as they would build it; full repair costs half the building's cost, paid as the HP goes back on,
+and they stop when a resource it costs runs out. Selecting a damaged building shows what a full repair would cost.
+Like a build, a repair returns the villager to the job it interrupted. A damaged building trains units and researches
+at its share of full HP (a Barracks at 60% HP works at 60% speed, never below 25%); the info panel shows the slowdown,
+and repairing brings it back to full speed.
 
 **Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove
@@ -120,7 +127,7 @@ siege, and villagers at the back.
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
-tree/mine/farm = gather, unfinished building = help build, relic = pick up). One finger drags the map, two fingers
+tree/mine/farm = gather, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
 Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap

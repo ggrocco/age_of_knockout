@@ -4,6 +4,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { farmStats } from '../data/farms.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 import { drawFrom } from './ore.js';
+import { canRepair } from './commands.js';
 
 const REACH = 1.0, CARRY = 10, RATE = { food: 0.7, wood: 0.6, gold: 0.5, stone: 0.5 };
 const IDLE = () => ({ type: 'idle' });
@@ -41,6 +42,7 @@ export function updateUnit(game, u) {
     case 'move': return doMove(game, u, o);
     case 'gather': return doGather(game, u, o);
     case 'build': return doBuild(game, u, o);
+    case 'repair': return doRepair(game, u, o);
     case 'attack': return doAttack(game, u, o);
     case 'relic': return doRelic(game, u, o);
   }
@@ -128,7 +130,7 @@ function doBuild(game, u, o) {
   if (!b || b.dead) return endBuild(u, o);
   if (b.constructed) {
     if (b.gatherType && b.amount > 0) { // a finished farm or mine is the last job in the chain: interrupted builds first, then work it
-      let last = o; while (last.resume?.type === 'build') last = last.resume;
+      let last = o; while (last.resume?.type === 'build' || last.resume?.type === 'repair') last = last.resume;
       last.resume = { type: 'gather', res: b.id, kind: b.gatherType, phase: 'go', fails: 0 }; // in place of any gather it interrupted
     }
     return endBuild(u, o);
@@ -223,4 +225,14 @@ function doRelic(game, u, o) {
     if (id !== null) return breach(u, id, o);
     if (++o.fails > 3) stop(u);
   }
+}
+
+// Repair: stand by the building and put HP back (game.js repairBuilding pays for it) until it is whole, gone, no longer
+// ours, or the owner runs out of something it costs; then take up the interrupted job, like a finished build.
+function doRepair(game, u, o) {
+  const b = game.entities.get(o.target);
+  if (!b || b.dead || b.owner !== u.owner || !b.constructed || b.hp >= b.maxHp || !canRepair(game.players[u.owner], b.type)) return endBuild(u, o);
+  if (distPoint(u.x, u.y, b) <= REACH) { b.repairers = (b.repairers || 0) + 1; u.path = null; return; }
+  const r = travel(game, u, goalNear(b, 0.95), centerOf(b));
+  if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) endBuild(u, o); }
 }
