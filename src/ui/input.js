@@ -219,7 +219,7 @@ export function createInput(ui) {
   return { update(dt) {
     if (!ui.game) return;
     if (ui.deleteConfirmOpen) { keys.clear(); return; }
-    const s = 22 * dt * (ui.view.zoom / 14);
+    const s = 22 * dt * (ui.view.halfExtents()[1] / 14); // pan by what is on screen, not the raw zoom level
     let dx = 0, dz = 0;
     if (keys.has('a') || keys.has('arrowleft')) { dx -= 1; dz += 1; } if (keys.has('d') || keys.has('arrowright')) { dx += 1; dz -= 1; }
     if (keys.has('w') || keys.has('arrowup')) { dx -= 1; dz -= 1; } if (keys.has('s') || keys.has('arrowdown')) { dx += 1; dz += 1; }
