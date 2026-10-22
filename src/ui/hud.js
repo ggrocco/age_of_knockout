@@ -1,14 +1,14 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle } from '../data/ages.js';
-import { canAfford, ageUpProblem, ageUpNeed } from '../sim/commands.js';
+import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
+import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
 import { ROUNDS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { icon } from './icons.js';
-import { COLORS, RES, costHtml, tipHtml, roundTipHtml } from './tips.js';
+import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { QUALITY } from '../render/quality.js';
 
-const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
+const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', 'pop limit': 'Population limit of this Age reached - advance to raise it', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
   'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center' };
 export const reasonText = r => REASONS[r] || r;
 const fmtTime = t => { const s = Math.floor(t / 20); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -53,8 +53,33 @@ export function createHud(ui) {
   document.addEventListener('click', hideTip);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
   window.addEventListener('resize', hideTip);
+  const deleteDialog = $('delete-confirmation'); let deleteRequest = null;
+  const finishDelete = () => {
+    const request = deleteRequest; if (!request) return;
+    deleteRequest = null; ui.deleteConfirmOpen = false;
+    if (ui.game !== request.game) return;
+    ui.paused = request.wasPaused;
+    if (deleteDialog.returnValue === 'delete') request.confirm();
+    if (request.focus?.isConnected) request.focus.focus({ preventScroll: true });
+  };
+  deleteDialog.addEventListener('close', () => { if (!deleteDialog.open) finishDelete(); });
+  hud.confirmDelete = (building, confirm) => {
+    if (deleteRequest || !ui.game || ui.game.result) return;
+    hideTip();
+    deleteRequest = { game: ui.game, wasPaused: ui.paused, focus: document.activeElement, confirm };
+    ui.paused = true; ui.deleteConfirmOpen = true;
+    $('delete-title').textContent = `Delete ${BUILDINGS[building.type].name}?`;
+    deleteDialog.returnValue = 'cancel'; deleteDialog.showModal();
+  };
+  hud.cancelDelete = () => {
+    if (deleteDialog.open) deleteDialog.close('cancel');
+    finishDelete();
+  };
   hud.update = () => {
     const g = ui.game, p = g.players[0], round = g.rules;
+    // The pause modal: shown for a player pause, not while the settings menu or delete dialog (which also pause) is up.
+    const pauseEl = $('pausemodal'), showPause = ui.paused && !g.result && !ui.deleteConfirmOpen && $('gamemenu').classList.contains('hidden');
+    if (showPause === pauseEl.classList.contains('hidden')) { pauseEl.classList.toggle('hidden', !showPause); if (showPause) { hideTip(); pauseEl.querySelector('button').focus({ preventScroll: true }); } }
     let obj = round ? round.desc : '';
     const st = g.roundState;
     if (round && round.id === 'wonder') obj = `Wonder countdown - you ${fmtTime(st.hold[0])}/${fmtTime(WONDER_TICKS)} | enemy ${fmtTime(st.hold[1])}/${fmtTime(WONDER_TICKS)}`;
@@ -65,16 +90,17 @@ export function createHud(ui) {
     const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
     const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${round ? (g.capTicks === Infinity ? ' / no time limit' : ' / time limit') : ''}"></span>`;
     let html;
-    if (ui.touch) html = resHtml + `<span class="res" title="Population">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span>${clockHtml}<button data-menu="open" aria-label="Menu">&#9776;</button>`;
+    if (ui.touch) html = resHtml + `<span class="res" title="Population (${ageTitle(p.age)} limit ${popLimit(p.age)})">&#9823;${p.pop}/${p.popCap}</span><span class="res">${ageName}${p.ageUp ? '&hellip;' : ''}</span><span style="flex:1"></span>${clockHtml}<button data-menu="open" aria-label="Menu">&#9776;</button>`;
     else html = resHtml
-      + `<span class="res" title="Population">Pop ${p.pop}/${p.popCap}</span><span class="res">${p.ageUp ? 'Advancing... ' : ''}${ageTitle(p.age)}</span>`
+      + `<span class="res" title="Population (${ageTitle(p.age)} limit ${popLimit(p.age)})">Pop ${p.pop}/${p.popCap}</span><span class="res">${p.ageUp ? 'Advancing... ' : ''}${ageTitle(p.age)}</span>`
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span>${clockHtml}`
       + [1, 2, 4].map(s => `<button data-speed="${s}" class="${ui.speed === s ? 'on' : ''}">${s}x</button>`).join('') + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button><button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
     if (!ui.touch) html += '<button data-menu="open" aria-label="Game settings">Settings</button>';
+    let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle') idleN++;
+    const badge = document.querySelector(ui.touch ? '#touchbar [data-act=idle] .badge' : '#idlebtn .badge'), bt = idleN ? String(idleN) : ''; if (badge.textContent !== bt) badge.textContent = bt;
+    if (!ui.touch) $('idlebtn').classList.toggle('has', idleN > 0);
     if (ui.touch) {
       const objEl = $('objective'), otxt = round ? `${round.name}: ${obj}` : ''; if (objEl.textContent !== otxt) objEl.textContent = otxt;
-      let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle') idleN++;
-      const badge = document.querySelector('#touchbar [data-act=idle] .badge'), bt = idleN ? String(idleN) : ''; if (badge.textContent !== bt) badge.textContent = bt;
       document.querySelector('#touchbar [data-act=box]').classList.toggle('on', !!ui.boxMode);
       $('placebar').classList.toggle('hidden', !ui.placing); document.body.classList.toggle('placing', !!ui.placing);
     }
@@ -96,7 +122,7 @@ export function createHud(ui) {
     const describe = e => {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
-      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${e.queue.map(q => UNITS[q.unit].name).join(', ')} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
       // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
       const next = AGES[ageIndex(p.age) + 1];
       if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;
@@ -106,16 +132,16 @@ export function createHud(ui) {
     else if (sel.length) { const c = {}; for (const e of sel) c[nameOf(e)] = (c[nameOf(e)] || 0) + 1; ih = `<h3>${sel.length} selected</h3>` + Object.entries(c).map(([k, v]) => `${v} x ${k}`).join('<br>'); }
     else if (insp) ih = describe(insp);
     else if (ui.inspect && ui.inspect.kind === 'resource') ih = `<h3>${ui.inspect.type}</h3>`;
-    else ih = `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}<br><br><small>Left-click / drag to select. Right-click to order. WASD pans, wheel zooms.</small>`;
+    else ih = `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}<br><br><small>Left-click / drag to select. Right-click to order. WASD or Space + drag pans, wheel zooms. Esc pauses.</small>`;
     if (ih !== infoKey) { info.innerHTML = ih; infoKey = ih; }
     // commands
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);
-    // Delete acts on any own selected building, foundations too; on touch the first tap arms it for 3 s (ui.actions.delete)
-    const del = own.find(e => e.kind === 'building'), armed = !!del && ui.touch && ui.delArm?.id === del.id && performance.now() - ui.delArm.t < 3000;
-    let key = `${del ? 'D' + del.id + (armed ? 'A' : '') : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
+    // Every selected own building, foundations too, uses the same confirmation dialog.
+    const del = own.find(e => e.kind === 'building');
+    let key = `${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
-      const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText('pop cap')] : [])];
+      const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText(popFullReason(p))] : [])];
       if (vills.length) for (const [id, d] of Object.entries(BUILDINGS)) {
         const locked = ageIndex(d.age) > ageIndex(p.age), short = shortOf(p, d.cost), ok = !locked && canAfford(p, d.cost);
         btns.push(tile(`data-build="${id}"`, { kind: 'building', id, name: d.name, cost: d.cost, tint: tintOf(d), ok, lockedAge: locked ? d.age : '', short, notes: notesFor(locked, d, short) }));
@@ -132,7 +158,7 @@ export function createHud(ui) {
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }
       }
-      if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: armed ? 'Tap again to delete' : 'Delete', cost: {}, tint: 't-del', ok: true, extra: armed ? '' : '<span class="c">No refund</span>', cx: armed ? ' armed' : '' }));
+      if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: 'Delete', cost: {}, tint: 't-del', ok: true, extra: '<span class="c">No refund</span>' }));
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }
       else btns.forEach((b, i) => { const el = cmds.children[i], sm = el.querySelector('small'); el.classList.toggle('off', b.off); el.setAttribute('aria-disabled', b.off); if (sm.innerHTML !== b.small) sm.innerHTML = b.small; });

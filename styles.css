@@ -27,6 +27,13 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 #bottom { position:absolute; left:0; right:0; bottom:0; height:168px; display:flex; gap:10px; padding:8px 10px; background:radial-gradient(70% 150% at 88% 115%, rgb(200 160 82 / .3), transparent 70%), radial-gradient(45% 110% at 62% -10%, rgb(130 96 52 / .28), transparent 70%), linear-gradient(#2c2117,#1a130c); border-top:2px solid var(--bronze); z-index:5; }
 #minimap-wrap { border:2px solid var(--bronze); background:#000; width:224px; height:134px; flex:none; }
 #minimap { display:block; cursor:pointer; }
+/* Desktop "next idle villager" button, floating above the minimap like the phone's round buttons; the badge counts idle villagers. */
+#idlebtn { position:absolute; left:10px; bottom:178px; z-index:5; width:44px; height:44px; border-radius:22px; padding:0; font-size:21px; background:#2a2118e6; color:var(--parch); border:1px solid var(--bronze); cursor:pointer; opacity:.7; }
+#idlebtn.has { opacity:1; box-shadow:0 0 0 2px #c0392b88; }
+#idlebtn:hover { background:linear-gradient(#7a5a33,#4a3620); opacity:1; }
+#idlebtn .badge { position:absolute; top:-4px; right:-4px; min-width:18px; height:18px; padding:0 4px; box-sizing:border-box; border-radius:9px; background:#c0392b; color:#fff; font:bold 11px/18px system-ui; text-align:center; }
+#idlebtn .badge:empty { display:none; }
+body.touch #idlebtn, body:not(.ingame) #idlebtn { display:none; }
 #info { flex:1; min-width:160px; overflow:hidden; font-size:14px; line-height:1.35; }
 #info h3 { margin:0 0 4px; font-size:17px; color:var(--bronze); font-weight:normal; }
 #info .bar { height:8px; background:#111; border:1px solid #000; border-radius:2px; margin:3px 0 6px; width:200px; }
@@ -53,7 +60,6 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 #cmds .tile.off { --t:150 140 126; --tl:205 197 184; opacity:.6; cursor:not-allowed; }
 #cmds .tile.age:not(.off) { animation:breathe 2.8s ease-in-out infinite; }
 #cmds .tile.t-del { border-color:rgb(var(--t) / .55); }
-#cmds .tile.t-del.armed { --g:.3; border-color:rgb(var(--tl)); animation:breathe .9s ease-in-out infinite; }
 @keyframes glint { 0% { left:-60%; opacity:0 } 25% { opacity:1 } 100% { left:130%; opacity:0 } }
 @keyframes breathe { 0%, 100% { box-shadow:var(--sh), 0 0 0 0 rgb(var(--t) / 0) } 50% { box-shadow:var(--sh), 0 0 18px 1px rgb(var(--t) / .55) } }
 .orb { position:relative; flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:rgb(var(--tl));
@@ -89,7 +95,7 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 #tip .tip-cost .dot { width:9px; height:9px; } #tip .tip-cost em { font-style:normal; opacity:.68; margin-left:1px; }
 #tip .note { margin-top:8px; color:#ff9c8f; }
 body.touch #tip { display:none; }
-@media (prefers-reduced-motion: reduce) { #cmds .tile.age:not(.off), #cmds .tile.armed, #cmds .tile:not(.off):hover::after { animation:none; } #cmds .tile, #tip, #tip.show, #tip.show.move { transition:none; } }
+@media (prefers-reduced-motion: reduce) { #cmds .tile.age:not(.off), #cmds .tile:not(.off):hover::after { animation:none; } #cmds .tile, #tip, #tip.show, #tip.show.move { transition:none; } }
 #toast { position:absolute; left:50%; bottom:186px; transform:translateX(-50%); background:#000c; border:1px solid var(--bronze); padding:6px 14px; border-radius:4px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:6; }
 #toast.show { opacity:1; }
 #dragbox { position:fixed; border:1px solid #4ade80; background:#4ade8022; z-index:4; pointer-events:none; }
@@ -100,11 +106,20 @@ body.touch #tip { display:none; }
 .card h2 { font-weight:normal; color:var(--bronze); margin:.2em 0; }
 .card p { margin:.5em auto; max-width:720px; line-height:1.5; }
 .card .btn { font-size:18px; padding:9px 24px; margin:10px 6px 0; }
+#delete-confirmation { width:calc(100vw - 24px); max-width:440px; max-height:90dvh; color:var(--parch); }
+#delete-confirmation::backdrop { background:#000b; }
+#delete-confirmation .delete-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:18px; }
+#delete-confirmation .btn { flex:1; min-height:44px; margin:0; padding:9px 12px; white-space:nowrap; }
+#delete-confirmation .danger { border-color:var(--red); background:linear-gradient(#79362c,#4b201a); }
+#delete-confirmation .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
 .card .level { margin-top:12px; } .card .level .btn { font-size:15px; padding:5px 14px; margin:4px 3px 0; }
-.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em 0 0; font-size:14px; opacity:.85; }
-.time-option { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; margin:8px auto 0; cursor:pointer; }
-.time-option input { width:18px; height:18px; margin:0; accent-color:var(--bronze); cursor:pointer; }
+.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em auto 0; font-size:14px; opacity:.85; }
+.time-option { width:100%; max-width:400px; margin:16px auto 0; text-align:left; }
+.time-option label, .time-scale { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.time-option output { color:var(--bronze); font-variant-numeric:tabular-nums; }
+.time-option input { display:block; width:100%; height:44px; margin:0; accent-color:var(--bronze); cursor:pointer; }
 .time-option input:focus-visible { outline:2px solid var(--bronze); outline-offset:3px; }
+.time-scale { font-size:12px; opacity:.75; }
 .quick small { display:block; margin-top:3px; font-size:11px; opacity:.75; }
 [data-tip]:not(.tile) { cursor:help; }
 .btn[data-tip] { cursor:pointer; }
@@ -135,7 +150,7 @@ body.touch #bottom { position: absolute; inset: 0; height: auto; padding: 0; bac
 body.touch #bottom > * { pointer-events: auto; }
 body.touch #minimap-wrap { position: absolute; left: calc(var(--sal) + 8px); bottom: calc(var(--sab) + 8px); width: 150px; height: 92px; border-width: 1px; opacity: .92; }
 body.touch #minimap { width: 100%; height: 100%; touch-action: none; }
-body.touch #info { position: absolute; left: calc(var(--sal) + 168px); bottom: calc(var(--sab) + 8px); width: min(36vw, 250px); min-width: 0; max-height: 92px; padding: 6px 9px; background: #1a130ccc; border: 1px solid #c8a05299; border-radius: 6px; font-size: 12px; line-height: 1.3; }
+body.touch #info { position: absolute; left: calc(var(--sal) + 168px); bottom: calc(var(--sab) + 8px); width: min(36vw, 250px); min-width: 0; max-height: min(160px, 40vh); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 6px 9px; background: #1a130ccc; border: 1px solid #c8a05299; border-radius: 6px; font-size: 12px; line-height: 1.3; }
 body.touch #info h3 { font-size: 14px; margin: 0 0 2px; } body.touch #info .bar { width: 100%; height: 6px; margin: 2px 0 3px; } body.touch #info small { display: none; }
 /* Tile counts are data-driven (13 buildings, 10 Barracks units): the panel grows up from the bottom and scrolls from its top, so no tile is pushed out of reach. */
 body.touch #cmds { position: absolute; right: calc(var(--sar) + 8px); bottom: calc(var(--sab) + 8px); top: auto; max-height: calc(100% - 84px - var(--sat) - var(--sab)); width: 246px; grid-template-columns: 1fr 1fr; grid-auto-rows: 48px; gap: 6px; align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -154,6 +169,12 @@ body.touch #gamemenu:not(.hidden) { display: flex; position: absolute; inset: 0;
 body.touch #gamemenu .card { padding: 16px; max-width: 320px; } body.touch #gamemenu .btn { display: block; width: 100%; height: 48px; margin: 8px 0 0; font-size: 16px; } body.touch #gamemenu .row { display: flex; gap: 8px; } body.touch #gamemenu .row .btn { margin-top: 8px; }
 body.touch #gamemenu .btn.on { outline: 2px solid var(--ok); }
 #gamemenu:not(.hidden) { display:flex; position:absolute; inset:0; z-index:12; background:#000b; align-items:center; justify-content:center; }
+#pausemodal:not(.hidden) { display:flex; position:absolute; inset:0; z-index:11; background:#0008; align-items:center; justify-content:center; }
+#pausemodal .card { max-width:380px; padding:20px 24px; }
+#pausemodal h2 { font-size:32px; letter-spacing:.08em; text-transform:uppercase; }
+#pausemodal .btn { min-width:160px; min-height:44px; }
+#pausemodal .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
+#viewport.grab { cursor:grab; } #viewport.grabbing { cursor:grabbing; }
 #gamemenu .card { max-width:420px; max-height:90dvh; overflow:auto; padding:20px; }
 #gamemenu .btn.on { outline:2px solid var(--ok); }
 #gamemenu .graphics { margin:18px 0 0; padding:12px 0 0; border:0; border-top:1px solid #c8a05266; }
@@ -176,7 +197,7 @@ body.touch .keys { grid-template-columns: 1fr; gap: 1px; text-align: center; } b
 @media (orientation: portrait) {
   body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(66px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
   body.touch #objective { font-size: 11px; }
-  body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 76px; }
+  body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 132px; }
   body.touch.has-cmds #info { bottom: calc(var(--sab) + 66px); }
   body.touch #cmds { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 8px); top: auto; width: auto; height: 56px; display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; align-items: stretch; touch-action: pan-x; }
   body.touch #cmds .tile { flex: 0 0 128px; height: 56px; }

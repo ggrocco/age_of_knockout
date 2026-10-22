@@ -4,6 +4,7 @@ import { buildModel, animate, TEAM, MODEL_MATERIAL } from './models.js';
 import { createModelBatch, PROXY_LAYER } from './batch.js';
 import { createTerrain } from './terrain.js';
 import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } from './quality.js';
+import { viewHalfHeight } from './camera-fit.js';
 import { createSkyLighting, createLightingEffects } from './lighting.js';
 
 let sessionQuality = null;
@@ -69,7 +70,7 @@ export function createView(container, game) {
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();
   function placeCamera() {
     const w = renderer.domElement.clientWidth || 1, h = renderer.domElement.clientHeight || 1, a = w / h;
-    const hh = a < 1 ? view.zoom * 1.2 / a : view.zoom; camera.left = -hh * a; camera.right = hh * a; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
+    const hh = viewHalfHeight(view.zoom, w, h); camera.left = -hh * a; camera.right = hh * a; camera.top = hh; camera.bottom = -hh; camera.updateProjectionMatrix();
     camera.position.copy(view.focus).addScaledVector(DIR, 120); camera.lookAt(view.focus); camera.updateMatrixWorld(true);
     const extent = Math.min(N, Math.max(18, hh * Math.max(1, a) * 1.4)), shadowCamera = sun.shadow.camera;
     shadowCamera.left = shadowCamera.bottom = -extent; shadowCamera.right = shadowCamera.top = extent;
@@ -80,7 +81,7 @@ export function createView(container, game) {
   view.resize = () => {
     const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
     renderer.setPixelRatio(renderPixelRatio(w, h, window.devicePixelRatio, preset));
-    renderer.setSize(w, h, false); placeCamera(); effects.resize(w, h);
+    renderer.setSize(w, h, false); view.setZoom(view.zoom); placeCamera(); effects.resize(w, h); // re-clamp: the zoom-out limit depends on the size
   };
   view.setQuality = name => {
     if (!validQuality(name)) return;
@@ -93,7 +94,10 @@ export function createView(container, game) {
     terrain.setQuality(preset); view.resize();
   };
   view.pan = (dx, dz) => { view.focus.x = Math.max(0, Math.min(N, view.focus.x + dx)); view.focus.z = Math.max(0, Math.min(N, view.focus.z + dz)); };
-  view.setZoom = z => { view.zoom = Math.max(6, Math.min(34, z)); };
+  view.setZoom = z => { // 3 lets a phone close in to ~7 tiles across in portrait; a big screen's width cap must not cost zoom-out reach
+    const fit = Math.min(1, viewHalfHeight(1, renderer.domElement.clientWidth, renderer.domElement.clientHeight));
+    view.zoom = Math.max(3, Math.min(34 / fit, z));
+  };
   view.centerOn = (x, y) => { view.focus.set(x, 0, y); };
 
   // terrain

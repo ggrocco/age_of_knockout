@@ -9,6 +9,7 @@ import { createInput } from './ui/input.js';
 import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
+import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
@@ -23,13 +24,13 @@ const LEVEL_DESC = { relaxed: 'A long peaceful start: opponents work at half you
 const storedLevel = () => { try { return localStorage.getItem('level'); } catch { return null; } };
 let level = [params.get('level'), storedLevel()].find(l => Object.hasOwn(LEVELS, l ?? '')) || 'normal';
 function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catch {} }
-const storedNoTimeLimit = () => { try { return localStorage.getItem('noTimeLimit') === 'true'; } catch { return false; } };
-let noTimeLimit = params.has('noTimeLimit') ? params.get('noTimeLimit') === '1' : storedNoTimeLimit();
-function setNoTimeLimit(value) { noTimeLimit = value; try { localStorage.setItem('noTimeLimit', String(value)); } catch {} }
+let timeLimit = (() => { try { return readTimeLimit(location.search, localStorage); } catch { return readTimeLimit(location.search); } })();
+function setTimeLimit(value) { timeLimit = Number(value); try { localStorage.setItem('timeLimit', String(timeLimit)); } catch {} }
+const timeLimitLabel = () => timeLimit === 0 ? 'No time limit' : timeLimit === 120 ? '2 hours' : `${timeLimit} minute${timeLimit === 1 ? '' : 's'}`;
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
 const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
 
-const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, wallStart: null, wallEnd: null, delArm: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
+const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, wallStart: null, wallEnd: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
   cmd(c) { const r = ui.game.command(0, c); if (!r.ok) hud.toast(reasonText(r.reason)); return r; },
   setSpeed(s) { ui.speed = s; }, togglePause() { ui.paused = !ui.paused; },
   startPlacing(type) {
@@ -42,39 +43,40 @@ const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, wallStart: 
   stopPlacing() { ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.view?.showGhost(null); ui.view?.showGhostLine(null); },
   marker(x, y) { ui.view?.marker(x, y); } };
 window.addEventListener('orientationchange', () => setTimeout(() => app.onResize?.(), 250));
-const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.quit = () => { endMatch(); menu(); };
+const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.confirmDelete = hud.confirmDelete; ui.quit = () => { endMatch(); menu(); };
 
 // Stop the render loop and free the WebGL context; a finished match otherwise keeps drawing behind menus.
 function endMatch() {
+  hud.cancelDelete(); ui.paused = false; document.getElementById('pausemodal').classList.add('hidden');
   const m = app.match; if (!m) return;
   cancelAnimationFrame(m.raf); m.ended = true; app.match = null;
   if (app.onResize) { window.removeEventListener('resize', app.onResize); app.onResize = null; }
   ui.view?.dispose(); ui.view = null; ui.game = null; ui.minimap = null;
 }
 
-function updateRoundCaps(diffs, unlimited = noTimeLimit) {
-  ui.roundCaps = Object.fromEntries(ROUNDS.map((r, i) => [r.id, matchOptions([null, diffs[i]], { noTimeLimit: unlimited }).capTicks ?? r.capTicks]));
+function updateRoundCaps(diffs, minutes = timeLimit) {
+  ui.roundCaps = Object.fromEntries(ROUNDS.map((r, i) => [r.id, matchOptions([null, diffs[i]], { timeLimit: minutes }).capTicks ?? r.capTicks]));
   hud.hideTip();
 }
 
 function show(html) { hud.hideTip(); screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
 function hide() { hud.hideTip(); screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 
-function startMatch({ roundId, seed, oppDiff, label, onEnd, unlimited = noTimeLimit }) {
+function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit }) {
   endMatch();
   document.body.classList.add('ingame');
   const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO; // botDiff: the bot that drives player 0 in autoplay/test modes
-  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff], { noTimeLimit: unlimited }) });
+  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff], { timeLimit: minutes }) });
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
-  ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.delArm = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
+  ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
   const bots = [createBot(game, 1, oppDiff)];
   if (autoplay) bots.unshift(createBot(game, 0, botDiff));
   const diffs = { 0: botDiff, 1: oppDiff };
   const tc = [...game.buildings.values()].find(b => b.owner === 0); view.centerOn(tc.x + 1.5, tc.y + 1.5); view.setZoom(ui.touch ? (innerHeight > innerWidth ? 7.5 : 9) : 13);
-  const m = app.match = { game, view, bots, diffs, acc: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
+  const m = app.match = { game, view, bots, diffs, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
   app.onResize = () => { view.resize(); }; window.addEventListener('resize', app.onResize);
   const loop = now => {
     m.raf = requestAnimationFrame(loop);
@@ -86,7 +88,8 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, unlimited = noTimeLi
       m.acc += dt * ui.speed * 20; let steps = Math.min(Math.floor(m.acc), 300); m.acc -= Math.floor(m.acc);
       for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = THINK_EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
-    input.update(dt); view.sync(); view.frame(dt, now / 1000); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
+    if (!ui.paused) m.animT += dt; // the animation clock stops with the match, so working villagers freeze mid-swing
+    input.update(dt); view.sync(); view.frame(dt, m.animT); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
     if (game.result && !m.ended) { m.ended = true; setTimeout(() => { if (app.match === m) showResult(m); }, AUTO ? 300 : 1200); }
   };
   m.raf = requestAnimationFrame(loop);
@@ -116,9 +119,9 @@ function bracketHtml(t) {
 }
 function bracketScreen() {
   const t = app.tournament, r = t.round, o = t.opponent;
-  updateRoundCaps(LEVELS[t.level], t.noTimeLimit);
+  updateRoundCaps(LEVELS[t.level], t.timeLimit);
   show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
-  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, unlimited: t.noTimeLimit, onEnd: won => afterMatch(won) });
+  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, minutes: t.timeLimit, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
   const t = app.tournament;
@@ -129,7 +132,7 @@ async function afterMatch(won) {
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);
   document.getElementById('again').onclick = menu;
 }
-function startTournament() { app.tournament = createTournament(pickSeed(), level, { noTimeLimit }); bracketScreen(); }
+function startTournament() { app.tournament = createTournament(pickSeed(), level, { timeLimit }); bracketScreen(); }
 
 function menu() {
   updateRoundCaps(LEVELS[level]);
@@ -137,10 +140,14 @@ function menu() {
   show(`<div class="card"><h1>Age of Knockout</h1><h2>A five-round elimination tournament in the spirit of Age of Empires (1997)</h2>
   <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
   ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, or pick up relics</span>
-  <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager, jump to Town Center</span><b>Space, Esc</b><span>pause, cancel</span></div>`}
+  <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager (or the round button above the minimap), jump to Town Center</span><b>Space + drag</b><span>pan the map with the mouse</span><b>Esc</b><span>pause / resume (cancels a placement first)</span></div>`}
   <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
-  <label class="time-option"><input type="checkbox" id="no-time-limit" aria-describedby="time-limit-help" ${noTimeLimit ? 'checked' : ''}> No time limit</label>
-  <p id="time-limit-help"><small>Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</small></p>
+  <div class="time-option">
+    <label for="time-limit">Time limit <output id="time-limit-value" for="time-limit">${timeLimitLabel()}</output></label>
+    <input type="range" id="time-limit" min="0" max="${MAX_TIME_LIMIT}" step="1" value="${timeLimit}" aria-valuetext="${timeLimitLabel()}" aria-describedby="time-limit-help">
+    <div class="time-scale"><span>0 &middot; No limit</span><span>2 hours</span></div>
+  </div>
+  <p id="time-limit-help"><small>Minutes of game time. Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</small></p>
   <button class="btn" data-auto id="start">Begin Tournament</button><br>
   ${ROUNDS.map((r, i) => `<button class="btn quick" data-i="${i}" data-tip="round:${r.id}" aria-describedby="tip" style="font-size:14px;padding:5px 12px">Quick: ${r.name}<small>${roundLimitText(r, ui.roundCaps[r.id])}</small></button>`).join('')}</div>`);
   document.getElementById('start').onclick = startTournament;
@@ -148,7 +155,12 @@ function menu() {
     updateRoundCaps(LEVELS[level]);
     for (const quick of document.querySelectorAll('.quick')) { const r = ROUNDS[+quick.dataset.i]; quick.querySelector('small').textContent = roundLimitText(r, ui.roundCaps[r.id]); }
   };
-  document.getElementById('no-time-limit').onchange = e => { setNoTimeLimit(e.target.checked); refreshOptions(); };
+  document.getElementById('time-limit').oninput = e => {
+    setTimeLimit(e.target.value);
+    document.getElementById('time-limit-value').textContent = timeLimitLabel();
+    e.target.setAttribute('aria-valuetext', timeLimitLabel());
+    refreshOptions();
+  };
   for (const b of document.querySelectorAll('.level .btn')) b.onclick = () => {
     setLevel(b.dataset.level); document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
     refreshOptions();

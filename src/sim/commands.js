@@ -1,12 +1,14 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageIndex } from '../data/ages.js';
+import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { secs, RES_KIND } from './util.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
 const RES = ['food', 'wood', 'gold', 'stone'];
+// 'pop limit' once houses already reach the age's ceiling (only advancing raises it), else 'pop cap' (build houses).
+export const popFullReason = p => p.popCap >= popLimit(p.age) ? 'pop limit' : 'pop cap';
 export const canAfford = (p, cost) => RES.every(k => p.res[k] >= (cost[k] || 0));
 const pay = (p, cost) => { for (const k of RES) p.res[k] -= cost[k] || 0; };
 const ownUnits = (game, pid, ids) => (ids || []).map(i => game.entities.get(i)).filter(e => e && e.kind === 'unit' && e.owner === pid && !e.dead);
@@ -107,7 +109,7 @@ export function execute(game, pid, cmd) {
       if (!(BUILDINGS[b.type].trains || []).includes(cmd.unit)) return fail('cannot train');
       if (ageIndex(def.age) > ageIndex(p.age)) return fail('age');
       if (b.queue.length >= 5) return fail('queue full');
-      if (p.pop >= p.popCap) return fail('pop cap');
+      if (p.pop >= p.popCap) return fail(popFullReason(p));
       if (!canAfford(p, def.cost)) return fail('resources');
       pay(p, def.cost); b.queue.push({ unit: cmd.unit, remaining: secs(def.trainTime) }); p.pop++;
       return OK;

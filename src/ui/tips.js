@@ -2,7 +2,7 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
-import { AGES, AGE_COST, ageTitle } from '../data/ages.js';
+import { AGES, AGE_COST, AGE_POP_LIMIT, ageTitle } from '../data/ages.js';
 import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
 import { icon } from './icons.js';
@@ -14,7 +14,7 @@ const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Ca
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
   town_center: 'Your base. Trains Villagers, accepts every resource and is where you advance to the next Age.',
-  house: 'Raises your population cap. Build more when training stalls at the cap.',
+  house: `Raises your population cap, up to the limit of your Age (${AGE_POP_LIMIT.stone} in the Stone Age, ${AGE_POP_LIMIT.future} in AI Future). Build more when training stalls at the cap.`,
   granary: 'Drop-off point for food. Place it beside berries and farms to shorten trips.',
   storage_pit: 'Drop-off point for wood, gold and stone. Also researches weapon and armor upgrades.',
   farm: 'A field that holds 400 food. Villagers work it for a steady food supply.',
@@ -54,7 +54,7 @@ export const DESC = {
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
   king: 'Regicide only: if your King falls, the match is lost. Keep him safe.',
   age: 'Research the next Age to unlock stronger units and buildings.',
-  delete: 'Knocks this building down at once. Nothing is refunded, and anything it was training is lost.',
+  delete: 'Asks you to confirm before removing this building. Nothing is refunded, and queued training or research is lost.',
 };
 
 // Cost chips: coloured dot + amount. `short` lists resources the player lacks; `compact` shortens 1000 to 1k.
@@ -74,6 +74,11 @@ const ROUND_INFO = {
   relics: { icon: 'villager', goal: `Control all 5 relics for ${RELIC_TICKS / 1200} uninterrupted game minutes. Carry them with units or store them in a Town Center or Government Center. Losing control of any relic resets the countdown. You can also win by eliminating the enemy empire.` },
 };
 
+// A production queue as "Villager x2, Scout": same units grouped in first-queued order, so a full queue fits a phone's info panel.
+export const queueText = queue => {
+  const n = new Map(); for (const q of queue) n.set(q.unit, (n.get(q.unit) || 0) + 1);
+  return [...n].map(([u, c]) => UNITS[u].name + (c > 1 ? ` ×${c}` : '')).join(', ');
+};
 export const roundTimeLabel = (round, capTicks = round.capTicks) => capTicks === Infinity ? 'No time limit' : `${capTicks / 1200} minutes`;
 export const roundLimitText = (round, capTicks = round.capTicks) => roundTimeLabel(round, capTicks) + (capTicks === Infinity ? '' : ' of game time');
 export const TIME_LIMIT_RULE = 'If no one wins before the limit, the higher score wins.';
