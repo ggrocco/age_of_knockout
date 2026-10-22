@@ -39,6 +39,13 @@ test('tower and wall have their own icon and a description of what they do', () 
   const h = tipHtml({ kind: 'building', id: 'tower' }); for (const s of ['Tower', DESC.tower, '40', '120']) assert.ok(h.includes(s), s);
   const w = tipHtml({ kind: 'building', id: 'wall' }); for (const s of ['Wall', DESC.wall, '</i>5<em>stone']) assert.ok(w.includes(s), s);
 });
+test('mine has its own icon and a tooltip with its cost and the rocky-ground rule', () => {
+  assert.match(ICONS.mine || '', /^<svg[^>]*viewBox="0 0 24 24"/);
+  assert.equal(Object.entries(ICONS).filter(([, s]) => s === ICONS.mine).length, 1, 'mine glyph is its own');
+  assert.match(DESC.mine, /rocky ground/i); assert.match(DESC.mine, /gold vein/i); assert.match(DESC.mine, /quarry/i);
+  const h = tipHtml({ kind: 'building', id: 'mine' });
+  for (const s of ['Mine', DESC.mine, '</i>100<em>wood', '</i>50<em>stone']) assert.ok(h.includes(s), s);
+});
 test('icon() falls back by unit class, then to a generic glyph', () => {
   assert.equal(icon('made_up_unit', 'siege'), ICONS.catapult);
   assert.equal(icon('made_up_unit', 'archer'), ICONS.bowman);

@@ -144,3 +144,27 @@ towers and walls are not modelled and nothing here comes from the openage data. 
   adds to the building score like any building; Wall segments do not, so spamming walls cannot win a time-cap tiebreak.
 - The `hp` on the `BUILDINGS` entries is the Tool-era value (the build menu and tooltip still show it); the entity's `maxHp` is
   the era value above.
+
+## Invented content (ore patches and the Mine)
+
+AoE1 has no Mines, no rocky ground and no resource respawn; all of this is invented for this game and every number is an
+untuned placeholder. Nothing here comes from the openage data.
+
+- **Ore patches** (`map.js`, `ore.js`): map tiles 2 (gold vein) and 3 (quarry), placed with their 180-degree mirror or not
+  at all. Per map: one 4x3 gold patch 12-16 tiles from each start (reserve 1500), plus mid-map patches 20-34 tiles from
+  the first start (two 5x4 gold, reserve 3000, and one 5x4 stone, reserve 2500), each ringed by 5 richer loose piles
+  (1200 gold / 900 stone). Tile ids and patch ids come from a counter; a patch is never reused.
+- **Mine** (`buildings.js`): Tool Age, 100 wood + 50 stone, 2x2, build time 30 s, 150 HP, sight 3, `extra: true` (does not
+  count toward an age-up), `ore: true` (it can only be placed on a patch tile of any kind). `gatherType` and `amount` are
+  copied from the patch the Mine stands on, not the building table. Villagers gather from it like a Farm, but every Mine
+  on a patch shares that patch's `reserve` (`drawFrom` in `ore.js`).
+- **Exhaustion**: when a reserve reaches 0 every Mine and foundation on the patch is removed (a foundation is lost with no
+  refund), its tiles revert to land, and a new mirrored pair of that kind spawns at half the mid-map reserve (1500 gold,
+  1250 stone), at most `PATCH_CAP` (12) patches alive at once.
+- **Pile respawn** (`ore.js`): every 30 s, if a kind's loose piles hold under 25% of its starting total and 120 s have
+  passed since the last respawn, a mirrored 2x2 block of piles appears on each side (800 gold / 600 stone each), more than
+  13 tiles from either start and more than 8 from the map centre (the relic land bridge).
+- **Bot** (`ai/bot.js`): digs Mines only on patches in its own half that its villagers can reach (computed once on the
+  bare map), when its loose piles of that kind run out.
+- **Look** (`render/arch/mine.js`): the Mine varies by era to satisfy the architecture invariants (distinct per era, team
+  colour, footprint, height cap); the wheel and the cart animate while it is finished.
