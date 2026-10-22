@@ -3,6 +3,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { secs, RES_KIND } from './util.js';
+import { formationSlots } from './formation.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
@@ -12,6 +13,17 @@ export const popFullReason = p => p.popCap >= popLimit(p.age) ? 'pop limit' : 'p
 export const canAfford = (p, cost) => RES.every(k => p.res[k] >= (cost[k] || 0));
 const pay = (p, cost) => { for (const k of RES) p.res[k] -= cost[k] || 0; };
 const ownUnits = (game, pid, ids) => (ids || []).map(i => game.entities.get(i)).filter(e => e && e.kind === 'unit' && e.owner === pid && !e.dead);
+
+// A build given to a villager that is gathering or on another unfinished build keeps that job as `resume`, and takes it up
+// again once the new building is done, gone or unreachable (orders.js doBuild). Builds interrupting builds nest, newest first.
+// Idle, moving or fighting villagers have nothing to go back to, so their build order gets no `resume` key. A gather resumes
+// heading for its resource, or still on its way to drop off a load.
+function buildOrder(u, target, queue) {
+  const order = queue ? { type: 'build', target, queue, fails: 0 } : { type: 'build', target, fails: 0 }, o = u.order;
+  if (o.type === 'gather') order.resume = { ...o, phase: o.phase === 'drop' ? 'drop' : 'go', fails: 0 };
+  else if (o.type === 'build') order.resume = o;
+  return order;
+}
 
 export function canPlace(game, pid, type, x, y) {
   const def = BUILDINGS[type], n = game.map.size, p = game.players[pid];
@@ -51,7 +63,8 @@ export function execute(game, pid, cmd) {
     case 'move': {
       const us = ownUnits(game, pid, cmd.ids); if (!us.length) return fail('no units');
       if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('bad target');
-      for (const u of us) { u.order = { type: 'move', x: cmd.x, y: cmd.y, slack: 0 }; u.path = null; u.retry = 0; }
+      const slots = us.length > 1 ? formationSlots(game, us, cmd.x, cmd.y) : null; // a group spreads out instead of piling onto one tile
+      for (const u of us) { const s = slots ? slots.get(u.id) : cmd; u.order = { type: 'move', x: s.x, y: s.y, slack: 0 }; u.path = null; u.retry = 0; }
       return OK;
     }
     case 'gather': {
@@ -71,7 +84,7 @@ export function execute(game, pid, cmd) {
       if (!canAfford(p, def.cost)) return fail('resources');
       pay(p, def.cost);
       const b = game.addBuilding(cmd.building, pid, cmd.x, cmd.y, false);
-      for (const u of us) { u.order = { type: 'build', target: b.id, fails: 0 }; u.path = null; u.retry = 0; }
+      for (const u of us) { u.order = buildOrder(u, b.id); u.path = null; u.retry = 0; }
       return OK;
     }
     case 'wall': { // a line of wall foundations (tiles from lineTiles): each free tile is paid for and placed in order, blocked ones are skipped free
@@ -86,7 +99,7 @@ export function execute(game, pid, cmd) {
       }
       if (!placed.length) return fail(short ? 'resources' : 'placement'); // a free tile it could not pay for, or nowhere free
       const [target, ...rest] = placed;
-      for (const u of us) { u.order = { type: 'build', target, queue: rest.slice(), fails: 0 }; u.path = null; u.retry = 0; }
+      for (const u of us) { u.order = buildOrder(u, target, rest.slice()); u.path = null; u.retry = 0; }
       return { ok: true, placed: placed.length };
     }
     case 'delete': { // knock down one of your own buildings: no refund; anything in its training queue is lost
@@ -100,7 +113,7 @@ export function execute(game, pid, cmd) {
       const us = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager'), b = game.entities.get(cmd.targetId);
       if (!us.length) return fail('no villagers');
       if (!b || b.dead || b.kind !== 'building' || b.owner !== pid || b.constructed) return fail('nothing to build');
-      for (const u of us) { u.order = { type: 'build', target: b.id, fails: 0 }; u.path = null; u.retry = 0; }
+      for (const u of us) { if (u.order.type === 'build' && u.order.target === b.id) continue; u.order = buildOrder(u, b.id); u.path = null; u.retry = 0; }
       return OK;
     }
     case 'train': {

@@ -135,3 +135,61 @@ test('railgun cannot carry relics', () => {
   const g = createGame({ seed: 1 }); const r = g.spawnRelic(20.5, 20.5), u = g.spawnUnit('railgun', 0, 20.5, 20.5);
   const res = g.command(0, { type: 'relic', ids: [u.id], relicId: r.id }); assert.equal(res.ok, false); assert.equal(res.reason, 'no carriers');
 });
+
+// Interrupting work with a build: the villager picks the interrupted job back up once the new building is done.
+const nearestRes = (g, v, type) => [...g.resources.values()].filter(r => r.type === type).sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+const houseAt = (g, s) => [...g.buildings.values()].find(b => b.type === 'house' && b.owner === 0 && b.x === s.x && b.y === s.y);
+const tickUntil = (g, f, n = 2000) => { for (let i = 0; i < n && !f(); i++) g.tick(); };
+test('a gatherer told to build goes back to the same resource once the building is done', () => {
+  const g = createGame({ seed: 1 }), v = mine(g, 0, 'villager')[0], tree = nearestRes(g, v, 'tree'), s = freeSpot(g, 0, 'house');
+  g.command(0, { type: 'gather', ids: [v.id], resourceId: tree.id }); for (let i = 0; i < 100; i++) g.tick();
+  assert.equal(g.command(0, { type: 'build', ids: [v.id], building: 'house', x: s.x, y: s.y }).ok, true);
+  assert.equal(v.order.type, 'build'); assert.equal(v.order.resume.type, 'gather'); assert.equal(v.order.resume.res, tree.id);
+  const h = houseAt(g, s); tickUntil(g, () => h.constructed); g.tick(); g.tick();
+  assert.equal(v.order.type, 'gather'); assert.equal(v.order.res, tree.id, 'back on the same tree'); assert.equal(v.order.resume, undefined);
+});
+test('a builder told to build something else finishes it, then the first building, then goes back to work', () => {
+  const g = createGame({ seed: 1 }), v = mine(g, 0, 'villager')[0], gold = nearestRes(g, v, 'gold'), a = freeSpot(g, 0, 'house'), b = freeSpot(g, 0, 'house', [a]);
+  g.command(0, { type: 'gather', ids: [v.id], resourceId: gold.id }); g.tick();
+  g.command(0, { type: 'build', ids: [v.id], building: 'house', x: a.x, y: a.y }); for (let i = 0; i < 60; i++) g.tick();
+  g.command(0, { type: 'build', ids: [v.id], building: 'house', x: b.x, y: b.y });
+  const ha = houseAt(g, a), hb = houseAt(g, b);
+  assert.equal(v.order.target, hb.id); assert.equal(v.order.resume.target, ha.id); assert.equal(v.order.resume.resume.res, gold.id);
+  tickUntil(g, () => hb.constructed); g.tick(); g.tick();
+  assert.equal(ha.constructed, false); assert.equal(v.order.type, 'build'); assert.equal(v.order.target, ha.id, 'back to the first foundation');
+  tickUntil(g, () => ha.constructed); g.tick(); g.tick();
+  assert.equal(v.order.type, 'gather'); assert.equal(v.order.res, gold.id, 'then back to the gold mine');
+});
+test('a finished farm is the last job of the chain: earlier builds first, then farm it instead of the old resource', () => {
+  const g = createGame({ seed: 1 }), p = g.players[0], [v, w] = mine(g, 0, 'villager'), tree = nearestRes(g, v, 'tree'); p.res.wood = 1000;
+  const a = freeSpot(g, 0, 'farm'); g.command(0, { type: 'build', ids: [v.id], building: 'farm', x: a.x, y: a.y });
+  const fa = [...g.buildings.values()].find(b => b.type === 'farm'); tickUntil(g, () => fa.constructed); g.tick(); g.tick();
+  assert.equal(v.order.type, 'gather'); assert.equal(v.order.res, fa.id, 'an idle builder farms what it built');
+  g.command(0, { type: 'gather', ids: [w.id], resourceId: tree.id }); g.tick();
+  const h = freeSpot(g, 0, 'house', [a]); g.command(0, { type: 'build', ids: [w.id], building: 'house', x: h.x, y: h.y });
+  const hh = houseAt(g, h); for (let i = 0; i < 40; i++) g.tick();
+  const f = freeSpot(g, 0, 'farm', [a, h]); g.command(0, { type: 'build', ids: [w.id], building: 'farm', x: f.x, y: f.y });
+  const fb = [...g.buildings.values()].find(b => b.type === 'farm' && b !== fa);
+  tickUntil(g, () => fb.constructed); g.tick(); g.tick();
+  assert.equal(hh.constructed, false); assert.equal(w.order.type, 'build'); assert.equal(w.order.target, hh.id, 'the unfinished house first');
+  tickUntil(g, () => hh.constructed); g.tick(); g.tick();
+  assert.equal(w.order.type, 'gather'); assert.equal(w.order.res, fb.id, 'then the new farm, not the tree');
+});
+test('a drop-off in progress resumes as a drop-off', () => {
+  const g = createGame({ seed: 1 }), v = mine(g, 0, 'villager')[0], tree = nearestRes(g, v, 'tree'), s = freeSpot(g, 0, 'house');
+  g.command(0, { type: 'gather', ids: [v.id], resourceId: tree.id }); tickUntil(g, () => v.order.phase === 'drop');
+  g.command(0, { type: 'build', ids: [v.id], building: 'house', x: s.x, y: s.y });
+  assert.equal(v.order.resume.phase, 'drop', 'carries its load home first');
+});
+test('a destroyed foundation sends the villager back to work; move and construct-on-itself do not stack', () => {
+  const g = createGame({ seed: 1 }), [v, w] = mine(g, 0, 'villager'), tree = nearestRes(g, v, 'tree'), s = freeSpot(g, 0, 'house');
+  g.command(0, { type: 'gather', ids: [v.id, w.id], resourceId: tree.id }); g.tick();
+  g.command(0, { type: 'build', ids: [v.id, w.id], building: 'house', x: s.x, y: s.y }); const h = houseAt(g, s);
+  const before = v.order; g.command(0, { type: 'construct', ids: [v.id], targetId: h.id });
+  assert.equal(v.order, before, 're-ordering onto its own foundation keeps the order (no self-resume)');
+  g.command(0, { type: 'move', ids: [w.id], x: w.x + 2, y: w.y }); assert.equal(w.order.resume, undefined, 'a move drops the chain');
+  g.command(0, { type: 'delete', id: h.id }); g.tick(); g.tick();
+  assert.equal(v.order.type, 'gather'); assert.equal(v.order.res, tree.id, 'foundation gone: back to the tree');
+  const idle = mine(g, 0, 'villager')[2]; g.command(0, { type: 'build', ids: [idle.id], building: 'house', x: s.x, y: s.y });
+  assert.equal('resume' in idle.order, false, 'nothing to resume: no resume key');
+});

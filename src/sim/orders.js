@@ -28,6 +28,10 @@ const stop = u => { u.order = IDLE(); u.path = null; };
 // Walled off: attack the enemy building in the way, and take up `o` again once it falls (doAttack restores `resume`).
 // travel just set a 40-tick retry for the failed path; clear it so the unit heads for the breach at once.
 const breach = (u, id, o) => { u.order = { type: 'attack', target: id, fails: 0, resume: o }; u.path = null; u.retry = 0; };
+// Hand back the order `o` interrupted (a breach's, or the job a build was given over), at once and with no retry wait.
+const resume = (u, o) => { u.order = o.resume; u.path = null; u.retry = 0; };
+// A build that ends (done, gone or unreachable) takes up the job it interrupted, if any, else the villager stops.
+const endBuild = (u, o) => o.resume ? resume(u, o) : stop(u);
 
 export function updateUnit(game, u) {
   if (u.cd > 0) u.cd--;
@@ -121,15 +125,17 @@ function doBuild(game, u, o) {
     const next = o.queue && nextInQueue(game, u, o);
     if (next) { o.target = next.id; o.fails = 0; u.path = null; u.retry = 0; return; }
   }
-  if (!b || b.dead) return stop(u);
+  if (!b || b.dead) return endBuild(u, o);
   if (b.constructed) {
-    if (b.gatherType && b.amount > 0) { u.order = { type: 'gather', res: b.id, kind: b.gatherType, phase: 'go', fails: 0 }; u.path = null; }
-    else stop(u);
-    return;
+    if (b.gatherType && b.amount > 0) { // a finished farm or mine is the last job in the chain: interrupted builds first, then work it
+      let last = o; while (last.resume?.type === 'build') last = last.resume;
+      last.resume = { type: 'gather', res: b.id, kind: b.gatherType, phase: 'go', fails: 0 }; // in place of any gather it interrupted
+    }
+    return endBuild(u, o);
   }
   if (distPoint(u.x, u.y, b) <= REACH) { b.workers++; u.path = null; return; }
   const r = travel(game, u, goalNear(b, 0.95), centerOf(b));
-  if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) stop(u); }
+  if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) endBuild(u, o); }
 }
 
 // AoE1 damage model (openage doc/reverse_engineering/game_mechanics/damage.md):
@@ -160,7 +166,7 @@ function doAttack(game, u, o) {
   const t = game.entities.get(o.target);
   if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) {
     if (!o.resume) return stop(u);
-    u.order = o.resume; u.path = null; u.retry = 0; return;
+    return resume(u, o);
   }
   if (distPoint(u.x, u.y, t) <= u.range + 0.1) {
     u.path = null;
