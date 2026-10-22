@@ -1,7 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { canPlace } from '../src/sim/commands.js';
-import { drawFrom, spawnPatchPair, updateRespawn, PATCH_CAP, RESPAWN_EVERY } from '../src/sim/ore.js';
+import { drawFrom, spawnPatchPair, updateRespawn, PATCH_CAP, RESPAWN_MIN, RESPAWN_EVERY } from '../src/sim/ore.js';
 import { secs } from '../src/sim/util.js';
 
 const villagers = (g, p) => [...g.units.values()].filter(u => u.owner === p && u.type === 'villager');
@@ -86,7 +86,7 @@ test('an emptied patch collapses its Mines and foundations, reverts to land, and
   const fresh = [...g.patches.values()].filter(p => !before.has(p.id));
   assert.equal(fresh.length, 2);
   const [p, q] = fresh;
-  for (const f of fresh) { assert.equal(f.kind, 'gold'); assert.equal(f.reserve, 1500); assert.equal(f.tiles.length, 12); }
+  for (const f of fresh) { assert.equal(f.kind, 'gold'); assert.equal(f.reserve, 500); assert.equal(f.startReserve, 500); assert.equal(f.tiles.length, 12); } // a third of 1500
   assert.equal(p.twin, q.id); assert.equal(q.twin, p.id);
   assert.deepEqual([...p.tiles].map(i => n * n - 1 - i).sort((a, b) => a - b), [...q.tiles].sort((a, b) => a - b), 'mirrored');
   const piles = new Set([...g.resources.values()].map(r => Math.floor(r.y) * n + Math.floor(r.x)));
@@ -102,21 +102,74 @@ test('an emptied patch collapses its Mines and foundations, reverts to land, and
   assert.ok(g.players[0].res.gold >= gold0 + 7, 'carried gold delivered: ' + (g.players[0].res.gold - gold0));
 });
 
-test('spawnPatchPair respects PATCH_CAP and returns false on a full map', () => {
-  const g = createGame({ seed: 3 }), start = g.patches.size;
-  assert.ok(start + 2 <= PATCH_CAP);
-  const spawn = gg => { const ok = spawnPatchPair(gg, 'stone', 1250); return { ok, ids: [...gg.patches.keys()], tiles: [...gg.map.tiles] }; };
+const liveOf = (g, kind) => [...g.patches.values()].filter(p => p.kind === kind);
+const reserveOf = (g, kind) => liveOf(g, kind).reduce((s, p) => s + p.reserve, 0);
+// Empty a patch the way Mines do: through drawFrom, so exhaustPatch and the respawn run for real.
+const drain = (g, p) => drawFrom(g, { patch: p.id, amount: p.reserve }, Infinity);
+
+test('spawnPatchPair keeps each kind under its own PATCH_CAP and returns false on a full map', () => {
+  assert.deepEqual(PATCH_CAP, { gold: 8, stone: 4 });
+  const g = createGame({ seed: 3 });
+  assert.ok(liveOf(g, 'gold').length + 2 <= PATCH_CAP.gold && liveOf(g, 'stone').length + 2 <= PATCH_CAP.stone);
+  const spawn = gg => { const ok = spawnPatchPair(gg, 'gold', 800); return { ok, ids: [...gg.patches.keys()], tiles: [...gg.map.tiles] }; };
   const first = spawn(g);
-  assert.equal(first.ok, true); assert.equal(g.patches.size, start + 2);
+  assert.equal(first.ok, true);
   assert.deepEqual(spawn(createGame({ seed: 3 })), first, 'deterministic');
-  for (let id = 1000; g.patches.size < PATCH_CAP - 1; id++) g.patches.set(id, { id, kind: 'gold', tiles: [], reserve: 1, twin: id });
-  for (let k = 0; k < 2; k++) {
+  const refused = (kind, why) => {
     const size = g.patches.size, tv = g.terrainVersion, tiles = [...g.map.tiles];
-    assert.equal(spawnPatchPair(g, 'gold', 1500), false, 'size ' + size);
+    assert.equal(spawnPatchPair(g, kind, 500), false, why);
     assert.equal(g.patches.size, size); assert.equal(g.terrainVersion, tv); assert.deepEqual([...g.map.tiles], tiles);
-    g.patches.set(2000, { id: 2000, kind: 'gold', tiles: [], reserve: 1, twin: 2000 });
+  };
+  while (liveOf(g, 'gold').length + 2 <= PATCH_CAP.gold) assert.equal(spawnPatchPair(g, 'gold', 500), true, 'room for gold');
+  assert.equal(liveOf(g, 'gold').length, PATCH_CAP.gold);
+  refused('gold', 'gold at its cap');
+  assert.equal(spawnPatchPair(g, 'stone', 500), true, 'a full gold cap leaves stone free');
+  assert.equal(liveOf(g, 'stone').length, PATCH_CAP.stone);
+  refused('stone', 'stone at its cap');
+  // Drain everything in turn: neither kind ever passes its cap.
+  for (let k = 0; k < 40 && g.patches.size; k++) {
+    const live = [...g.patches.values()]; drain(g, live[k % live.length]);
+    for (const kind of ['gold', 'stone']) assert.ok(liveOf(g, kind).length <= PATCH_CAP[kind], `${kind} over its cap at step ${k}`);
   }
-  assert.equal(g.patches.size, PATCH_CAP);
+});
+
+test('draining gold to its cap, then a quarry, a gold and the other quarry still respawns quarries', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const g = createGame({ seed });
+    while (liveOf(g, 'gold').length + 2 <= PATCH_CAP.gold) assert.equal(spawnPatchPair(g, 'gold', 1500), true, 'seed ' + seed);
+    const [q1] = liveOf(g, 'stone'), q2 = g.patches.get(q1.twin);
+    assert.ok(q1 && q2, 'two map quarries, seed ' + seed);
+    let before = liveOf(g, 'stone').length; drain(g, q1);
+    assert.equal(liveOf(g, 'stone').length, before - 1 + 2, 'a quarry pair after the first quarry, seed ' + seed);
+    drain(g, liveOf(g, 'gold')[0]);
+    before = liveOf(g, 'stone').length; drain(g, q2);
+    assert.equal(liveOf(g, 'stone').length, before - 1 + 2, 'a quarry pair after the other quarry, seed ' + seed);
+    assert.ok(liveOf(g, 'stone').every(p => p.reserve === Math.floor(2500 / 3)), 'a third of the map quarry');
+  }
+});
+
+test('a chain of drains thins each kind out and stops below RESPAWN_MIN', () => {
+  const g = createGame({ seed: 3 });
+  // Drain p: the kind's live reserve strictly drops; returns the new patches.
+  const step = p => {
+    const known = new Set(g.patches.keys()), sum = reserveOf(g, p.kind);
+    drain(g, p);
+    assert.ok(reserveOf(g, p.kind) < sum, `${p.kind} reserve ${sum} -> ${reserveOf(g, p.kind)}`);
+    return [...g.patches.values()].filter(q => !known.has(q.id));
+  };
+  const stops = p => { // no respawn, and not because of the cap
+    const fresh = step(p);
+    assert.deepEqual(fresh, [], 'no respawn below ' + RESPAWN_MIN);
+    assert.ok(liveOf(g, p.kind).length + 2 <= PATCH_CAP[p.kind], 'room under the cap, so the floor stopped it');
+  };
+  for (const [first, next] of [[homePatch(g, 0), 500], [liveOf(g, 'gold').find(p => p.reserve === 3000), 1000]]) {
+    assert.ok(first, 'patch for ' + next);
+    const fresh = step(first);
+    assert.equal(fresh.length, 2);
+    for (const f of fresh) { assert.equal(f.reserve, next); assert.equal(f.startReserve, next); }
+    assert.ok(Math.floor(next / 3) < RESPAWN_MIN); // 166 and 333
+    stops(fresh[0]);
+  }
 });
 
 test('finishing a Mine sends its builders to gather gold, not food', () => {
@@ -173,6 +226,7 @@ test('piles respawn mirrored once below 25% of the start, with a cooldown', () =
 });
 
 test('respawned piles and patches keep clear of the centre and the starts', () => {
+  let spawned = 0;
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const g = createGame({ seed });
     for (let k = 0; k < 6; k++) {
@@ -189,9 +243,57 @@ test('respawned piles and patches keep clear of the centre and the starts', () =
       g.patches.clear();
       const known = new Set(g.patches.keys());
       if (!spawnPatchPair(g, 'gold', 1500)) continue;
+      spawned++;
       for (const p of g.patches.values()) if (!known.has(p.id)) for (const i of p.tiles) assert.ok(!nearCentre(g, i), `seed ${seed}: patch tile ${i} within 8 of the centre`);
     }
   }
+  assert.ok(spawned > 0, 'no patch pair ever spawned');
+});
+
+// Replays: game A shows where the next respawn would land; game B, same seed and same oreRng, gets an obstacle there
+// first. B draws the same candidates, so it reaches A's pick at the same try and must turn it down.
+const firstNew = (g, before) => [...g.resources.values()].find(r => !before.has(r.id));
+const goldRespawn = seed => { const g = createGame({ seed }); dropPiles(g, 'gold'); return g; };
+const respawnGold = g => { const before = new Set(g.resources.keys()); updateRespawn(g); return piles(g, 'gold').filter(r => !before.has(r.id)); };
+const block = (x, y) => [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+
+test('a respawned pile or patch never covers a loose relic', () => {
+  for (const seed of [1, 2, 3]) {
+    const a = goldRespawn(seed), got = respawnGold(a), n = a.map.size;
+    assert.equal(got.length, 8, 'A spawned, seed ' + seed);
+    const sx = Math.floor(got[0].x), sy = Math.floor(got[0].y);
+    const b = goldRespawn(seed), relics = block(sx, sy).map(([x, y]) => b.spawnRelic(x + 0.5, y + 0.5));
+    const held = b.spawnRelic(sx + 0.5, sy + 0.5); held.holder = [...b.units.keys()][0]; // carried: doesn't count
+    const mine = respawnGold(b), at = new Set(mine.map(r => tileOfPile(b, r)));
+    assert.equal(mine.length, 8, 'B spawned elsewhere, seed ' + seed);
+    for (const r of relics) assert.equal(at.has(Math.floor(r.y) * n + Math.floor(r.x)), false, `seed ${seed}: pile on a relic`);
+    // Patches: the same replay with spawnPatchPair, a relic on one tile of A's first patch.
+    const pa = createGame({ seed }), known = new Set(pa.patches.keys());
+    assert.equal(spawnPatchPair(pa, 'stone', 800), true);
+    const tile = [...pa.patches.values()].find(p => !known.has(p.id)).tiles[5];
+    const pb = createGame({ seed }); pb.spawnRelic(tile % n + 0.5, Math.floor(tile / n) + 0.5);
+    assert.equal(spawnPatchPair(pb, 'stone', 800), true);
+    assert.equal(pb.patchAt[tile], 0, `seed ${seed}: patch on a relic`);
+  }
+});
+
+test('a pile block enclosed by trees or water is never chosen', () => {
+  let tried = 0;
+  for (const seed of [1, 2, 3, 4, 5]) for (const wall of ['tree', 'water']) {
+    const a = goldRespawn(seed), got = respawnGold(a), n = a.map.size;
+    if (got.length !== 8) continue;
+    const sx = Math.floor(got[0].x), sy = Math.floor(got[0].y), b = goldRespawn(seed);
+    for (let y = sy - 1; y <= sy + 2; y++) for (let x = sx - 1; x <= sx + 2; x++) { // the ring around A's 2x2 block
+      if (x >= sx && x <= sx + 1 && y >= sy && y <= sy + 1) continue;
+      const i = y * n + x;
+      if (b.map.tiles[i] === 1 || b.occAt(x, y)) continue;
+      if (wall === 'water') b.map.tiles[i] = 1; else b.addResource({ type: 'tree', x: x + 0.5, y: y + 0.5, amount: 100 });
+    }
+    const mine = respawnGold(b), at = new Set(mine.map(r => tileOfPile(b, r)));
+    for (const [x, y] of block(sx, sy)) assert.equal(at.has(y * n + x), false, `seed ${seed} ${wall}: pile in the enclosed block`);
+    tried++;
+  }
+  assert.ok(tried >= 8, 'replays run ' + tried);
 });
 
 test('respawn is deterministic for a seed', () => {

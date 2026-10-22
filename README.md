@@ -69,12 +69,13 @@ Each era unlocks units and buildings and changes how your buildings look.
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
 where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
 
-**Mines and rocky ground.** The map has grey rocky ground: gold veins (yellow flecks) and quarries (blue-grey).
+**Mines and rocky ground.** The map has grey rocky ground: gold veins (yellow flecks) and quarries (grey).
 From the Tool Age a villager can build a **Mine** (100 wood, 50 stone) on one; only rocky ground will take it. Right-click
 the finished Mine with villagers and they dig gold or stone from it, carrying it to the nearest Storage Pit or Town Center.
 Every Mine on a patch draws on the patch's one shared reserve (the inspect line reads "Gold left N"). When the reserve
 runs dry the Mines collapse, the ground turns back to grass, and a fresh pair of patches of that kind appears elsewhere
-on the map, one for each side. Loose gold and stone piles run out too: when a kind drops below a quarter of its starting
+on the map, one for each side, each holding a third of what the emptied patch started with. The rocky ground thins out:
+once that third would be under 400 no new pair appears, and at most 8 gold and 4 stone patches exist at once. Loose gold and stone piles run out too: when a kind drops below a quarter of its starting
 total, new mirrored piles appear (a block for each side, away from both bases and the centre). The opponent digs Mines on
 its own half of the map when its piles run low.
 

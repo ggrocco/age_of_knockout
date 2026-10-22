@@ -51,8 +51,13 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
 - `src/sim`: the game itself, **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (`game.js`) owns all
   state (entities/units/buildings/resources/relics Maps, occupancy grid). The player and the bot both act only through
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
-  rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up).
-  Keep it DOM-free and deterministic so the headless runner and tests work.
+  rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
+  `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
+  gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
+  runner and tests work.
+  - `map.tiles` is no longer fixed after generation: ore patches (tiles 2 gold vein, 3 quarry) appear and revert to
+    land (0) during play. Whatever changes `map.tiles` must bump `game.terrainVersion`; the terrain (`render/terrain.js`)
+    and the minimap (`render/minimap.js`) compare it with the version they last drew and repaint when it moves on.
 - `src/rounds/index.js`: per-round rules. `check(game)` returns null or `{winner, reason}`; rounds have a tick cap
   plus a score tiebreak (`scoreOf`). The menu's No time limit option sets `capTicks: Infinity` for human matches;
   off-screen bracket matches keep finite caps so resolution always terminates.

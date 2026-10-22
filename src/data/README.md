@@ -153,17 +153,23 @@ untuned placeholder. Nothing here comes from the openage data.
 - **Ore patches** (`map.js`, `ore.js`): map tiles 2 (gold vein) and 3 (quarry), placed with their 180-degree mirror or not
   at all. Per map: one 4x3 gold patch 12-16 tiles from each start (reserve 1500), plus mid-map patches 20-34 tiles from
   the first start (two 5x4 gold, reserve 3000, and one 5x4 stone, reserve 2500), each ringed by 5 richer loose piles
-  (1200 gold / 900 stone). Tile ids and patch ids come from a counter; a patch is never reused.
+  (1200 gold / 900 stone). Tile values are fixed (2 gold vein, 3 quarry); only patch ids come from a counter
+  (`game.nextPatchId`), so a patch id is never reused.
 - **Mine** (`buildings.js`): Tool Age, 100 wood + 50 stone, 2x2, build time 30 s, 150 HP, sight 3, `extra: true` (does not
   count toward an age-up), `ore: true` (it can only be placed on a patch tile of any kind). `gatherType` and `amount` are
   copied from the patch the Mine stands on, not the building table. Villagers gather from it like a Farm, but every Mine
   on a patch shares that patch's `reserve` (`drawFrom` in `ore.js`).
 - **Exhaustion**: when a reserve reaches 0 every Mine and foundation on the patch is removed (a foundation is lost with no
-  refund), its tiles revert to land, and a new mirrored pair of that kind spawns at half the mid-map reserve (1500 gold,
-  1250 stone), at most `PATCH_CAP` (12) patches alive at once.
+  refund), its tiles revert to land, and a new mirrored pair of that kind spawns, each new patch holding
+  `floor(startReserve / 3)` of the drained patch's starting reserve (the pair holds 2/3 of it, so the map thins out):
+  home gold 1500 -> 500 -> none, mid gold 3000 -> 1000 -> none, quarry 2500 -> 833 -> none. No respawn when that third
+  is under `RESPAWN_MIN` (400), and none past the kind's cap, `PATCH_CAP` = 8 gold and 4 stone patches alive (per kind,
+  so gold can't crowd out the quarries).
 - **Pile respawn** (`ore.js`): every 30 s, if a kind's loose piles hold under 25% of its starting total and 120 s have
   passed since the last respawn, a mirrored 2x2 block of piles appears on each side (800 gold / 600 stone each), more than
-  13 tiles from either start and more than 8 from the map centre (the relic land bridge).
+  13 tiles from either start and more than 8 from the map centre (the relic land bridge), never on a loose relic, and
+  only where a tile beside each block is reachable on foot from a Town Center (a 4-neighbour flood through land and ore
+  ground, blocked by water, resources and buildings). Respawned patches also avoid loose relics.
 - **Bot** (`ai/bot.js`): digs Mines only on patches in its own half that its villagers can reach (computed once on the
   bare map), when its loose piles of that kind run out.
 - **Look** (`render/arch/mine.js`): the Mine varies by era to satisfy the architecture invariants (distinct per era, team
