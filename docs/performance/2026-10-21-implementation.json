@@ -1,0 +1,25 @@
+{
+  "device": "ANGLE Metal Renderer: Apple M2 Max",
+  "browser": "Chromium 155, app browser",
+  "viewport": [1280, 720, 2],
+  "scenario": "High; Death Match seed 1 at tick 12000, 511 groups with resource map synthetically explored",
+  "method": "Original/current/current/original, 60 warm-up frames and 180 measured frames per run, 60 FPS cap, asynchronous GPU queries; CPU is elapsed renderer JavaScript time excluding product HUD/input/compositor",
+  "runs": [
+    {"kind":"original","initMs":815.3,"cpu":{"mean":2.4428,"p50":2.2,"p95":5.1},"gpuMs":{"mean":6.5143,"p50":6.1696,"p95":11.8253},"glError":0,"calls":21,"triangles":1149458},
+    {"kind":"current","initMs":56.5,"cpu":{"mean":1.8033,"p50":1.4,"p95":3.5},"gpuMs":{"mean":6.6737,"p50":6.1721,"p95":12.0225},"glError":0,"calls":21,"triangles":1149458},
+    {"kind":"current","initMs":46.6,"cpu":{"mean":1.7311,"p50":1.3,"p95":3.2},"gpuMs":{"mean":6.6895,"p50":6.196,"p95":11.7014},"glError":0,"calls":21,"triangles":1149458},
+    {"kind":"original","initMs":1013.6,"cpu":{"mean":2.8594,"p50":2.2,"p95":5.6},"gpuMs":{"mean":5.2421,"p50":5.38,"p95":6.4666},"glError":0,"calls":21,"triangles":1149458}
+  ],
+  "shaderParity": {
+    "cosmeticsMeanByteError": 0.017121446397569445,
+    "cosmeticsMaxByteError": 125,
+    "fractionOfCosmeticChannelsDifferingOver8": 0.00028130425347222223,
+    "terrainMeanByteError": 0.027018229166666668,
+    "terrainMaxByteError": 1,
+    "glError": 0
+  },
+  "presetTextures": {"balanced":12,"ultra":18,"highAfterUltra":18},
+  "idleFramesPer600ms": {"desktop":6,"touchPortrait":6,"touchLandscape":6},
+  "tournamentFlow": {"forcedHumanWins":5,"moduleWorkers":4,"champion":true},
+  "limits": ["Short renderer samples, not OS CPU usage or battery measurements", "GPU average increased in this comparison; no GPU speedup is claimed", "Maximum-population battles and Safari/physical phones remain unmeasured"]
+}

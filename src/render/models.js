@@ -335,9 +335,9 @@ export function animate(g, e, t, moving) {
     a.turret.position.z = e.order.type === 'attack' ? -Math.max(0, (e.cd - e.cooldown + 8) / 8) * 0.1 : 0;
     a.hull.position.y = moving ? Math.abs(Math.sin(t * 12 + e.id)) * 0.02 : 0;
   } else if (a.type === 'drone') {
-    a.body.position.y = 1.1 + Math.sin(t * 3 + e.id) * 0.055;
+    a.body.position.y = 1.1 + (g.userData.gpuCosmetics ? 0 : Math.sin(t * 3 + e.id) * 0.055);
     a.body.rotation.x = moving ? 0.12 : 0;
-    a.rotors.forEach((rotor, i) => { rotor.rotation.y = t * (i % 2 ? 35 : -35); });
+    if (!g.userData.gpuCosmetics) a.rotors.forEach((rotor, i) => { rotor.rotation.y = t * (i % 2 ? 35 : -35); });
   } else if (a.type === 'mech') {
     const stride = moving ? Math.sin(t * 8 + e.id) * 0.5 : 0;
     a.legs[0].rotation.x = stride; a.legs[1].rotation.x = -stride;
@@ -348,13 +348,13 @@ export function animate(g, e, t, moving) {
     const p = e.constructed ? 1 : 0.15 + 0.85 * e.progress; a.body.scale.y = p;
     if (a.scaffold) a.scaffold.visible = !e.constructed;
     if (a.crops) { a.crops.visible = e.constructed; a.crops.scale.y = 0.35 + 0.65 * Math.min(1, e.amount / 400); }
-    if (a.flag) a.flag.rotation.y = Math.sin(t * 3) * 0.35;
+    if (a.flag && !g.userData.gpuCosmetics) a.flag.rotation.y = Math.sin(t * 3) * 0.35;
     // The mast, every flag and the animated parts only show on a finished building.
     if (a.mast) a.mast.visible = e.constructed;
     if (a.flag) a.flag.visible = e.constructed;
-    for (const sp of a.spinners ?? []) { sp.p.visible = e.constructed; sp.p.rotation[sp.axis] = t * sp.speed; }
-    for (const f of a.floaters ?? []) { f.p.visible = e.constructed; f.p.position.y = f.y + Math.sin(t * f.speed + f.phase) * f.amp; }
-    for (const sm of a.smoke ?? []) { const k = (t * 0.35 + sm.phase) % 1; sm.p.visible = e.constructed; sm.p.position.y = sm.y + k * 0.9; sm.p.scale.setScalar(0.5 + k * 0.9); }
+    for (const sp of a.spinners ?? []) { sp.p.visible = e.constructed; if (!g.userData.gpuCosmetics) sp.p.rotation[sp.axis] = t * sp.speed; }
+    for (const f of a.floaters ?? []) { f.p.visible = e.constructed; if (!g.userData.gpuCosmetics) f.p.position.y = f.y + Math.sin(t * f.speed + f.phase) * f.amp; }
+    for (const sm of a.smoke ?? []) { const k = (t * 0.35 + sm.phase) % 1; sm.p.visible = e.constructed; if (!g.userData.gpuCosmetics) { sm.p.position.y = sm.y + k * 0.9; sm.p.scale.setScalar(0.5 + k * 0.9); } }
     // The sim sets a tower's cd to its cooldown on a shot and counts it down each tick: the shot shows for 6 ticks
     // (0.3 s), so even the Industrial tower's 12-tick burst blinks. No cooldown (the gallery's entities): never.
     if (a.fire) a.fire.visible = !!e.constructed && e.cooldown > 0 && e.cd > e.cooldown - 6;

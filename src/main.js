@@ -2,6 +2,7 @@ import { createGame } from './sim/game.js';
 import { createBot, matchOptions, THINK_EVERY } from './ai/bot.js';
 import { ROUNDS, roundById, scoreOf } from './rounds/index.js';
 import { createTournament, LEVELS, LEVEL_NAME } from './tournament/bracket.js';
+import { createAsyncSimulator } from './tournament/async-sim.js';
 import { createView } from './render/view.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud, reasonText } from './ui/hud.js';
@@ -28,10 +29,10 @@ let timeLimit = (() => { try { return readTimeLimit(location.search, localStorag
 function setTimeLimit(value) { timeLimit = Number(value); try { localStorage.setItem('timeLimit', String(timeLimit)); } catch {} }
 const timeLimitLabel = () => timeLimit === 0 ? 'No time limit' : timeLimit === 120 ? '2 hours' : `${timeLimit} minute${timeLimit === 1 ? '' : 's'}`;
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
-const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 30;
+const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 10;
 
 const ui = app.ui = { touch: TOUCH, boxMode: false, placeTile: null, wallStart: null, wallEnd: null, game: null, view: null, minimap: null, sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
-  cmd(c) { const r = ui.game.command(0, c); if (!r.ok) hud.toast(reasonText(r.reason)); return r; },
+  cmd(c) { const r = ui.game.command(0, c); if (!r.ok) hud.toast(reasonText(r.reason)); hud.invalidate(); ui.view?.sync(true); ui.view?.invalidate(); return r; },
   setSpeed(s) { ui.speed = s; }, togglePause() { ui.paused = !ui.paused; },
   startPlacing(type) {
     ui.placing = type; ui.wallStart = ui.wallEnd = null;
@@ -49,6 +50,7 @@ const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.con
 function endMatch() {
   hud.cancelDelete(); ui.paused = false; document.getElementById('pausemodal').classList.add('hidden');
   const m = app.match; if (!m) return;
+  hud.reset();
   cancelAnimationFrame(m.raf); m.ended = true; app.match = null;
   if (app.onResize) { window.removeEventListener('resize', app.onResize); app.onResize = null; }
   ui.view?.dispose(); ui.view = null; ui.game = null; ui.minimap = null;
@@ -80,7 +82,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit 
   app.onResize = () => { view.resize(); }; window.addEventListener('resize', app.onResize);
   const loop = now => {
     m.raf = requestAnimationFrame(loop);
-    const budget = ui.paused || game.result ? IDLE_FRAME_MS : FRAME_MS;
+    const budget = FRAME_MS;
     if (now < m.next - 2) return; // 2 ms slack keeps a jittery 60 Hz display at 60
     m.next = Math.max(m.next, now - budget) + budget; // next due time: averages the cap on 120/144 Hz without catch-up bursts
     const dt = Math.min(0.1, (now - m.last) / 1000); m.last = now; m.frames++;
@@ -89,7 +91,15 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit 
       for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = THINK_EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
     if (!ui.paused) m.animT += dt; // the animation clock stops with the match, so working villagers freeze mid-swing
-    input.update(dt); view.sync(); view.frame(dt, m.animT); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
+    input.update(dt); view.sync(); hud.update();
+    const selectionKey = `${[...ui.sel]}|${ui.placing}`;
+    const idle = ui.paused || game.result;
+    if (!idle || now >= (m.nextRender || 0) || m.viewRevision !== view.revision || m.selectionKey !== selectionKey) {
+      view.frame(Math.min(0.1, (now - (m.lastRender ?? now - 16.67)) / 1000), m.animT);
+      m.lastRender = now; m.nextRender = now + IDLE_FRAME_MS;
+      m.viewRevision = view.revision; m.selectionKey = selectionKey;
+    }
+    if (m.frames % 3 === 0) ui.minimap.draw();
     if (game.result && !m.ended) { m.ended = true; setTimeout(() => { if (app.match === m) showResult(m); }, AUTO ? 300 : 1200); }
   };
   m.raf = requestAnimationFrame(loop);
@@ -126,7 +136,13 @@ function bracketScreen() {
 async function afterMatch(won) {
   const t = app.tournament;
   show(`<div class="card"><h2>${won ? 'Round won' : 'Round lost'}</h2><p>Simulating the rest of the bracket&hellip;</p><div class="prog"><i id="pbar"></i></div><p id="ptxt"></p></div>`);
-  await t.resolveAsync(won, { onProgress: (d, n) => { document.getElementById('pbar').style.width = (d / n * 100) + '%'; document.getElementById('ptxt').textContent = `${d} / ${n} matches`; } });
+  const simulator = createAsyncSimulator();
+  try {
+    await t.resolveAsync(won, { simulate: simulator.simulate, onProgress: (d, n) => { document.getElementById('pbar').style.width = (d / n * 100) + '%'; document.getElementById('ptxt').textContent = `${d} / ${n} matches`; } });
+  } catch {
+    show('<div class="card"><h2>Unable to finish the bracket</h2><p>Please start a new tournament.</p><button class="btn" id="recover">Back to menu</button></div>');
+    document.getElementById('recover').onclick = menu; return;
+  } finally { simulator.dispose(); }
   if (!t.over) return bracketScreen();
   const champ = !!t.champion;
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);

@@ -16,6 +16,7 @@ node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rou
 ```
 
 No build step: plain ES modules, with three.js loaded through the import map in `index.html`.
+For hardware render measurements, start the dev server and open `http://localhost:8000/test/tools/render-audit.html?quality=high`. The diagnostic reports CPU and asynchronous GPU timings, restores your saved graphics preference, and is excluded from the nginx image.
 
 ## How a tournament works
 
@@ -36,7 +37,7 @@ Relaxed opponents work at half your speed and wait 30 minutes, and until the Bro
 ![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
 Before each round the bracket shows the rules, the time limit and your opponent. The other matches in each round are
-played out by bots in the background.
+played out by bots in a background Worker so the progress screen stays responsive.
 
 | Round | Game type | Goal |
 | --- | --- | --- |
@@ -195,6 +196,8 @@ rendering remains available. `test/render-models.test.js` checks every unit and 
 animation transforms, and `test/graphics-quality.test.js` covers preference handling, pixel budgets and the
 rendering fallback. Shaders, picking, lighting and visual quality are checked in a browser.
 
+Static model and contact-shadow transforms stay on the GPU until they change. Building flags, machinery, smoke and drone rotors use vertex-shader animation; terrain textures are baked once on the GPU when a match starts. Paused and result screens reduce decorative rendering to 10 FPS, while camera and selection changes remain responsive. The simulation remains deterministic JavaScript at 20 ticks per second.
+
 ## URL parameters
 
 | Param | Effect |
@@ -209,7 +212,7 @@ rendering fallback. Shaders, picking, lighting and visual quality are checked in
 | `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
 | `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the touch layout |
-| `&fps=N` | Frame cap (default 60; 30 while paused or on the result card) |
+| `&fps=N` | Frame cap (default 60; decorative rendering at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
 
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,

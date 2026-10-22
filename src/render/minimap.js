@@ -23,7 +23,11 @@ export function createMinimap(canvas, game, view) {
     for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { const i = y * N + x; if (pl.visible[i]) continue; const p = toCanvas(x + 0.5, y + 0.5); fctx.fillStyle = pl.explored[i] ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.88)'; fctx.fillRect(p.x - sc, p.y - sc * 0.5, sc * 2, sc); }
   };
   const RC = { tree: '#1f4d1f', berry: '#b0208f', gold: '#facc15', stone: '#9ca3af' };
+  let drawStamp = -1, focusX, focusZ, halfX, halfY, entityCount, drawTerrainStamp;
   const mm = { draw() {
+    const [hx, hy] = view.halfExtents();
+    if (drawTerrainStamp === game.terrainVersion && drawStamp === game.time && entityCount === game.entities.size && focusX === view.focus.x && focusZ === view.focus.z && halfX === hx && halfY === hy) return;
+    drawTerrainStamp = game.terrainVersion; drawStamp = game.time; entityCount = game.entities.size; focusX = view.focus.x; focusZ = view.focus.z; halfX = hx; halfY = hy;
     updateTerrain(); ctx.fillStyle = '#0a0d09'; ctx.fillRect(0, 0, W, H); ctx.drawImage(terrain, 0, 0);
     const pl = game.players[0];
     for (const r of game.knownResources(0)) { const p = toCanvas(r.x, r.y); ctx.fillStyle = RC[r.type]; ctx.fillRect(p.x - 1, p.y - 1, 2, 2); }
