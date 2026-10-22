@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { hashBuildings } from './tools/hash-buildings.js';
-import { designOf, DESIGNS } from '../src/render/arch/index.js';
+import { designOf, DESIGNS, archGeos } from '../src/render/arch/index.js';
 import { buildModel, animate, MODEL_MATERIAL } from '../src/render/models.js';
 import { BUILDINGS } from '../src/data/buildings.js';
 import { AGES, ageIndex } from '../src/data/ages.js';
@@ -330,6 +330,35 @@ test('Wall: every segment fills its tile and is static', () => {
     }
     for (const k of ['spinners', 'floaters', 'smoke', 'flag', 'mast', 'fire', 'crops']) assert.equal(a[k], undefined, `wall/${age} has ${k}`);
   }
+});
+// Two upward faces of different colours in one plane z-fight: the Medieval tower's roof (its parapet's top flush with
+// the coping's) flickered in stripes as the camera panned. Pairs of overlapping coplanar up faces, colours apart.
+const coplanarClashes = geo => {
+  const p = geo.attributes.position.array, c = geo.attributes.color.array, up = [];
+  for (let i = 0; i < p.length; i += 9) {
+    const y = p[i + 1]; if (Math.abs(p[i + 4] - y) > 1e-6 || Math.abs(p[i + 7] - y) > 1e-6) continue;
+    const pts = [[p[i], p[i + 2]], [p[i + 3], p[i + 5]], [p[i + 6], p[i + 8]]];
+    const area = (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0]) - (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]);
+    if (area > 1e-9) up.push({ y, pts, col: [c[i], c[i + 1], c[i + 2]] });
+  }
+  // Separating axis test with a margin: faces that only share an edge don't overlap.
+  const apart = (A, B) => [A, B].some(T => T.some((q, k) => {
+    const r = T[(k + 1) % 3], ax = r[1] - q[1], az = q[0] - r[0], L = Math.hypot(ax, az);
+    const a = A.map(v => (v[0] * ax + v[1] * az) / L), b = B.map(v => (v[0] * ax + v[1] * az) / L);
+    return Math.max(...a) <= Math.min(...b) + 1e-3 || Math.max(...b) <= Math.min(...a) + 1e-3;
+  }));
+  // Beyond the per-face patina (0.94 to 1.02).
+  const differ = (a, b) => a.some((v, k) => Math.max(v, b[k]) > 1.1 * Math.min(v, b[k]));
+  up.sort((a, b) => a.y - b.y);
+  const out = [];
+  for (let i = 0; i < up.length; i++) for (let j = i + 1; j < up.length && up[j].y - up[i].y < 1e-5; j++) {
+    if (differ(up[i].col, up[j].col) && !apart(up[i].pts, up[j].pts)) out.push(up[i].y.toFixed(3));
+  }
+  return out;
+};
+test('Medieval tower: no coplanar faces of two colours on top', () => {
+  const geos = archGeos('tower', 0, BUILDINGS.tower.size, 'medieval');
+  assert.deepEqual(coplanarClashes(geos.body), []);
 });
 
 // --- Part 2 closeout: every building in every era ---

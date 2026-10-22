@@ -644,10 +644,11 @@ export function tower(ctx) {
   b.box(1.76, 0.04, 1.76, COBBLE).cylT(0.73, 0.83, y0 - 0.04, STONE_D, 0, 0.04, 0, n);
   b.cylT(R - 0.01, R + 0.01, top - y0, STONE, 0, y0, 0, n);
   for (const y of [1.2, 1.9]) b.cylT(R + 0.025, R + 0.025, 0.05, STONE_D, 0, y, 0, n);
-  // The machicolations, the parapet and its merlons.
+  // The machicolations, the parapet and its merlons. The parapet stops under its coping, so the two never share a top
+  // face (coplanar, they z-fight and the roof flickers as the camera pans).
   for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n; b.box(0.09, 0.16, 0.13, STONE_D, Math.sin(a) * 0.76, top, Math.cos(a) * 0.76, 0, a); }
   const py = top + 0.16, pt = py + 0.3;
-  b.cylT(0.83, 0.83, 0.3, STONE, 0, py, 0, n).cylT(0.84, 0.84, 0.04, STONE_D, 0, pt - 0.04, 0, n);
+  b.cylT(0.83, 0.83, 0.26, STONE, 0, py, 0, n).cylT(0.84, 0.84, 0.04, STONE_D, 0, pt - 0.04, 0, n);
   for (let i = 0; i < 8; i++) { const a = (i + 0.5) * Math.PI / 4; b.box(0.26, 0.22, 0.13, STONE, Math.sin(a) * 0.77, pt, Math.cos(a) * 0.77, 0, a).box(0.28, 0.03, 0.15, STONE_D, Math.sin(a) * 0.77, pt + 0.22, Math.cos(a) * 0.77, 0, a); }
   // Arrow loops on the camera side and the parapet.
   for (const [a, y] of [[Math.PI / 4, 0.75], [Math.PI / 2, 1.4], [Math.PI / 4, 1.42], [Math.PI / 2, 0.62]]) loop(b, Math.sin(a) * (R + 0.005), y, Math.cos(a) * (R + 0.005), a);
@@ -661,9 +662,9 @@ export function tower(ctx) {
   place(b, heater(t), R + 0.012, 1.42, 0, Math.PI / 2, 1.4);
   // The bartizan: a corbelled turret at the back right, its slate cone flying the flag.
   const bx = Math.sin(3 * Math.PI / 4) * 0.8, bz = Math.cos(3 * Math.PI / 4) * 0.8;
-  b.cylT(0.21, 0.06, 0.34, STONE_D, bx, 1.78, bz, 10).cylT(0.21, 0.21, pt + 0.18 - 2.12, STONE, bx, 2.12, bz, 10);
+  b.cylT(0.21, 0.06, 0.34, STONE_D, bx, 1.78, bz, 10).cylT(0.21, 0.21, pt + 0.14 - 2.12, STONE, bx, 2.12, bz, 10);
   b.cylT(0.225, 0.225, 0.04, STONE_D, bx, pt + 0.14, bz, 10).cone(0.27, 0.5, SLATE, bx, pt + 0.18, bz, 10);
-  loop(b, bx + 0.15, pt - 0.2, bz + 0.15, Math.PI / 4, 0.2);
+  loop(b, bx + 0.15, pt - 0.22, bz + 0.15, Math.PI / 4, 0.2);
   flag(ctx, bx, pt + 0.62, bz, 0.5);
   // The quarrels, loosed between the merlons toward the camera sides.
   const fire = new B();
