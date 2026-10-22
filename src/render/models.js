@@ -347,7 +347,7 @@ export function animate(g, e, t, moving) {
   } else if (a.type === 'building') {
     const p = e.constructed ? 1 : 0.15 + 0.85 * e.progress; a.body.scale.y = p;
     if (a.scaffold) a.scaffold.visible = !e.constructed;
-    if (a.crops) { a.crops.visible = e.constructed; a.crops.scale.y = 0.35 + 0.65 * Math.min(1, e.amount / 400); }
+    if (a.crops) { a.crops.visible = e.constructed; a.crops.scale.y = 0.35 + 0.65 * Math.min(1, e.amount / (e.maxAmount || 400)); }
     if (a.flag && !g.userData.gpuCosmetics) a.flag.rotation.y = Math.sin(t * 3) * 0.35;
     // The mast, every flag and the animated parts only show on a finished building.
     if (a.mast) a.mast.visible = e.constructed;

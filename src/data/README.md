@@ -151,6 +151,32 @@ towers and walls are not modelled and nothing here comes from the openage data. 
 - The `hp` on the `BUILDINGS` entries is the Tool-era value (the build menu and tooltip still show it); the entity's `maxHp` is
   the era value above.
 
+## Invented content (Farm eras)
+
+AoE1's Farm holds a fixed amount (its Domestication / Plow / Irrigation techs add food per farm; not checked against the
+openage data, and none of them is modelled). Here the Farm instead scales with its owner's era, like the Tower; every
+number is a game-tuned guess (`FARM` in `farms.js`).
+
+- `addBuilding` gives a new Farm its owner's era `amount` and sets `maxAmount` to it. When the owner advances,
+  `refreshFarms` (`src/sim/game.js`) grows every Farm of theirs to the new capacity, keeping the fraction of food left
+  (`amount / maxAmount`); an unfinished Farm is full, so it starts full.
+- `rate` multiplies the food gather rate of a villager working a Farm (`orders.js`), read from the owner's era at gather
+  time, so it needs no refresh. It stacks with `gatherMult` and `workRate`. Berries and Mines are not affected, and the
+  carry load (10) is unchanged, so a faster Farm shortens the work part of each trip, not the walk.
+- The Stone row is the Farm's old fixed 400 food at normal speed, so the Stone Age economy is unchanged.
+
+  | Era | Food held | Work speed |
+  |---|---|---|
+  | Stone | 400 | 1x |
+  | Tool | 500 | 1.1x |
+  | Bronze | 600 | 1.2x |
+  | Iron | 750 | 1.3x |
+  | Medieval | 900 | 1.4x |
+  | Age of Sail | 1050 | 1.55x |
+  | Industrial | 1250 | 1.75x |
+  | Modern | 1500 | 2x |
+  | AI Future | 1800 | 2.4x |
+
 ## Invented content (ore patches and the Mine)
 
 AoE1 has no Mines, no rocky ground and no resource respawn; all of this is invented for this game and every number is an

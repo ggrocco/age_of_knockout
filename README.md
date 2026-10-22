@@ -75,6 +75,9 @@ around the centre (the opponent mirrors you). Gather food, wood, gold and stone,
 Each era unlocks units and buildings and changes how your buildings look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
 180 and 200 in AI Future (each house adds 4, the Town Center 10).
+Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 600, 750, 900, 1050, 1250, 1500 and
+1800 in AI Future, and villagers work it faster (normal speed in Stone, up to 2.4x in AI Future). When you advance,
+every Farm you already have grows to the new size and keeps its share of food left.
 
 ![Industrial Age Death Match base: brick houses with chimneys, a factory, a castle and red-brick towers](docs/screenshots/deathmatch.jpg)
 

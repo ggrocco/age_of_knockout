@@ -6,7 +6,7 @@ export const BUILDINGS = {
   house:             { name: 'House', hp: 75, cost: c(0, 30), size: 2, buildTime: 15, age: 'stone', pop: 4, sight: 3 },
   granary:           { name: 'Granary', hp: 200, cost: c(0, 120), size: 2, buildTime: 25, age: 'stone', drops: ['food'], sight: 4 },
   storage_pit:       { name: 'Storage Pit', hp: 200, cost: c(0, 120), size: 2, buildTime: 25, age: 'stone', drops: ['wood', 'gold', 'stone'], sight: 4 },
-  farm:              { name: 'Farm', hp: 50, cost: c(0, 60), size: 2, buildTime: 15, age: 'stone', gatherType: 'food', amount: 400, sight: 2, extra: true },
+  farm:              { name: 'Farm', hp: 50, cost: c(0, 60), size: 2, buildTime: 15, age: 'stone', gatherType: 'food', sight: 2, extra: true }, // holds and yields more each era (farms.js)
   // Invented. Only on ore ground: what it yields (gatherType) and how much is left (amount) come from the patch under it (sim/ore.js).
   mine:              { name: 'Mine', hp: 150, cost: c(0, 100, 0, 50), size: 2, buildTime: 30, age: 'tool', sight: 3, extra: true, ore: true },
   barracks:          { name: 'Barracks', hp: 350, cost: c(0, 125), size: 3, buildTime: 30, age: 'stone', trains: ['clubman', 'slinger', 'axeman', 'spearman', 'hoplite', 'swordsman', 'musketeer', 'rifleman', 'machine_gunner', 'mech'], sight: 4 },

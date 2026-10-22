@@ -2,6 +2,7 @@
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
+import { farmStats } from '../data/farms.js';
 import { AGES, AGE_COST, AGE_POP_LIMIT, ageTitle } from '../data/ages.js';
 import { WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { ageUpNeed } from '../sim/commands.js';
@@ -17,7 +18,7 @@ export const DESC = {
   house: `Raises your population cap, up to the limit of your Age (${AGE_POP_LIMIT.stone} in the Stone Age, ${AGE_POP_LIMIT.future} in AI Future). Build more when training stalls at the cap.`,
   granary: 'Drop-off point for food. Place it beside berries and farms to shorten trips.',
   storage_pit: 'Drop-off point for wood, gold and stone. Also researches weapon and armor upgrades.',
-  farm: 'A field that holds 400 food. Villagers work it for a steady food supply.',
+  farm: 'A field of food villagers work for a steady supply. Each Age it holds more food and is worked faster; advancing grows your Farms too.',
   barracks: 'Trains infantry and Slingers, later Musketeers, Riflemen and Machine Gunners. The Future Age adds the Mech Walker.',
   archery_range: 'Trains ranged units: Bowmen, Crossbowmen in the Medieval Age, then Combat Drones in the Future Age.',
   stable: 'Trains fast cavalry: Scouts for exploring, Horse Archers for raids and armoured Knights in the Medieval Age.',
@@ -95,8 +96,8 @@ export function roundTipHtml(round, capTicks = round.capTicks) {
     + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
 }
 
-// state: { kind: 'unit'|'building'|'tech'|'age'|'delete', id, next?, short?: string[], notes?: string[] }
-export function tipHtml({ kind, id, next, short = [], notes = [] }) {
+// state: { kind: 'unit'|'building'|'tech'|'age'|'delete', id, next?, age? (the player's era, for era-scaled stats), short?: string[], notes?: string[] }
+export function tipHtml({ kind, id, next, age = 'stone', short = [], notes = [] }) {
   let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
   if (kind === 'unit') {
     const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageTitle(u.age)}`; cost = u.cost;
@@ -109,7 +110,7 @@ export function tipHtml({ kind, id, next, short = [], notes = [] }) {
     if (b.trains) stats += row('Trains', names(b.trains), true);
     if (b.pop) stats += row('Adds', `+${b.pop} population`, true);
     if (b.drops) stats += row('Drop-off', b.drops.map(cap).join(', '), true);
-    if (b.gatherType) stats += row('Holds', `${b.amount} ${b.gatherType}`, true);
+    if (id === 'farm') { const f = farmStats(age); stats += row('Holds', `${f.amount} food`, true) + row('Work speed', f.rate > 1 ? `+${Math.round((f.rate - 1) * 100)}% food gathering` : 'Normal', true); }
   } else if (kind === 'tech') {
     const t = TECHS[id]; title = t.name; sub = `Research, ${ageTitle(t.age)}`; cost = t.cost; desc = t.desc;
     stats = row('Research time', `${t.time}s`, true);
