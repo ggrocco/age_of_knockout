@@ -47,7 +47,7 @@ const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.con
 
 // Stop the render loop and free the WebGL context; a finished match otherwise keeps drawing behind menus.
 function endMatch() {
-  hud.cancelDelete();
+  hud.cancelDelete(); ui.paused = false; document.getElementById('pausemodal').classList.add('hidden');
   const m = app.match; if (!m) return;
   cancelAnimationFrame(m.raf); m.ended = true; app.match = null;
   if (app.onResize) { window.removeEventListener('resize', app.onResize); app.onResize = null; }
@@ -76,7 +76,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit 
   if (autoplay) bots.unshift(createBot(game, 0, botDiff));
   const diffs = { 0: botDiff, 1: oppDiff };
   const tc = [...game.buildings.values()].find(b => b.owner === 0); view.centerOn(tc.x + 1.5, tc.y + 1.5); view.setZoom(ui.touch ? (innerHeight > innerWidth ? 7.5 : 9) : 13);
-  const m = app.match = { game, view, bots, diffs, acc: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
+  const m = app.match = { game, view, bots, diffs, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
   app.onResize = () => { view.resize(); }; window.addEventListener('resize', app.onResize);
   const loop = now => {
     m.raf = requestAnimationFrame(loop);
@@ -88,7 +88,8 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit 
       m.acc += dt * ui.speed * 20; let steps = Math.min(Math.floor(m.acc), 300); m.acc -= Math.floor(m.acc);
       for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = THINK_EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
-    input.update(dt); view.sync(); view.frame(dt, now / 1000); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
+    if (!ui.paused) m.animT += dt; // the animation clock stops with the match, so working villagers freeze mid-swing
+    input.update(dt); view.sync(); view.frame(dt, m.animT); hud.update(); if (m.frames % 3 === 0) ui.minimap.draw();
     if (game.result && !m.ended) { m.ended = true; setTimeout(() => { if (app.match === m) showResult(m); }, AUTO ? 300 : 1200); }
   };
   m.raf = requestAnimationFrame(loop);
@@ -139,7 +140,7 @@ function menu() {
   show(`<div class="card"><h1>Age of Knockout</h1><h2>A five-round elimination tournament in the spirit of Age of Empires (1997)</h2>
   <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
   ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, or pick up relics</span>
-  <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager (or the round button above the minimap), jump to Town Center</span><b>Space, Esc</b><span>pause, cancel</span></div>`}
+  <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager (or the round button above the minimap), jump to Town Center</span><b>Space + drag</b><span>pan the map with the mouse</span><b>Esc</b><span>pause / resume (cancels a placement first)</span></div>`}
   <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
   <div class="time-option">
     <label for="time-limit">Time limit <output id="time-limit-value" for="time-limit">${timeLimitLabel()}</output></label>

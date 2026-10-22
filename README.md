@@ -84,8 +84,9 @@ where it starts, tap where it ends, then press Place); an enemy army with no way
 ### Controls (desktop)
 
 Left click / drag select (double-click: all of a type) · right click move / gather / build / attack / fetch relic ·
-WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager, `H` Town Center, Space pause, Esc cancel · click the
-minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
+WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager, `H` Town Center · hold Space and drag
+with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
+included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
 
 **Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove

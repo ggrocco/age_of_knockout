@@ -30,6 +30,7 @@ export function createInput(ui) {
   const el = document.getElementById('viewport'), keys = new Set(), drag = { on: false, x: 0, y: 0, moved: false }, box = document.getElementById('dragbox');
   let mouse = { x: 0, y: 0 }, lastClick = { t: 0, id: -1 }, shiftDown = false;
   let wallDrag = null, wallCur = null; // desktop wall drag: the start tile while the button is held, and the last tile under the cursor
+  let spaceDown = false, grab = null; // hold Space and left-drag to pan: grab is the last cursor point while dragging
   const g = () => ui.game;
   const selectedUnitIds = () => [...ui.sel].filter(id => g().entities.get(id)?.kind === 'unit');
   const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; };
@@ -100,17 +101,21 @@ export function createInput(ui) {
 
   // ----- mouse (desktop) -----
   el.addEventListener('mousedown', e => {
-    if (e.button !== 0) return; drag.on = true; drag.x = e.clientX; drag.y = e.clientY; drag.moved = false;
+    if (e.button !== 0) return;
+    if (spaceDown && ui.game) { grab = { x: e.clientX, y: e.clientY }; el.classList.add('grabbing'); return; }
+    drag.on = true; drag.x = e.clientX; drag.y = e.clientY; drag.moved = false;
     if (ui.game && ui.placing === 'wall') wallDrag = wallCur = tileForPlacing(e.clientX, e.clientY);
   });
   window.addEventListener('mousemove', e => {
     mouse = { x: e.clientX, y: e.clientY };
+    if (grab) { if (ui.game) panBy(grab, mouse); grab = mouse; return; }
     if (drag.on) {
       if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
       if (drag.moved && !ui.placing) { box.classList.remove('hidden'); Object.assign(box.style, { left: Math.min(drag.x, e.clientX) + 'px', top: Math.min(drag.y, e.clientY) + 'px', width: Math.abs(e.clientX - drag.x) + 'px', height: Math.abs(e.clientY - drag.y) + 'px' }); }
     }
   });
   window.addEventListener('mouseup', e => {
+    if (e.button === 0 && grab) { grab = null; el.classList.remove('grabbing'); return; }
     if (e.button !== 0 || !drag.on) return; drag.on = false; box.classList.add('hidden');
     const start = wallDrag; wallDrag = null;
     // a wall drag ends wherever the button is let go, even over the HUD: the ghost line showed the ground tile under the cursor
@@ -125,7 +130,12 @@ export function createInput(ui) {
     else { setSel([]); ui.inspect = ent; }
   });
   window.addEventListener('keydown', e => { if (ui.deleteConfirmOpen) return; shiftDown = e.shiftKey; keys.add(e.key.toLowerCase()); onKey(e); });
-  window.addEventListener('keyup', e => { shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase()); });
+  window.addEventListener('keyup', e => {
+    shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase());
+    if (e.key === ' ' && spaceDown) { e.preventDefault(); setSpace(false); } // Firefox clicks a focused button on Space keyup
+  });
+  window.addEventListener('blur', () => { keys.clear(); setSpace(false); });
+  function setSpace(on) { spaceDown = on; el.classList.toggle('grab', on); if (!on) { grab = null; el.classList.remove('grabbing'); } }
   el.addEventListener('contextmenu', e => {
     e.preventDefault(); if (!ui.game) return;
     if (ui.placing) { cancelDrag(); return ui.stopPlacing(); }
@@ -138,11 +148,13 @@ export function createInput(ui) {
   function cancelDrag() { drag.on = false; wallDrag = null; box.classList.add('hidden'); }
   function onKey(e) {
     if (!ui.game) return;
-    if (e.key === 'Escape') { if (ui.placing) cancelDrag(); ui.stopPlacing(); setSel([]); }
+    // Esc cancels a placement first; otherwise it pauses and resumes. While paused (the pause modal) other shortcuts wait.
+    if (e.key === 'Escape') { if (ui.placing) { cancelDrag(); ui.stopPlacing(); } else if (!ui.game.result) { e.preventDefault(); ui.togglePause(); } }
+    else if (ui.paused) return;
+    else if (e.key === ' ') { e.preventDefault(); if (!e.repeat) setSpace(true); } // held Space + left-drag pans the map
     else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); if (!e.repeat) ui.actions.delete(b.id); } } // Backspace is the Mac "delete" key; held keys must not auto-repeat requests.
     else if (e.key === '.') ui.actions.idle();
     else if (e.key.toLowerCase() === 'h') ui.actions.home();
-    else if (e.key === ' ') { e.preventDefault(); ui.togglePause(); }
     else if (e.key === '+' || e.key === '=') ui.view.setZoom(ui.view.zoom * 0.9); else if (e.key === '-') ui.view.setZoom(ui.view.zoom * 1.1);
   }
 
