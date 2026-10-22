@@ -107,3 +107,23 @@ test('buildings re-skin in every new era', () => {
 test('Castle and Factory have their own geometry, not the placeholder box', () => {
   for (const type of ['castle', 'factory']) { const m = buildModel({ kind: 'building', type, owner: 0, size: BUILDINGS[type].size, constructed: true, progress: 1, amount: 0 }, 'modern'); assert.ok(m.anim.body.children[0].geometry.attributes.position.count > 100, type); }
 });
+test('the Mine has finite geometry in every era and animates only while dug', () => {
+  for (const age of AGES) for (const owner of [0, 1]) {
+    const e = { kind: 'building', type: 'mine', owner, size: BUILDINGS.mine.size, constructed: true, progress: 1, amount: 1500, gatherType: 'gold', digging: 0 };
+    const model = buildModel(e, age), g = new THREE.Group(); g.add(model.root); g.userData.anim = model.anim;
+    checkGeometry(model, `mine/${age}/${owner}`);
+    const { wheel, cart } = model.anim;
+    assert.ok(wheel && cart, `mine/${age}: no wheel or cart`);
+    animate(g, e, 0, false); const still = cart.p.position.toArray(), spin = wheel.p.rotation[wheel.axis];
+    animate(g, e, 1, false);
+    assert.deepEqual(cart.p.position.toArray(), still, `mine/${age}: the cart runs while nobody digs`);
+    assert.equal(wheel.p.rotation[wheel.axis], spin, `mine/${age}: the wheel turns while nobody digs`);
+    e.digging = 2; animate(g, e, 2, false); const at = cart.p.position.toArray(), turned = wheel.p.rotation[wheel.axis];
+    animate(g, e, 2.5, false);
+    assert.notDeepEqual(cart.p.position.toArray(), at, `mine/${age}: the cart stays put while dug`);
+    assert.notEqual(wheel.p.rotation[wheel.axis], turned, `mine/${age}: the wheel stays still while dug`);
+    // Under construction the moving parts hide.
+    e.constructed = false; e.progress = 0.4; animate(g, e, 3, false);
+    assert.equal(cart.p.visible, false); assert.equal(wheel.p.visible, false);
+  }
+});

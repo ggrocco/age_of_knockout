@@ -156,7 +156,7 @@ export function createView(container, game) {
     const e = ud.entity, bg = new THREE.Mesh(geo.plane, overlay.barBg), fg = new THREE.Mesh(geo.plane, overlay.barFg[0]), bar = new THREE.Group();
     // Overlapping bars stack per entity (background, then fill) in the order their entities appeared.
     bg.renderOrder = 4 + ud.seq * 1e-6; fg.renderOrder = bg.renderOrder + 1e-7; bg.scale.set(1, 0.14, 1); bg.raycast = fg.raycast = noRaycast; bar.add(bg, fg);
-    bar.position.y = e.kind === 'building' ? (e.gatherType ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar);
+    bar.position.y = e.kind === 'building' ? (e.type === 'farm' ? 0.8 : e.type === 'house' ? 1.8 : 2.6) : 1.5; g.add(bar);
     return ud.bar = { bar, fg };
   }
   const removeGroup = g => { scene.remove(g); batch.remove(g); disposeObject(g); };
@@ -182,7 +182,7 @@ export function createView(container, game) {
   const worldPos = e => e.kind === 'building' ? [e.x + e.size / 2, 0, e.y + e.size / 2] : [e.x, e.kind === 'relic' ? (e.holder !== null ? 1.35 : 0.2) : 0, e.y];
   view.frame = (dt, t) => {
     placeCamera();
-    terrain.update(t, view.fogEnabled);
+    terrain.refresh(); terrain.update(t, view.fogEnabled);
     const k = Math.min(1, dt * 16);
     for (const g of view.groups.values()) {
       const e = g.userData.entity; if (!e) continue;
