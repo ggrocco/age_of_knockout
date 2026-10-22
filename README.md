@@ -273,6 +273,11 @@ Same tests without Jenkins:
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test
 ```
 
+## Contributing
+
+Issues, ideas and pull requests are welcome and much appreciated! Age of Knockout is a one-person project made just
+for fun, so please expect slow replies and reviews. Contributor and agent notes are in `AGENTS.md`.
+
 ## Status
 
 Rules, AI and bracket are covered by headless tests and bot-vs-bot runs; the renderer and UI were checked with
