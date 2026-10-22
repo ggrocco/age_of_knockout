@@ -56,7 +56,7 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
 - `src/sim`: the game itself, **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (`game.js`) owns all
   state (entities/units/buildings/resources/relics Maps, occupancy grid). The player and the bot both act only through
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
-  rivers), `path.js` (A*), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
+  rivers), `path.js` (A*), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
   `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
   gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
   runner and tests work.

@@ -103,6 +103,10 @@ included; during a building placement Esc cancels it instead) · click the minim
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove
 it without a refund; queued training and research are lost. Closing the dialog restores your previous pause state.
 
+**Group moves:** several units sent to one spot (right click on the ground or the minimap, or a tap on touch) spread out
+around it in a block facing the way they march, one unit per tile: melee fighters in the front rows, then ranged units,
+siege, and villagers at the back.
+
 ### Controls (phone / touch)
 
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
