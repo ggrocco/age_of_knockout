@@ -1,6 +1,6 @@
 import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
-import { BUILDINGS, repairCost } from '../data/buildings.js';
+import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
 import { farmStats } from '../data/farms.js';
 import { AGES, popLimit } from '../data/ages.js';
@@ -186,10 +186,11 @@ function updateBuilding(game, b) {
     return;
   }
   if (b.repairers) repairBuilding(game, b, rate);
-  if (b.queue.length && (b.queue[0].remaining -= rate) <= 0) {
+  const work = rate * workSpeed(b); // a damaged building trains and researches slower (repairing is not slowed)
+  if (b.queue.length && (b.queue[0].remaining -= work) <= 0) {
     const q = b.queue.shift(), sp = game.findSpawn(b); game.spawnUnit(q.unit, b.owner, sp.x, sp.y);
   }
-  if (b.research && (b.research.remaining -= rate) <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
+  if (b.research && (b.research.remaining -= work) <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
 }
 
 // Villagers who stood repairing `b` this tick (units update first) put HP back as fast as they would build it, crew scaling

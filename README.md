@@ -110,7 +110,9 @@ of that chain instead, as in AoE. Move, attack or gather orders replace the whol
 **Repair a building:** select villagers and right-click (tap on touch) one of your finished, damaged buildings. They
 put its HP back as fast as they would build it; full repair costs half the building's cost, paid as the HP goes back on,
 and they stop when a resource it costs runs out. Selecting a damaged building shows what a full repair would cost.
-Like a build, a repair returns the villager to the job it interrupted.
+Like a build, a repair returns the villager to the job it interrupted. A damaged building trains units and researches
+at its share of full HP (a Barracks at 60% HP works at 60% speed, never below 25%); the info panel shows the slowdown,
+and repairing brings it back to full speed.
 
 **Delete a building:** select it and click **Delete**, or press **Delete / Backspace**. A confirmation dialog names
 the building and pauses the match. Choose **Cancel** (or press **Esc**) to keep it, or **Delete building** to remove

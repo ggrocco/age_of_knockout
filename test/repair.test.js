@@ -1,6 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
-import { BUILDINGS, REPAIR_COST, repairCost } from '../src/data/buildings.js';
+import { BUILDINGS, REPAIR_COST, repairCost, workSpeed } from '../src/data/buildings.js';
+import { TECHS } from '../src/data/techs.js';
 
 const vills = (g, p) => [...g.units.values()].filter(u => u.owner === p && u.type === 'villager');
 const tc = (g, p) => [...g.buildings.values()].find(b => b.owner === p && b.type === 'town_center');
@@ -87,4 +88,33 @@ test('several villagers repair faster than one, and repairing is deterministic',
   const one = play(1), three = play(3);
   assert.ok(three.hp > one.hp * 1.5, `${three.hp} vs ${one.hp}`);
   assert.equal(play(3).snap, three.snap);
+});
+
+test('a damaged building trains slower in proportion to its HP (never below 25%) and is back to normal once repaired', () => {
+  const trainTicks = hpFrac => {
+    const g = createGame({ seed: 1 }), t = tc(g, 0); g.players[0].res.food = 1000;
+    t.hp = t.maxHp * hpFrac;
+    assert.equal(g.command(0, { type: 'train', buildingId: t.id, unit: 'villager' }).ok, true);
+    const n = vills(g, 0).length; let i = 0;
+    while (vills(g, 0).length === n && i < 5000) { g.tick(); i++; }
+    return i;
+  };
+  const full = trainTicks(1), half = trainTicks(0.5), wrecked = trainTicks(0.05);
+  assert.ok(Math.abs(half - full * 2) <= 2, `half HP ${half} vs full ${full}`);
+  assert.ok(Math.abs(wrecked - full * 4) <= 4, `5% HP ${wrecked} vs full ${full} (floor 25%)`);
+  assert.equal(workSpeed({ hp: 600, maxHp: 600 }), 1);
+  assert.equal(workSpeed({ hp: 150, maxHp: 600 }), 0.25);
+});
+
+test('research slows with damage too, and repairing restores the speed', () => {
+  const g = createGame({ seed: 1 }), p = g.players[0], t = tc(g, 0);
+  p.age = 'tool'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
+  const pit = g.addBuilding('storage_pit', 0, Math.floor(t.x) - 4, Math.floor(t.y), true);
+  pit.hp = pit.maxHp / 2;
+  assert.equal(TECHS.bronze_weapons.building, 'storage_pit');
+  assert.equal(g.command(0, { type: 'research', buildingId: pit.id, tech: 'bronze_weapons' }).ok, true);
+  const start = pit.research.remaining; g.tick();
+  assert.ok(Math.abs(start - pit.research.remaining - 0.5) < 1e-9, 'half speed at half HP');
+  pit.hp = pit.maxHp; g.tick();
+  assert.ok(Math.abs(start - pit.research.remaining - 1.5) < 1e-9, 'full speed once whole');
 });

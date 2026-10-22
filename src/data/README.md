@@ -26,6 +26,9 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
   and in proportion to the HP restored. When a resource the building costs runs out, the repair stops there. Rate and
   cost are invented (AoE2-style) and not checked against AoE1. Any finished building can be repaired except Farms and
   Mines, which right-click gathers instead (the `repair` command itself accepts them).
+- **Damage slows production** (`workSpeed`, `DAMAGED_MIN_SPEED` in `buildings.js`): a damaged building trains and
+  researches at `hp / maxHp` of its normal speed, never below 25%, back to full once repaired. Invented; AoE1 has no
+  such rule. Repairing, Farm/Mine gathering, tower fire and the player-wide age-up are not slowed.
 - The Wonder does not count toward the age-up building requirement (flagged `extra`, like the Farm): it is a
   victory building, so leaving Bronze needs only the Government Center.
 

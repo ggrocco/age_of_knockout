@@ -26,3 +26,7 @@ export const BUILDINGS = {
 export const REPAIR_COST = 0.5;
 // What putting `hp` HP back on a building of `type` with `maxHp` costs.
 export const repairCost = (type, hp, maxHp) => Object.fromEntries(Object.entries(BUILDINGS[type].cost).map(([k, v]) => [k, v * REPAIR_COST * hp / maxHp]));
+// Damage slows a building's production (invented): it trains and researches at its share of full HP, never below
+// DAMAGED_MIN_SPEED, and is back to full speed once repaired.
+export const DAMAGED_MIN_SPEED = 0.25;
+export const workSpeed = b => Math.max(DAMAGED_MIN_SPEED, Math.min(1, b.hp / b.maxHp));
