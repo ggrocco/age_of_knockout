@@ -110,6 +110,10 @@ const cropsShrink = age => {
   assert.equal(a.crops.visible, true); const full = a.crops.scale.y;
   e.amount = 0; animate(g, e, 1, false);
   assert.ok(a.crops.scale.y < full, `${age}: crops did not shrink (${a.crops.scale.y} vs ${full})`);
+  const empty = a.crops.scale.y; // a later-era Farm is measured against its own capacity, not the Stone 400
+  e.maxAmount = e.amount = 1800; animate(g, e, 1, false); assert.equal(a.crops.scale.y, full, `${age}: a full 1800 Farm is not full`);
+  e.amount = 900; animate(g, e, 1, false);
+  assert.ok(a.crops.scale.y > empty && a.crops.scale.y < full, `${age}: a half-full 1800 Farm shows ${a.crops.scale.y}`);
 };
 // The design's spinners (what names them) are hidden while it is unfinished, then show and turn once it is finished.
 const spinnersTurn = (type, age, what) => {

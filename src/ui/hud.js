@@ -24,8 +24,8 @@ export function createHud(ui) {
   // otherwise `off` and `small` (cost line) are patched in place so hover/glow animations and focus survive resource ticks.
   const tips = new Map();
   const roundTips = new Map(ROUNDS.map(r => [`round:${r.id}`, r]));
-  const tile = (attrs, { kind, id, name, cost, tint, cls, ok, lockedAge, short = [], notes = [], next, extra = '', cx = '' }) => {
-    tips.set(`${kind}:${id}`, tipHtml({ kind, id, next, short, notes }));
+  const tile = (attrs, { kind, id, name, cost, tint, cls, ok, lockedAge, short = [], notes = [], next, age, extra = '', cx = '' }) => {
+    tips.set(`${kind}:${id}`, tipHtml({ kind, id, next, age, short, notes }));
     const lock = lockedAge ? `<span class="lock">${icon('lock')}</span>` : '', small = lockedAge ? ageTitle(lockedAge) : costHtml(cost, short, true) + extra;
     return { key: `${attrs}|${name}|${lockedAge ? 'L' : ''}`, off: !ok, small,
       html: `<button class="btn tile ${tint}${ok ? '' : ' off'}${lockedAge ? ' locked' : ''}${cx}" ${attrs} data-tip="${kind}:${id}" aria-describedby="tip" aria-disabled="${!ok}"><span class="orb">${icon(id, cls)}${lock}</span><span class="lbl"><b>${name}</b><small>${small}</small></span></button>` };
@@ -129,7 +129,7 @@ export function createHud(ui) {
     const describe = e => {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
-      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}${e.maxAmount ? ' / ' + e.maxAmount : ''}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
       // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
       const next = AGES[ageIndex(p.age) + 1];
       if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;
@@ -151,7 +151,7 @@ export function createHud(ui) {
       const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText(popFullReason(p))] : [])];
       if (vills.length) for (const [id, d] of Object.entries(BUILDINGS)) {
         const locked = ageIndex(d.age) > ageIndex(p.age), short = shortOf(p, d.cost), ok = !locked && canAfford(p, d.cost);
-        btns.push(tile(`data-build="${id}"`, { kind: 'building', id, name: d.name, cost: d.cost, tint: tintOf(d), ok, lockedAge: locked ? d.age : '', short, notes: notesFor(locked, d, short) }));
+        btns.push(tile(`data-build="${id}"`, { kind: 'building', id, name: d.name, cost: d.cost, tint: tintOf(d), ok, lockedAge: locked ? d.age : '', short, notes: notesFor(locked, d, short), age: p.age }));
       }
       if (bld) {
         for (const u of BUILDINGS[bld.type].trains || []) { const d = UNITS[u], locked = ageIndex(d.age) > ageIndex(p.age), short = shortOf(p, d.cost), popFull = p.pop >= p.popCap, ok = !locked && canAfford(p, d.cost) && !popFull;

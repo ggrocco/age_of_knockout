@@ -2,6 +2,7 @@ import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
+import { farmStats } from '../data/farms.js';
 import { AGES, popLimit } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
@@ -49,6 +50,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     const e = { id: game.nextId++, kind: 'building', type, owner, x, y, size: d.size, maxHp, hp: constructed ? maxHp : 1, constructed, progress: constructed ? 1 : 0,
       queue: [], workers: 0, sight: d.sight, marmor: d.marmor ?? 3, parmor: d.parmor ?? 8, dead: false, gatherType: d.gatherType || null, amount: d.amount || 0 };
     if (d.ore) { const pt = game.patches.get(game.patchAt[y * n + x]); Object.assign(e, { patch: pt?.id ?? 0, gatherType: pt?.kind ?? 'gold', amount: pt?.reserve ?? 0, digging: 0 }); } // a Mine yields what its patch holds
+    if (type === 'farm') e.amount = e.maxAmount = farmStats(game.players[owner].age).amount; // a Farm holds its owner's era's food
     if (d.defence === 'tower') Object.assign(e, { atk: def.atk, atkType: def.atkType, range: def.range, cooldown: def.cooldown, splash: def.splash || 0, bonus: null, cd: 0 });
     game.entities.set(e.id, e); game.buildings.set(e.id, e);
     if (!constructed && opensFoundation(type)) { for (const i of cells(e)) reserved.add(i); return e; } // units may stand on it until it is finished
@@ -141,7 +143,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
     for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
     for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
     if (game.time % RESPAWN_EVERY === 0) updateRespawn(game);
-    for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); }
+    for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); refreshFarms(game, p.id); }
     for (const r of game.relics.values()) if (r.holder !== null) { const h = game.entities.get(r.holder); if (h) { r.x = h.x; r.y = h.y; } }
     game.recount();
     if (game.time % 4 === 0) updateVision(game);
@@ -161,6 +163,13 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
   if (rules && rules.setup) rules.setup(game);
   game.recount(); updateVision(game);
   return game;
+}
+
+// When a player advances, each of their Farms grows to the new era's capacity and keeps its fraction of food left
+// (amount / maxAmount), as a Tower keeps its fraction of health. An unfinished Farm is full, so it starts full again.
+function refreshFarms(game, pid) {
+  const cap = farmStats(game.players[pid].age).amount;
+  for (const b of game.buildings.values()) if (b.owner === pid && b.type === 'farm') { b.amount = b.amount / b.maxAmount * cap; b.maxAmount = cap; }
 }
 
 function updateBuilding(game, b) {

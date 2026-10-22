@@ -1,6 +1,7 @@
 import { findPath } from './path.js';
 import { breachTarget } from './defence.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { farmStats } from '../data/farms.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 import { drawFrom } from './ore.js';
 
@@ -90,7 +91,7 @@ function doGather(game, u, o) {
     const r = travel(game, u, goalNear(res, 0.95), centerOf(res));
     if (r === 'fail') { if (++o.fails > 3) stop(u); else o.res = -1; }
   } else if (o.phase === 'work') {
-    const p = game.players[u.owner], rate = RATE[kind] * DT * p.gatherMult[kind] * p.workRate;
+    const p = game.players[u.owner], rate = RATE[kind] * DT * p.gatherMult[kind] * p.workRate * (res.type === 'farm' ? farmStats(p.age).rate : 1); // Farms work faster each era
     if (u.carry.type !== kind) u.carry = { type: kind, amount: 0 };
     if (res.kind === 'building') res.gatherers = (res.gatherers || 0) + 1;
     const take = drawFrom(game, res, rate); u.carry.amount += take; game.players[u.owner].gathered += take; // removes an empty pile/Farm, exhausts a Mine's patch
