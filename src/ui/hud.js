@@ -17,7 +17,7 @@ const shortOf = (p, cost) => RES.filter(k => cost[k] > p.res[k]);
 
 export function createHud(ui) {
   const $ = id => document.getElementById(id), top = $('topbar'), info = $('info'), cmds = $('cmds');
-  let cmdKey = '', infoKey = '';
+  let cmdKey = '', infoKey = '', updateKey = '', lastGame = null, revision = 0;
   const hud = { toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(hud._t); hud._t = setTimeout(() => t.classList.remove('show'), 2200); } };
   // Glass command tile: icon orb + name + cost. Disabled tiles use .off / aria-disabled (not [disabled]) so they still receive hover for the tooltip.
   // tile() returns a descriptor: `key` (attributes + name + lock) changes only when the tile set, its target building or a lock state changes (then the panel is rebuilt);
@@ -75,8 +75,15 @@ export function createHud(ui) {
     if (deleteDialog.open) deleteDialog.close('cancel');
     finishDelete();
   };
+  hud.invalidate = () => { revision++; };
+  hud.reset = () => { lastGame = null; updateKey = ''; cmdKey = ''; infoKey = ''; };
   hud.update = () => {
-    const g = ui.game, p = g.players[0], round = g.rules;
+    const g = ui.game;
+    if (!g) return;
+    const stamp = `${g.time}|${!!g.result}|${[...ui.sel]}|${ui.inspect?.id}|${ui.placing}|${ui.paused}|${ui.speed}|${ui.boxMode}|${ui.resignArmed}|${ui.deleteConfirmOpen}|${$('gamemenu').classList.contains('hidden')}|${revision}`;
+    if (lastGame === g && updateKey === stamp) return;
+    lastGame = g; updateKey = stamp;
+    const p = g.players[0], round = g.rules;
     // The pause modal: shown for a player pause, not while the settings menu or delete dialog (which also pause) is up.
     const pauseEl = $('pausemodal'), showPause = ui.paused && !g.result && !ui.deleteConfirmOpen && $('gamemenu').classList.contains('hidden');
     if (showPause === pauseEl.classList.contains('hidden')) { pauseEl.classList.toggle('hidden', !showPause); if (showPause) { hideTip(); pauseEl.querySelector('button').focus({ preventScroll: true }); } }

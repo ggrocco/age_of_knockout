@@ -63,6 +63,10 @@ pipeline {
           v=$(docker exec "$CI_ID-web" grep -o 'src="v/[^/]*' /usr/share/nginx/html/index.html | cut -d/ -f2)
           [ -n "$v" ] || { echo "FAIL index.html has no versioned script path"; exit 1; }
           check "/v/$v/src/main.js" javascript
+          check "/v/$v/src/tournament/worker.js" javascript
+          check "/eof/v/$v/src/tournament/worker.js" javascript
+          check "/v/$v/src/render/terrain-bake.js" javascript
+          check "/v/$v/src/render/cosmetics.js" javascript
           check "/v/$v/styles.css" text/css
           check "/eof/v/$v/src/gallery/main.js" javascript
           check /src/gallery/main.js javascript

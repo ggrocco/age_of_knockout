@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createGrass } from './grass.js';
+import { bakeTerrain } from './terrain-bake.js';
 
 // Visual noise has its own seed; it never consumes the simulation's RNG.
 function hash(x, y, seed) {
@@ -7,19 +8,8 @@ function hash(x, y, seed) {
   n = Math.imul(n ^ (n >>> 13), 1274126177);
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
-function noise(x, y, seed) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  let u = x - ix, v = y - iy;
-  u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
-  const a = hash(ix, iy, seed), b = hash(ix + 1, iy, seed);
-  const c = hash(ix, iy + 1, seed), d = hash(ix + 1, iy + 1, seed);
-  return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
-}
-
 export function createTerrain(game, renderer, preset) {
-  const { size: n, tiles, starts } = game.map, scale = 24;
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = n * scale;
-  const ctx = canvas.getContext('2d'), pixels = ctx.createImageData(canvas.width, canvas.height);
+  const { size: n, tiles } = game.map;
   const waterAt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && tiles[y * n + x] === 1;
   // Distance to the opposite terrain type gives shores a sand / shallow-water fringe.
   const shore = new Float32Array(n * n).fill(4);
@@ -34,73 +24,7 @@ export function createTerrain(game, renderer, preset) {
     return (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v)
       + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
   };
-  // Ore ground (tiles 2 gold vein, 3 quarry) fades into the land round it over about a quarter tile, so a patch is no
-  // hard square: d is the distance to the nearest edge or corner shared with other ground, roughened by noise.
-  const oreAt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && tiles[y * n + x] >= 2 ? tiles[y * n + x] : 0;
-  const oreWeight = (x, y, kind) => {
-    const tx = Math.floor(x), ty = Math.floor(y), u = x - tx, v = y - ty;
-    let d = 1;
-    if (oreAt(tx - 1, ty) !== kind) d = Math.min(d, u);
-    if (oreAt(tx + 1, ty) !== kind) d = Math.min(d, 1 - u);
-    if (oreAt(tx, ty - 1) !== kind) d = Math.min(d, v);
-    if (oreAt(tx, ty + 1) !== kind) d = Math.min(d, 1 - v);
-    for (const [dx, dy, cu, cv] of [[-1, -1, u, v], [1, -1, 1 - u, v], [-1, 1, u, 1 - v], [1, 1, 1 - u, 1 - v]]) {
-      if (oreAt(tx + dx, ty + dy) !== kind) d = Math.min(d, Math.hypot(cu, cv));
-    }
-    return Math.max(0, Math.min(1, (d + (noise(x * 3.1, y * 3.1, game.seed + 57) - 0.5) * 0.2) / 0.25));
-  };
-  // Rocky grey-brown ground; a gold vein glints with sparse yellow flecks, a quarry is greyer and split by dark cracks.
-  const oreColor = (x, y, px, py, kind) => {
-    const rough = noise(x * 1.7, y * 1.7, game.seed + 41), fine = noise(x * 6, y * 6, game.seed + 43) - 0.5;
-    if (kind === 2) {
-      if (hash(px >> 1, py >> 1, game.seed + 71) > 0.965 && fine > -0.1) return [224, 186, 66];
-      return [114 + rough * 28 + fine * 22, 102 + rough * 24 + fine * 20, 82 + rough * 16 + fine * 14];
-    }
-    const crack = Math.abs(noise(x * 2.3, y * 2.3, game.seed + 83) - 0.5) < 0.022 ? 0.62 : 1;
-    return [(124 + rough * 26 + fine * 20) * crack, (122 + rough * 25 + fine * 20) * crack, (116 + rough * 22 + fine * 18) * crack];
-  };
-  // The canvas colour of pixel (px, py), from the tiles as they are now.
-  const colorAt = (px, py) => {
-    const x = px / scale, y = py / scale, kind = tiles[Math.floor(y) * n + Math.floor(x)];
-    const broad = noise(x * 0.22, y * 0.22, game.seed), detail = noise(x * 2.7, y * 2.7, game.seed + 9);
-    const grain = hash(px, py, game.seed + 31) - 0.5;
-    let color;
-    if (kind === 1) {
-      const shallow = Math.max(0, 1 - shoreAt(x, y) / 4);
-      color = [28 + shallow * 28, 68 + shallow * 38, 74 + shallow * 34];
-    } else {
-      let earth = Math.max(0, (broad - 0.52) * 2.2);
-      for (const start of starts) {
-        const distance = Math.hypot(x - start.x - 0.5, y - start.y - 0.5);
-        earth = Math.max(earth, Math.max(0, 1 - distance / 5) * 0.85);
-      }
-      const sand = Math.max(0, 1 - shoreAt(x, y) / 2) * 0.7;
-      const grass = [83 + broad * 30, 94 + broad * 30, 47 + broad * 16];
-      color = grass.map((v, c) => v * (1 - earth) + [141, 119, 80][c] * earth);
-      color = color.map((v, c) => v * (1 - sand) + [166, 150, 106][c] * sand);
-      if (kind >= 2) {
-        const w = oreWeight(x, y, kind), ore = oreColor(x, y, px, py, kind);
-        color = color.map((v, c) => v * (1 - w) + ore[c] * w);
-      }
-    }
-    return color.map(v => v + (detail - 0.5) * 17 + grain * 13);
-  };
-  // Paints tiles [x0, x1) x [y0, y1) into the image data.
-  const paint = (x0, y0, x1, y1) => {
-    for (let py = y0 * scale; py < y1 * scale; py++) for (let px = x0 * scale; px < x1 * scale; px++) {
-      const color = colorAt(px, py), i = (py * canvas.width + px) * 4;
-      for (let c = 0; c < 3; c++) pixels.data[i + c] = color[c];
-      pixels.data[i + 3] = 255;
-    }
-  };
-  paint(0, 0, n, n);
-  ctx.putImageData(pixels, 0, 0);
-  // What the canvas shows, to find the tiles that changed when terrainVersion moves on.
-  const painted = Uint8Array.from(tiles);
-  let terrainStamp = game.terrainVersion;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const baked = bakeTerrain(renderer, game.map, game.seed, shore), texture = baked.texture;
   const geometry = new THREE.PlaneGeometry(n, n);
   const micro = new Uint8Array(128 * 128 * 4);
   for (let i = 0; i < 128 * 128; i++) {
@@ -165,26 +89,10 @@ export function createTerrain(game, renderer, preset) {
   const maskData = new Uint8Array(n * n * 4), mask = new THREE.DataTexture(maskData, n, n);
   mask.magFilter = mask.minFilter = THREE.NearestFilter;
   const grass = createGrass(game, mask); grass.setCount(preset.grass);
-  let maskStamp = -1;
+  let maskStamp = -1, terrainStamp = game.terrainVersion;
   return { ground, water, grass: grass.mesh, setQuality(next) { grass.setCount(next.grass); },
-    // Ore patches come and go during play (sim/ore.js). Repaints each changed tile and its neighbours, whose edge fade
-    // reads it; cheap to call every frame.
-    refresh() {
-      if (game.terrainVersion === terrainStamp) return;
-      terrainStamp = game.terrainVersion;
-      const dirty = new Uint8Array(n * n);
-      for (let i = 0; i < n * n; i++) if (painted[i] !== tiles[i]) {
-        painted[i] = tiles[i];
-        const x = i % n, y = i / n | 0;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (x + dx >= 0 && y + dy >= 0 && x + dx < n && y + dy < n) dirty[(y + dy) * n + x + dx] = 1;
-      }
-      let any = false;
-      for (let i = 0; i < n * n; i++) if (dirty[i]) {
-        const x = i % n, y = i / n | 0;
-        paint(x, y, x + 1, y + 1); ctx.putImageData(pixels, 0, 0, x * scale, y * scale, scale, scale); any = true;
-      }
-      if (any) texture.needsUpdate = true;
-    },
+    // The small grid is uploaded only when ore patches change; pixels are repainted on the GPU.
+    refresh() { if (terrainStamp !== game.terrainVersion) { baked.refresh(game.terrainVersion); terrainStamp = game.terrainVersion; } },
     update(t, fogEnabled = true) {
       waterTime.value = t; normalTexture.offset.set(t * 0.008 % 1, t * 0.005 % 1); grass.update(t, fogEnabled);
       if (maskStamp !== game.time && (game.time % 4 === 0 || maskStamp < 0)) {
@@ -196,6 +104,6 @@ export function createTerrain(game, renderer, preset) {
         mask.needsUpdate = true;
       }
     },
-    dispose() { texture.dispose(); bumpTexture.dispose(); normalTexture.dispose(); mask.dispose(); },
+    dispose() { baked.dispose(); bumpTexture.dispose(); normalTexture.dispose(); mask.dispose(); },
   };
 }

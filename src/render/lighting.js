@@ -24,11 +24,13 @@ export function createSkyLighting(renderer) {
 class WorldAO extends SSAOPass {
   render(renderer, writeBuffer, readBuffer, ...rest) {
     const hidden = [], autoShadow = renderer.shadowMap.autoUpdate;
-    this.scene.traverse(o => {
-      if (o.isMesh && o.visible && (o.userData.skipAO || o.material.transparent || o.material.depthTest === false)) {
-        hidden.push(o); o.visible = false;
-      }
-    });
+    if (!this.excluded) {
+      this.excluded = [];
+      this.scene.traverse(o => {
+        if (o.isMesh && (o.userData.skipAO || o.material.transparent || o.material.depthTest === false)) this.excluded.push(o);
+      });
+    }
+    for (const o of this.excluded) if (o.visible) { hidden.push(o); o.visible = false; }
     renderer.shadowMap.autoUpdate = false;
     this.ssaoMaterial.uniforms.cameraProjectionMatrix.value.copy(this.camera.projectionMatrix);
     this.ssaoMaterial.uniforms.cameraInverseProjectionMatrix.value.copy(this.camera.projectionMatrixInverse);
@@ -40,20 +42,21 @@ class WorldAO extends SSAOPass {
   }
 }
 
-export function createLightingEffects(renderer, scene, camera, preset) {
+export function createLightingEffects(renderer, scene, camera, preset, cosmetics) {
   // Float render targets are required by SSAOPass; direct rendering is the fallback.
   if (!preset.ao || !renderer.extensions.has('EXT_color_buffer_float')) return {
-    enabled: false, resize() {}, render() { renderer.render(scene, camera); }, dispose() {},
+    enabled: false, invalidate() {}, resize() {}, render() { renderer.render(scene, camera); }, dispose() {},
   };
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: preset.samples > 12 ? 4 : 2 });
   const composer = new EffectComposer(renderer, target), beauty = new RenderPass(scene, camera);
   const ao = new WorldAO(scene, camera, 1, 1, preset.samples), output = new OutputPass();
+  cosmetics?.patch(ao.normalMaterial);
   ao.ssaoMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.depthRenderMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.kernelRadius = 0.65; ao.minDistance = 0.00015; ao.maxDistance = 0.018;
   composer.addPass(beauty); composer.addPass(ao); composer.addPass(output);
   return {
-    enabled: true,
+    enabled: true, invalidate() { ao.excluded = null; },
     resize(width, height) {
       const ratio = renderer.getPixelRatio();
       composer.setPixelRatio(ratio); composer.setSize(width, height);

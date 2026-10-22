@@ -1,0 +1,430 @@
+{
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+  "softwareGpu": false,
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+  "viewport": [
+    1280,
+    720,
+    2
+  ],
+  "multiDraw": true,
+  "gpuTimer": true,
+  "webgpu": true,
+  "initMs": 801.2,
+  "sim": {
+    "seed": 1,
+    "round": "deathmatch",
+    "ticks": 12000,
+    "units": 28,
+    "buildings": 55,
+    "resources": 489,
+    "ages": [
+      "modern",
+      "modern"
+    ],
+    "tick": {
+      "n": 12000,
+      "mean": 0.0489,
+      "p50": 0,
+      "p95": 0.1
+    },
+    "think": {
+      "n": 2400,
+      "mean": 0.041,
+      "p50": 0,
+      "p95": 0.1
+    }
+  },
+  "scenes": [
+    {
+      "name": "high-natural",
+      "groups": 153,
+      "inView": 89,
+      "batchInstances": 213,
+      "matrixBytes": 36864,
+      "render": {
+        "frame": 1099,
+        "calls": 21,
+        "triangles": 640534,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.2333,
+        "p50": 0.1,
+        "p95": 0.3
+      },
+      "cpu": {
+        "n": 150,
+        "mean": 1.5753,
+        "p50": 1.8,
+        "p95": 2.2
+      },
+      "sceneMatrix": {
+        "n": 150,
+        "mean": 0.242,
+        "p50": 0.3,
+        "p95": 0.4
+      },
+      "renderSubmit": {
+        "n": 150,
+        "mean": 0.9013,
+        "p50": 1,
+        "p95": 1.3
+      },
+      "batchPrep": {
+        "n": 150,
+        "mean": 0.2087,
+        "p50": 0.2,
+        "p95": 0.4
+      },
+      "batchPasses": {
+        "n": 150,
+        "mean": 3,
+        "p50": 3,
+        "p95": 3
+      },
+      "cadence": {
+        "n": 150,
+        "mean": 16.6667,
+        "p50": 16.7,
+        "p95": 16.9
+      },
+      "gpuMs": {
+        "n": 150,
+        "mean": 4.3368,
+        "p50": 3.8342,
+        "p95": 7.5109
+      },
+      "disjoint": false
+    },
+    {
+      "name": "high-natural-sort-off",
+      "groups": 153,
+      "inView": 89,
+      "batchInstances": 213,
+      "matrixBytes": 36864,
+      "render": {
+        "frame": 2179,
+        "calls": 21,
+        "triangles": 640534,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.06,
+        "p50": 0.1,
+        "p95": 0.2
+      },
+      "cpu": {
+        "n": 150,
+        "mean": 1.7093,
+        "p50": 1.8,
+        "p95": 2.6
+      },
+      "sceneMatrix": {
+        "n": 150,
+        "mean": 0.2947,
+        "p50": 0.3,
+        "p95": 0.5
+      },
+      "renderSubmit": {
+        "n": 150,
+        "mean": 0.9327,
+        "p50": 1,
+        "p95": 1.5
+      },
+      "batchPrep": {
+        "n": 150,
+        "mean": 0.13,
+        "p50": 0.1,
+        "p95": 0.3
+      },
+      "batchPasses": {
+        "n": 150,
+        "mean": 3,
+        "p50": 3,
+        "p95": 3
+      },
+      "cadence": {
+        "n": 150,
+        "mean": 16.6667,
+        "p50": 16.7,
+        "p95": 17.1
+      },
+      "gpuMs": {
+        "n": 150,
+        "mean": 5.6582,
+        "p50": 5.6058,
+        "p95": 8.348
+      },
+      "disjoint": false
+    },
+    {
+      "name": "balanced-natural",
+      "groups": 153,
+      "inView": 89,
+      "batchInstances": 213,
+      "matrixBytes": 36864,
+      "render": {
+        "frame": 2359,
+        "calls": 14,
+        "triangles": 405838,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.08,
+        "p50": 0.1,
+        "p95": 0.2
+      },
+      "cpu": {
+        "n": 150,
+        "mean": 1.3293,
+        "p50": 1.4,
+        "p95": 1.7
+      },
+      "sceneMatrix": {
+        "n": 150,
+        "mean": 0.292,
+        "p50": 0.3,
+        "p95": 0.4
+      },
+      "renderSubmit": {
+        "n": 150,
+        "mean": 0.708,
+        "p50": 0.7,
+        "p95": 1
+      },
+      "batchPrep": {
+        "n": 150,
+        "mean": 0.156,
+        "p50": 0.2,
+        "p95": 0.3
+      },
+      "batchPasses": {
+        "n": 150,
+        "mean": 2,
+        "p50": 2,
+        "p95": 2
+      },
+      "cadence": {
+        "n": 150,
+        "mean": 16.6667,
+        "p50": 16.7,
+        "p95": 17.1
+      },
+      "gpuMs": {
+        "n": 150,
+        "mean": 1.7826,
+        "p50": 1.3642,
+        "p95": 3.3763
+      },
+      "disjoint": false
+    },
+    {
+      "name": "high-explored-map",
+      "groups": 511,
+      "inView": 138,
+      "batchInstances": 571,
+      "matrixBytes": 65536,
+      "render": {
+        "frame": 3439,
+        "calls": 21,
+        "triangles": 1149458,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.2067,
+        "p50": 0.2,
+        "p95": 0.3
+      },
+      "cpu": {
+        "n": 150,
+        "mean": 2.4907,
+        "p50": 1.9,
+        "p95": 4.1
+      },
+      "sceneMatrix": {
+        "n": 150,
+        "mean": 0.4987,
+        "p50": 0.5,
+        "p95": 1
+      },
+      "renderSubmit": {
+        "n": 150,
+        "mean": 1.1927,
+        "p50": 0.9,
+        "p95": 2.1
+      },
+      "batchPrep": {
+        "n": 150,
+        "mean": 0.3273,
+        "p50": 0.3,
+        "p95": 0.6
+      },
+      "batchPasses": {
+        "n": 150,
+        "mean": 3,
+        "p50": 3,
+        "p95": 3
+      },
+      "cadence": {
+        "n": 150,
+        "mean": 16.666,
+        "p50": 16.7,
+        "p95": 17.3
+      },
+      "gpuMs": {
+        "n": 150,
+        "mean": 6.1827,
+        "p50": 6.1342,
+        "p95": 7.5888
+      },
+      "disjoint": false
+    },
+    {
+      "name": "high-explored-sort-off",
+      "groups": 511,
+      "inView": 138,
+      "batchInstances": 571,
+      "matrixBytes": 65536,
+      "render": {
+        "frame": 4519,
+        "calls": 21,
+        "triangles": 1149458,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.1567,
+        "p50": 0.2,
+        "p95": 0.2
+      },
+      "cpu": {
+        "n": 150,
+        "mean": 2.462,
+        "p50": 1.9,
+        "p95": 3.9
+      },
+      "sceneMatrix": {
+        "n": 150,
+        "mean": 0.6247,
+        "p50": 0.5,
+        "p95": 1
+      },
+      "renderSubmit": {
+        "n": 150,
+        "mean": 1.0113,
+        "p50": 0.9,
+        "p95": 1.6
+      },
+      "batchPrep": {
+        "n": 150,
+        "mean": 0.2253,
+        "p50": 0.2,
+        "p95": 0.4
+      },
+      "batchPasses": {
+        "n": 150,
+        "mean": 3,
+        "p50": 3,
+        "p95": 3
+      },
+      "cadence": {
+        "n": 150,
+        "mean": 16.6667,
+        "p50": 16.7,
+        "p95": 17.3
+      },
+      "gpuMs": {
+        "n": 150,
+        "mean": 4.9579,
+        "p50": 4.196,
+        "p95": 8.0587
+      },
+      "disjoint": false
+    },
+    {
+      "name": "high-explored-live",
+      "groups": 512,
+      "inView": 139,
+      "batchInstances": 576,
+      "matrixBytes": 65536,
+      "render": {
+        "frame": 5785,
+        "calls": 21,
+        "triangles": 1152784,
+        "points": 0,
+        "lines": 0
+      },
+      "minimap": {
+        "n": 30,
+        "mean": 0.0833,
+        "p50": 0.1,
+        "p95": 0.2
+      },
+      "cpu": {
+        "n": 180,
+        "mean": 2.5239,
+        "p50": 2,
+        "p95": 4.9
+      },
+      "sceneMatrix": {
+        "n": 180,
+        "mean": 0.4961,
+        "p50": 0.4,
+        "p95": 0.9
+      },
+      "renderSubmit": {
+        "n": 180,
+        "mean": 1.0128,
+        "p50": 0.8,
+        "p95": 2
+      },
+      "batchPrep": {
+        "n": 180,
+        "mean": 0.2739,
+        "p50": 0.3,
+        "p95": 0.6
+      },
+      "batchPasses": {
+        "n": 180,
+        "mean": 3,
+        "p50": 3,
+        "p95": 3
+      },
+      "cadence": {
+        "n": 180,
+        "mean": 16.6667,
+        "p50": 16.7,
+        "p95": 17.2
+      },
+      "gpuMs": {
+        "n": 180,
+        "mean": 6.4356,
+        "p50": 6.4016,
+        "p95": 7.8368
+      },
+      "disjoint": false
+    }
+  ],
+  "matrixWrites": {
+    "writes": 552,
+    "unchanged": 533,
+    "unchangedPercent": 96.6
+  },
+  "glError": 0,
+  "notes": [
+    "Main 60 FPS run, 150 measured frames after 30 warm-up frames per frozen scene; live sample 180 measured frames. CPU numbers are wall times on the calling JavaScript thread and exclude DOM HUD/input and browser compositor. GPU elapsed queries are asynchronous; disjoint samples are rejected.",
+    "Explored-map scenarios synthetically reveal the resource map. The natural scene is hard-vs-hard Death Match seed 1 at tick 12000.",
+    "matrixWrites is a separate one-frame frozen-state observation before the live sample.",
+    "A minimap fog-rebuild microbenchmark was discarded because its synthetic tick stamp did not align with the four-tick fog update cadence."
+  ]
+}
