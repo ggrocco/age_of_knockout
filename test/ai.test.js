@@ -276,14 +276,19 @@ test('disabling time limits overrides difficulty caps while keeping the bot hand
   assert.deepEqual(matchOptions([null, 'relaxed'], { noTimeLimit: false }), matchOptions([null, 'relaxed']));
 });
 
-test('a Tool Age bot with no gold piles nearby builds a Mine on its home patch and works it', () => {
-  const g = createGame({ seed: 3, rules: roundById('conquest') }), b = createBot(g, 1, 'medium'), ev = THINK_EVERY.medium, p = g.players[1];
+// Player 1 as a medium bot in the Tool Age with plenty of everything, every tile explored, 13 villagers and no gold
+// piles (none respawn either); terrain(g) edits the map before the bot is made, prep(g) runs before the 6000 ticks.
+// Returns the game and the last Mine it worked.
+function goldlessBot(prep = () => {}, terrain = () => {}) {
+  const g = createGame({ seed: 3, rules: roundById('conquest') }); terrain(g);
+  const b = createBot(g, 1, 'medium'), ev = THINK_EVERY.medium, p = g.players[1];
   p.age = 'tool'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
   for (const r of [...g.resources.values()]) if (r.type === 'gold') g.remove(r);
-  g.pileStart.gold = 0; // no gold piles respawn either: the patches are the only gold
+  g.pileStart.gold = 0;
   p.explored.fill(1);
   const s = g.map.starts[1];
   for (let k = 0; k < 10; k++) g.spawnUnit('villager', 1, s.x - 2 + k % 5, s.y + 3 + Math.floor(k / 5));
+  prep(g);
   let worked = null;
   for (let i = 0; i < 6000 && !g.result; i++) {
     g.tick(); if (i % ev === 0) b.think();
@@ -291,10 +296,37 @@ test('a Tool Age bot with no gold piles nearby builds a Mine on its home patch a
       const r = g.entities.get(u.order.res); if (r && r.type === 'mine') worked = r;
     }
   }
+  return { g, worked };
+}
+const patchCentre = (g, pt) => { const n = g.map.size; return pt.tiles.reduce((c, i) => ({ x: c.x + (i % n + 0.5) / pt.tiles.length, y: c.y + (((i / n) | 0) + 0.5) / pt.tiles.length }), { x: 0, y: 0 }); };
+const fromStart = (g, pid, pt) => { const c = patchCentre(g, pt), s = g.map.starts[pid]; return Math.hypot(c.x - s.x, c.y - s.y); };
+
+test('a Tool Age bot with no gold piles nearby builds a Mine on its home patch and works it', () => {
+  const { g, worked } = goldlessBot();
+  const homePatch = [...g.patches.values()].filter(pt => pt.kind === 'gold').sort((a, b) => fromStart(g, 1, a) - fromStart(g, 1, b))[0];
   const mines = [...g.buildings.values()].filter(x => x.type === 'mine' && x.owner === 1 && x.constructed);
   assert.ok(mines.length >= 1, 'a finished Mine');
   assert.ok(worked, 'a villager gathers gold from a Mine');
   assert.ok(mines.includes(worked) || worked.dead, 'the worked Mine is the bot\'s own');
-  const home = g.patches.get(g.patchAt[Math.floor(mines[0].y) * g.map.size + Math.floor(mines[0].x)]);
-  assert.equal(home?.kind, 'gold');
+  assert.equal(mines[0].patch, homePatch.id, 'the Mine is on the gold patch nearest its start');
+});
+
+test('a bot never puts a Mine on a gold patch in the enemy half', () => {
+  let enemySide = 0;
+  const { g } = goldlessBot(g => { for (const pt of g.patches.values()) if (pt.kind === 'gold') { if (fromStart(g, 1, pt) < fromStart(g, 0, pt)) pt.reserve = 0; else enemySide++; } });
+  assert.ok(enemySide >= 1, 'control: the enemy half still has gold patches the bot has explored');
+  const mines = [...g.buildings.values()].filter(x => x.type === 'mine' && x.owner === 1);
+  assert.deepEqual(mines.map(m => m.patch), [], 'no Mine, finished or not, on an enemy-half patch');
+});
+
+test('a bot never puts a Mine on a gold patch it cannot walk to', () => {
+  let home = null;
+  const { g } = goldlessBot(g => { for (const pt of g.patches.values()) if (pt.kind === 'gold' && pt !== home && fromStart(g, 1, pt) < fromStart(g, 0, pt)) pt.reserve = 0; },
+    g => { // moat the bot's home gold patch: a ring of water round it, the only gold left in its half
+      const n = g.map.size; home = [...g.patches.values()].filter(pt => pt.kind === 'gold').sort((a, b) => fromStart(g, 1, a) - fromStart(g, 1, b))[0];
+      const on = new Set(home.tiles);
+      for (const i of home.tiles) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const j = i + dy * n + dx; if (!on.has(j)) g.map.tiles[j] = 1; }
+    });
+  assert.ok(home.reserve > 0, 'control: the moated patch still holds gold');
+  assert.deepEqual([...g.buildings.values()].filter(x => x.type === 'mine' && x.owner === 1).map(m => m.patch), [], 'no Mine on the unreachable patch');
 });

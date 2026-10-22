@@ -230,11 +230,15 @@ export function createBot(game, pid, difficulty = 'medium') {
     for (const b of done) if ((BUILDINGS[b.type].drops || []).includes(kind)) best = Math.min(best, distPoint(p.x, p.y, b));
     return best;
   }
-  // Top-left of the first 2x2 Mine spot on an ore patch of this kind, trying patches nearest `home` first.
+  // Top-left of the first 2x2 Mine spot on an ore patch of this kind, trying patches nearest `home` first. Only patches
+  // in our own half (nearer our start than the enemy's), and only spots with a tile on or around them we can walk to:
+  // a foundation nobody can reach would block every later Mine of that kind.
   function mineSpot(kind, home) {
-    const n = game.map.size, centre = p => p.tiles.reduce((c, i) => ({ x: c.x + (i % n + 0.5) / p.tiles.length, y: c.y + (((i / n) | 0) + 0.5) / p.tiles.length }), { x: 0, y: 0 });
-    const patches = [...game.patches.values()].filter(p => p.kind === kind && p.reserve > 0).map(p => ({ p, d: dist(centre(p), home) })).sort((a, b) => a.d - b.d);
-    for (const { p } of patches) for (const i of p.tiles) { const x = i % n, y = (i / n) | 0; if (canPlace(game, pid, 'mine', x, y)) return { x, y }; }
+    const n = game.map.size, own = game.map.starts[pid], centre = p => p.tiles.reduce((c, i) => ({ x: c.x + (i % n + 0.5) / p.tiles.length, y: c.y + (((i / n) | 0) + 0.5) / p.tiles.length }), { x: 0, y: 0 });
+    const walkable = (x, y) => { for (let j = y - 1; j <= y + 2; j++) for (let i = x - 1; i <= x + 2; i++) if (i >= 0 && j >= 0 && i < n && j < n && reach[j * n + i]) return true; return false; };
+    const patches = [...game.patches.values()].filter(p => p.kind === kind && p.reserve > 0).map(p => ({ p, c: centre(p) }))
+      .filter(({ c }) => dist(c, own) < dist(c, enemyStart)).map(({ p, c }) => ({ p, d: dist(c, home) })).sort((a, b) => a.d - b.d);
+    for (const { p } of patches) for (const i of p.tiles) { const x = i % n, y = (i / n) | 0; if (walkable(x, y) && canPlace(game, pid, 'mine', x, y)) return { x, y }; }
     return null;
   }
   function assign(idle, vills, tc, home, done) {
