@@ -3,6 +3,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { secs, RES_KIND } from './util.js';
+import { formationSlots } from './formation.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
@@ -62,7 +63,8 @@ export function execute(game, pid, cmd) {
     case 'move': {
       const us = ownUnits(game, pid, cmd.ids); if (!us.length) return fail('no units');
       if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('bad target');
-      for (const u of us) { u.order = { type: 'move', x: cmd.x, y: cmd.y, slack: 0 }; u.path = null; u.retry = 0; }
+      const slots = us.length > 1 ? formationSlots(game, us, cmd.x, cmd.y) : null; // a group spreads out instead of piling onto one tile
+      for (const u of us) { const s = slots ? slots.get(u.id) : cmd; u.order = { type: 'move', x: s.x, y: s.y, slack: 0 }; u.path = null; u.retry = 0; }
       return OK;
     }
     case 'gather': {
