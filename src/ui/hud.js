@@ -80,7 +80,7 @@ export function createHud(ui) {
   hud.update = () => {
     const g = ui.game;
     if (!g) return;
-    const stamp = `${g.time}|${[...ui.sel]}|${ui.inspect?.id}|${ui.placing}|${ui.paused}|${ui.speed}|${ui.boxMode}|${ui.resignArmed}|${ui.deleteConfirmOpen}|${$('gamemenu').classList.contains('hidden')}|${revision}`;
+    const stamp = `${g.time}|${!!g.result}|${[...ui.sel]}|${ui.inspect?.id}|${ui.placing}|${ui.paused}|${ui.speed}|${ui.boxMode}|${ui.resignArmed}|${ui.deleteConfirmOpen}|${$('gamemenu').classList.contains('hidden')}|${revision}`;
     if (lastGame === g && updateKey === stamp) return;
     lastGame = g; updateKey = stamp;
     const p = g.players[0], round = g.rules;

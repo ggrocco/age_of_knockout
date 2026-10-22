@@ -5,8 +5,34 @@ import { createModelBatch } from '../src/render/batch.js';
 import { createContactShadows } from '../src/render/contact-shadows.js';
 import { buildModel, animate, MODEL_MATERIAL } from '../src/render/models.js';
 import { prepareCosmetics } from '../src/render/cosmetics.js';
+import { bakeTerrain } from '../src/render/terrain-bake.js';
 
 const proxy = material => { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.BoxGeometry(), material)); g.updateMatrixWorld(true); return g; };
+test('terrain refresh uploads current ore tiles, restores renderer state and releases its resources', () => {
+  const previous = {}, viewport = new THREE.Vector4(3, 4, 20, 30), scissor = new THREE.Vector4(5, 6, 10, 12);
+  let current = previous, testScissor = true, draws = 0, material, geometry;
+  const renderer = {
+    capabilities: { maxTextureSize: 1024, getMaxAnisotropy: () => 8 },
+    getRenderTarget: () => current, setRenderTarget: value => { current = value; },
+    getViewport: value => value.copy(viewport), setViewport: (...args) => { if (args.length === 1) viewport.copy(args[0]); else viewport.set(...args); },
+    getScissor: value => value.copy(scissor), setScissor: value => scissor.copy(value),
+    getScissorTest: () => testScissor, setScissorTest: value => { testScissor = value; },
+    render: scene => { draws++; ({ material, geometry } = scene.children[0]); },
+  };
+  const tiles = Uint8Array.from([0, 1, 2, 3]), map = { size: 2, tiles, starts: [{ x: 0, y: 0 }, { x: 1, y: 1 }] };
+  const target = bakeTerrain(renderer, map, 7, new Float32Array(4).fill(4), 4);
+  const input = material.uniforms.terrainGrid.value;
+  assert.equal(input.image.data[8], 2); assert.equal(input.image.data[12], 3);
+  tiles[2] = 0; target.refresh(1); target.refresh(1);
+  assert.equal(draws, 2, 'unchanged terrain versions do not redraw');
+  assert.equal(input.image.data[8], 0, 'depleted ore is removed from the uploaded grid');
+  assert.equal(current, previous); assert.deepEqual(viewport.toArray(), [3, 4, 20, 30]);
+  assert.deepEqual(scissor.toArray(), [5, 6, 10, 12]); assert.equal(testScissor, true);
+  const released = [];
+  for (const item of [input, material, geometry, target]) item.addEventListener('dispose', () => released.push(item));
+  target.dispose(); assert.equal(released.length, 4);
+});
+
 test('batch keeps unchanged matrices resident, and uploads changes after hide/show', () => {
   const material = new THREE.MeshStandardMaterial(), batch = createModelBatch(material), g = proxy(material);
   batch.add(g); assert.equal(batch.update(g), 1); batch.flush(0);

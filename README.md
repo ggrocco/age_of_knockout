@@ -196,7 +196,7 @@ rendering remains available. `test/render-models.test.js` checks every unit and 
 animation transforms, and `test/graphics-quality.test.js` covers preference handling, pixel budgets and the
 rendering fallback. Shaders, picking, lighting and visual quality are checked in a browser.
 
-Static model and contact-shadow transforms stay on the GPU until they change. Building flags, machinery, smoke and drone rotors use vertex-shader animation; terrain textures are baked once on the GPU when a match starts. Paused and result screens reduce decorative rendering to 10 FPS, while camera and selection changes remain responsive. The simulation remains deterministic JavaScript at 20 ticks per second.
+Static model and contact-shadow transforms stay on the GPU until they change. Building flags, machinery, smoke and drone rotors use vertex-shader animation; terrain textures are baked on the GPU at match start and repainted there when ore patches change. Paused and result screens redraw at 10 FPS, while camera and selection changes remain responsive. Pausing freezes the animation clock. The simulation remains deterministic JavaScript at 20 ticks per second.
 
 ## URL parameters
 
@@ -212,7 +212,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 | `?timeLimit=0..120` | Override the saved time limit in whole minutes; 0 = unlimited, default 25 |
 | `?noTimeLimit=1\|0` | Legacy override: 1 = unlimited, 0 = 25 minutes; `timeLimit` takes precedence |
 | `?touch=1` | Force the touch layout |
-| `&fps=N` | Frame cap (default 60; decorative rendering at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
+| `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
 
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,

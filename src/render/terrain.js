@@ -89,10 +89,10 @@ export function createTerrain(game, renderer, preset) {
   const maskData = new Uint8Array(n * n * 4), mask = new THREE.DataTexture(maskData, n, n);
   mask.magFilter = mask.minFilter = THREE.NearestFilter;
   const grass = createGrass(game, mask); grass.setCount(preset.grass);
-  let maskStamp = -1;
+  let maskStamp = -1, terrainStamp = game.terrainVersion;
   return { ground, water, grass: grass.mesh, setQuality(next) { grass.setCount(next.grass); },
     // The small grid is uploaded only when ore patches change; pixels are repainted on the GPU.
-    refresh() { baked.refresh(game.terrainVersion); },
+    refresh() { if (terrainStamp !== game.terrainVersion) { baked.refresh(game.terrainVersion); terrainStamp = game.terrainVersion; } },
     update(t, fogEnabled = true) {
       waterTime.value = t; normalTexture.offset.set(t * 0.008 % 1, t * 0.005 % 1); grass.update(t, fogEnabled);
       if (maskStamp !== game.time && (game.time % 4 === 0 || maskStamp < 0)) {
