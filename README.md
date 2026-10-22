@@ -4,7 +4,7 @@ A browser RTS in the spirit of Age of Empires I (1997), played as a 32-player kn
 against AI. Five rounds, each a different game type: Standard (conquest), Death Match, Regicide, Wonder Race,
 Capture the Relics. Lose once and you're out.
 
-**Play it in the browser: https://ggrocco.github.io/my_age/**
+**Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
 ![A Bronze Age base in Wonder Race: mud-brick houses, two towers and a Wonder under construction](docs/screenshots/wonder.jpg)
 
@@ -254,7 +254,7 @@ builds the same image.
 
 ## Deploy (GitHub Pages)
 
-`.github/workflows/pages.yml` publishes the game to https://ggrocco.github.io/my_age/ on every push to `main` (or
+`.github/workflows/pages.yml` publishes the game to https://ggrocco.github.io/age_of_knockout/ on every push to `main` (or
 by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image and deploys them with
 GitHub's Pages actions. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
 or on a plan that allows Pages for private repositories). Pages caches files for 10 minutes, so the workflow serves
