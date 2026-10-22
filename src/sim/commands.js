@@ -11,17 +11,19 @@ const RES = ['food', 'wood', 'gold', 'stone'];
 // 'pop limit' once houses already reach the age's ceiling (only advancing raises it), else 'pop cap' (build houses).
 export const popFullReason = p => p.popCap >= popLimit(p.age) ? 'pop limit' : 'pop cap';
 export const canAfford = (p, cost) => RES.every(k => p.res[k] >= (cost[k] || 0));
+// Repairs are paid bit by bit, so any of each resource the building costs is enough to go on.
+export const canRepair = (p, type) => RES.every(k => !BUILDINGS[type].cost[k] || p.res[k] > 0);
 const pay = (p, cost) => { for (const k of RES) p.res[k] -= cost[k] || 0; };
 const ownUnits = (game, pid, ids) => (ids || []).map(i => game.entities.get(i)).filter(e => e && e.kind === 'unit' && e.owner === pid && !e.dead);
 
-// A build given to a villager that is gathering or on another unfinished build keeps that job as `resume`, and takes it up
-// again once the new building is done, gone or unreachable (orders.js doBuild). Builds interrupting builds nest, newest first.
-// Idle, moving or fighting villagers have nothing to go back to, so their build order gets no `resume` key. A gather resumes
-// heading for its resource, or still on its way to drop off a load.
-function buildOrder(u, target, queue) {
-  const order = queue ? { type: 'build', target, queue, fails: 0 } : { type: 'build', target, fails: 0 }, o = u.order;
+// A build (or repair) given to a villager that is gathering, building or repairing keeps that job as `resume`, and takes it
+// up again once the new building is done, gone or unreachable (orders.js doBuild / doRepair). Builds interrupting builds nest,
+// newest first. Idle, moving or fighting villagers have nothing to go back to, so their order gets no `resume` key. A gather
+// resumes heading for its resource, or still on its way to drop off a load.
+function buildOrder(u, target, queue, type = 'build') {
+  const order = queue ? { type, target, queue, fails: 0 } : { type, target, fails: 0 }, o = u.order;
   if (o.type === 'gather') order.resume = { ...o, phase: o.phase === 'drop' ? 'drop' : 'go', fails: 0 };
-  else if (o.type === 'build') order.resume = o;
+  else if (o.type === 'build' || o.type === 'repair') order.resume = o;
   return order;
 }
 
@@ -114,6 +116,14 @@ export function execute(game, pid, cmd) {
       if (!us.length) return fail('no villagers');
       if (!b || b.dead || b.kind !== 'building' || b.owner !== pid || b.constructed) return fail('nothing to build');
       for (const u of us) { if (u.order.type === 'build' && u.order.target === b.id) continue; u.order = buildOrder(u, b.id); u.path = null; u.retry = 0; }
+      return OK;
+    }
+    case 'repair': { // put a finished, damaged building's HP back; paid as it goes (orders.js doRepair, game.js repairBuilding)
+      const us = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager'), b = game.entities.get(cmd.targetId);
+      if (!us.length) return fail('no villagers');
+      if (!b || b.dead || b.kind !== 'building' || b.owner !== pid || !b.constructed || b.hp >= b.maxHp) return fail('nothing to repair');
+      if (!canRepair(p, b.type)) return fail('resources');
+      for (const u of us) { if (u.order.type === 'repair' && u.order.target === b.id) continue; u.order = buildOrder(u, b.id, null, 'repair'); u.path = null; u.retry = 0; }
       return OK;
     }
     case 'train': {

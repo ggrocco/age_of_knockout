@@ -1,0 +1,57 @@
+# Publishes the game to GitHub Pages on every push to main (enable it once under Settings > Pages > Source:
+# GitHub Actions). Ships the same files as the Dockerfile's nginx stage.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Assemble site
+        run: |
+          set -eu
+          # Pages caches every file for 10 minutes. Serve the game's own files from v/<content hash>/ so a fresh
+          # page never mixes old and new modules (the Dockerfile does the same through an nginx rewrite).
+          v=$(find index.html buildings.html styles.css src -type f | sort | xargs cat | md5sum | cut -c1-12)
+          mkdir -p _site/v/$v _site/node_modules/three/examples
+          cp index.html buildings.html favicon.svg _site/
+          cp -r styles.css src _site/v/$v/
+          sed -i "s#href=\"styles.css\"#href=\"v/$v/styles.css\"#; s#src=\"src/#src=\"v/$v/src/#" \
+            _site/index.html _site/buildings.html
+          # index.html's (and buildings.html's) import map points at these two three.js paths
+          cp -r node_modules/three/build _site/node_modules/three/
+          cp -r node_modules/three/examples/jsm _site/node_modules/three/examples/
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

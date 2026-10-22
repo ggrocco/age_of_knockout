@@ -1,5 +1,5 @@
 import { UNITS } from '../data/units.js';
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
 import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
@@ -9,7 +9,9 @@ import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.
 import { QUALITY } from '../render/quality.js';
 
 const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', 'pop limit': 'Population limit of this Age reached - advance to raise it', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
-  'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center' };
+  'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center',
+  'nothing to repair': 'Nothing to repair' };
+const TECHS_AT = new Set(Object.values(TECHS).map(t => t.building)); // buildings that research something
 export const reasonText = r => REASONS[r] || r;
 const fmtTime = t => { const s = Math.floor(t / 20); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const tintOf = d => !d.cls ? 't-bld' : d.age === 'future' ? 't-fut' : d.cls === 'civ' ? 't-civ' : d.cls === 'siege' ? 't-siege' : 't-mil';
@@ -129,7 +131,12 @@ export function createHud(ui) {
     const describe = e => {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
       if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
-      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20)}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}${e.maxAmount ? ' / ' + e.maxAmount : ''}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20 / workSpeed(e))}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}${e.maxAmount ? ' / ' + e.maxAmount : ''}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
+      if (e.kind === 'building' && e.owner === 0 && e.constructed && !e.gatherType && e.hp < e.maxHp) { // what villagers would pay to make it whole
+        const rc = repairCost(e.type, e.maxHp - e.hp, e.maxHp), rcr = Object.fromEntries(Object.entries(rc).map(([k, v]) => [k, Math.ceil(v)]));
+        if (BUILDINGS[e.type].trains || TECHS_AT.has(e.type)) s += `<br><span class="lose">Damaged: works at ${Math.round(workSpeed(e) * 100)}% speed</span>`;
+        s += `<br>Repair: ${costHtml(rcr, shortOf(p, rcr), true)}${ui.touch ? '' : ' <small>(right-click with villagers)</small>'}`;
+      }
       // Phones have no tooltips and the Advance tile clips 4-resource costs, so the Town Center lists the next Age's full cost here.
       const next = AGES[ageIndex(p.age) + 1];
       if (ui.touch && e.type === 'town_center' && e.owner === 0 && e.constructed && next) s += `<br>${ageTitle(next)}: ${costHtml(AGE_COST[next].cost, shortOf(p, AGE_COST[next].cost), true)}`;
@@ -145,7 +152,7 @@ export function createHud(ui) {
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);
     // Every selected own building, foundations too, uses the same confirmation dialog.
     const del = own.find(e => e.kind === 'building');
-    let key = `${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
+    let key = `${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20 / workSpeed(bld)) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
       const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText(popFullReason(p))] : [])];
@@ -160,7 +167,7 @@ export function createHud(ui) {
           if (t.building !== bld.type || p.techs.has(id)) continue;
           const inProg = bld.research?.tech === id, locked = ageIndex(p.age) < ageIndex(t.age), needReq = t.requires && !p.techs.has(t.requires);
           const short = shortOf(p, t.cost), busy = bld.research && !inProg, ok = !inProg && !locked && !needReq && !busy && canAfford(p, t.cost);
-          const notes = inProg ? [`Researching (${Math.ceil(bld.research.remaining / 20)}s)`] : locked ? ['Requires ' + ageTitle(t.age)] : needReq ? ['Needs ' + TECHS[t.requires].name] : busy ? ['Building is busy'] : short.length ? [reasonText('resources')] : [];
+          const notes = inProg ? [`Researching (${Math.ceil(bld.research.remaining / 20 / workSpeed(bld))}s)`] : locked ? ['Requires ' + ageTitle(t.age)] : needReq ? ['Needs ' + TECHS[t.requires].name] : busy ? ['Building is busy'] : short.length ? [reasonText('resources')] : [];
           btns.push(tile(`data-research="${id}" data-b="${bld.id}"`, { kind: 'tech', id, name: t.name, cost: t.cost, tint: 't-age', ok, lockedAge: locked ? t.age : '', short, notes })); }
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }

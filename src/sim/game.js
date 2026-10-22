@@ -1,6 +1,6 @@
 import { generateMap } from './map.js';
 import { UNITS } from '../data/units.js';
-import { BUILDINGS } from '../data/buildings.js';
+import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
 import { farmStats } from '../data/farms.js';
 import { AGES, popLimit } from '../data/ages.js';
@@ -185,8 +185,24 @@ function updateBuilding(game, b) {
     }
     return;
   }
-  if (b.queue.length && (b.queue[0].remaining -= rate) <= 0) {
+  if (b.repairers) repairBuilding(game, b, rate);
+  const work = rate * workSpeed(b); // a damaged building trains and researches slower (repairing is not slowed)
+  if (b.queue.length && (b.queue[0].remaining -= work) <= 0) {
     const q = b.queue.shift(), sp = game.findSpawn(b); game.spawnUnit(q.unit, b.owner, sp.x, sp.y);
   }
-  if (b.research && (b.research.remaining -= rate) <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
+  if (b.research && (b.research.remaining -= work) <= 0) { const t = b.research.tech; b.research = null; game.completeTech(b.owner, t); }
+}
+
+// Villagers who stood repairing `b` this tick (units update first) put HP back as fast as they would build it, crew scaling
+// included. The owner pays repairCost for it; short of a resource, only the share they can pay goes on and the stock hits 0.
+function repairBuilding(game, b, rate) {
+  const w = b.repairers, p = game.players[b.owner]; b.repairers = 0;
+  let hp = Math.min(b.maxHp - b.hp, b.maxHp * Math.pow(w, 0.7) * rate / secs(BUILDINGS[b.type].buildTime));
+  if (hp <= 0) return;
+  const cost = repairCost(b.type, hp, b.maxHp);
+  let f = 1, short = null; for (const k in cost) if (cost[k] > 0 && p.res[k] / cost[k] < f) { f = p.res[k] / cost[k]; short = k; }
+  if (f <= 0) return;
+  for (const k in cost) p.res[k] = Math.max(0, p.res[k] - cost[k] * f);
+  if (short) p.res[short] = 0; // exactly, so doRepair sees it run out instead of chasing a rounding crumb
+  b.hp = Math.min(b.maxHp, b.hp + hp * f);
 }

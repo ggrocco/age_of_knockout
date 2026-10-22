@@ -98,8 +98,8 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 ## When you change X, also update Y
 
 - New or changed URL param, control, or game rule the player sees: `README.md` and the table above.
-- Import map or static assets in `index.html` / `buildings.html`: the `Dockerfile` `COPY` lines and the smoke-test
-  paths in `Jenkinsfile`.
+- Import map or static assets in `index.html` / `buildings.html`: the `Dockerfile` `COPY` lines, the smoke-test
+  paths in `Jenkinsfile` and the "Assemble site" step in `.github/workflows/pages.yml`.
 - A deliberate change to a `KEPT` building look: regenerate `test/fixtures/kept-buildings.json` (command above).
 - A deviation from AoE1 (stat, rule, tech-tree placement): `src/data/README.md` and `progress.md`.
 - A ruling, known gap or deferred minor issue: append it to `progress.md`.
@@ -137,6 +137,9 @@ folders the import map references (`node_modules/three/build`, `.../examples/jsm
 `Jenkinsfile` builds the `test` target, runs the unit tests (JUnit to `reports/junit.xml`) and `bot-sim.js 12` in
 it, then builds the nginx image and smoke-tests it from inside the container. It only needs the docker CLI on the
 agent; it never pushes or deploys.
+
+`.github/workflows/pages.yml` deploys the same file set to GitHub Pages (https://ggrocco.github.io/my_age/) on every
+push to `main`, after `npm test`. Pages serves from a `/my_age/` sub-path, so page and module URLs must stay relative.
 
 ## Project docs
 
