@@ -17,6 +17,9 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
 - The population ceiling rises with the age instead of AoE1's fixed 50: houses (+4) and Town Centers (+10) raise the
   cap up to `AGE_POP_LIMIT` in `ages.js` (Stone 50, Tool 65, Bronze 80, Iron 100, Medieval 120, Age of Sail 140,
   Industrial 160, Modern 180, AI Future 200). Not an AoE1 rule; the later eras have no AoE1 counterpart.
+- A villager pulled off gathering or another build to construct something goes back to that job when it is done
+  (unfinished buildings newest first, then its resource); AoE1 builders go idle after anything but a Farm. A finished
+  Farm or Mine is still worked by its builder, after any unfinished buildings in the chain.
 - The Wonder does not count toward the age-up building requirement (flagged `extra`, like the Farm): it is a
   victory building, so leaving Bronze needs only the Government Center.
 

@@ -67,6 +67,17 @@ test('villagers gather gold from a Mine and drop it at the Town Center', () => {
   assert.ok(dug >= 1 && dug <= 3, 'digging ' + dug);
 });
 
+test('a woodcutter told to build a Mine digs it afterwards instead of going back to the tree', () => {
+  const g = createGame({ seed: 3 }), p = g.players[0], home = homePatch(g, 0), r = rectOn(g, home), v = villagers(g, 0)[0];
+  explore(g, 0); p.age = 'tool'; p.res.wood = 1000; p.res.stone = 1000;
+  const tree = [...g.resources.values()].filter(t => t.type === 'tree').sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+  g.command(0, { type: 'gather', ids: [v.id], resourceId: tree.id }); g.tick();
+  assert.equal(g.command(0, { type: 'build', ids: [v.id], building: 'mine', x: r.x, y: r.y }).ok, true);
+  const m = [...g.buildings.values()].find(b => b.type === 'mine' && b.owner === 0);
+  for (let i = 0; i < 4000 && !m.constructed; i++) g.tick(); g.tick(); g.tick();
+  assert.equal(m.constructed, true); assert.equal(v.order.type, 'gather'); assert.equal(v.order.res, m.id); assert.equal(v.order.kind, 'gold');
+});
+
 test('an emptied patch collapses its Mines and foundations, reverts to land, and spawns a mirrored pair', () => {
   const g = createGame({ seed: 3 }), n = g.map.size, home = homePatch(g, 0), [ra, rb] = twoSquares(g, home);
   const built = g.addBuilding('mine', 0, ra.x, ra.y, true), found = g.addBuilding('mine', 0, rb.x, rb.y, false);
