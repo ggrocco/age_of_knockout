@@ -235,6 +235,12 @@ function buildingModel(e, age = 'stone') {
   for (const x of g.extra.smoke ?? []) (anim.smoke ??= []).push({ p: part(x), y: x.at[1], phase: x.phase ?? 0 });
   // A tower's shot (muzzle flash, loosed bolt, laser): a pivot that animate() shows just after each shot.
   if (g.extra.fire) { anim.fire = part(g.extra.fire); anim.fire.visible = false; }
+  // A Mine's winding wheel and ore cart, which move only while villagers dig, and the ore pile of the patch's kind.
+  if (g.extra.wheel) anim.wheel = { p: part(g.extra.wheel), axis: g.extra.wheel.axis, speed: g.extra.wheel.speed ?? 2 };
+  if (g.extra.cart) anim.cart = { p: pivot(...g.extra.cart.from, g.extra.cart.geo), from: g.extra.cart.from, to: g.extra.cart.to };
+  if (anim.cart) root.add(anim.cart.p);
+  if (g.extra.ore) { const o = g.extra.ore; anim.ore = pivot(...o.at, o[e.gatherType] ?? o.gold); root.add(anim.ore); }
+  if (anim.wheel || anim.cart) anim.dig = { phase: 0, last: null };
   return { root, anim, shadow: e.size * 0.62, boxShadow: true };
 }
 
@@ -352,6 +358,15 @@ export function animate(g, e, t, moving) {
     // The sim sets a tower's cd to its cooldown on a shot and counts it down each tick: the shot shows for 6 ticks
     // (0.3 s), so even the Industrial tower's 12-tick burst blinks. No cooldown (the gallery's entities): never.
     if (a.fire) a.fire.visible = !!e.constructed && e.cooldown > 0 && e.cd > e.cooldown - 6;
+    // The Mine's work clock runs only while it is dug, so the wheel and cart stop where they are between trips.
+    if (a.dig) {
+      const d = a.dig;
+      if (e.constructed && e.digging > 0 && d.last !== null) d.phase += Math.max(0, t - d.last);
+      d.last = t;
+      if (a.wheel) { a.wheel.p.visible = !!e.constructed; a.wheel.p.rotation[a.wheel.axis] = -d.phase * a.wheel.speed; }
+      if (a.cart) { const { p, from, to } = a.cart, f = 0.5 - 0.5 * Math.cos(d.phase * 1.6); p.visible = !!e.constructed; p.position.set(...from.map((v, i) => v + (to[i] - v) * f)); }
+    }
+    if (a.ore) a.ore.visible = !!e.constructed;
   } else if (a.type === 'res') {
     const full = e.type === 'tree' ? 100 : e.type === 'berry' ? 200 : e.type === 'gold' ? 800 : 600, f = 0.55 + 0.45 * Math.min(1, e.amount / full), s = a.mesh.userData.baseScale;
     a.mesh.scale.set(s * f, s * (e.type === 'tree' ? f : 0.6 + 0.4 * f), s * f);
