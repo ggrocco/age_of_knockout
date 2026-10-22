@@ -4,6 +4,8 @@ A browser RTS in the spirit of Age of Empires I (1997), played as a 32-player kn
 against AI. Five rounds, each a different game type: Standard (conquest), Death Match, Regicide, Wonder Race,
 Capture the Relics. Lose once and you're out.
 
+**Play it in the browser: https://ggrocco.github.io/my_age/**
+
 ![A Bronze Age base in Wonder Race: mud-brick houses, two towers and a Wonder under construction](docs/screenshots/wonder.jpg)
 
 ## Run
@@ -249,6 +251,15 @@ docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PO
 The image is static files only (`index.html`, `buildings.html`, `styles.css`, `favicon.svg`, `src/`, the two
 three.js folders the import map uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .`
 builds the same image.
+
+## Deploy (GitHub Pages)
+
+`.github/workflows/pages.yml` publishes the game to https://ggrocco.github.io/my_age/ on every push to `main` (or
+by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image and deploys them with
+GitHub's Pages actions. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
+or on a plan that allows Pages for private repositories). Pages caches files for 10 minutes, so the workflow serves
+`styles.css` and `src/` from `v/<content hash>/`, as the Docker image does; a new deploy reaches players within
+about 10 minutes and never mixes old and new modules.
 
 ## CI (Jenkins)
 
