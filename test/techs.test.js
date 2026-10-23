@@ -1,6 +1,8 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { secs } from '../src/sim/util.js';
+import { TECHS } from '../src/data/techs.js';
+import { AGES, ageIndex } from '../src/data/ages.js';
 
 const pit = (g, owner = 0) => g.addBuilding('storage_pit', owner, 10, 10, true);
 
@@ -80,4 +82,26 @@ test('weapon techs reach the knight but not the tank; ballistics reaches gunners
   const g = createGame({ seed: 1 }), k = g.spawnUnit('knight', 0, 20, 20), t = g.spawnUnit('tank', 0, 20, 21), m = g.spawnUnit('musketeer', 0, 20, 22), c = g.spawnUnit('cannon', 0, 20, 23);
   g.completeTech(0, 'bronze_weapons'); assert.equal(k.atk, 14); assert.equal(t.atk, 22);
   g.completeTech(0, 'ballistics'); assert.equal(m.range, 6); assert.equal(c.range, 10);
+});
+
+test('the Storage Pit has an upgrade in every era, listed in era order with valid prerequisites', () => {
+  const pit = Object.entries(TECHS).filter(([, t]) => t.building === 'storage_pit');
+  for (const age of AGES) assert.ok(pit.some(([, t]) => t.age === age), `no Storage Pit tech in ${age}`);
+  const order = pit.map(([, t]) => ageIndex(t.age));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'HUD lists them in era order');
+  for (const [id, t] of Object.entries(TECHS)) if (t.requires) {
+    const r = TECHS[t.requires];
+    assert.ok(r && r.building === t.building && ageIndex(r.age) <= ageIndex(t.age), `${id} needs ${t.requires}`);
+  }
+});
+
+test('later Storage Pit upgrades reach their era units', () => {
+  const g = createGame({ seed: 1 }), at = (u, i) => g.spawnUnit(u, 0, 20, 20 + i);
+  const [mus, can, tank, mech, drone, rail] = ['musketeer', 'cannon', 'tank', 'mech', 'drone', 'railgun'].map(at);
+  g.completeTech(0, 'paper_cartridges'); g.completeTech(0, 'rifled_barrels');
+  assert.equal(mus.atk, 12); assert.equal(drone.atk, 8); assert.equal(can.atk, 75, 'siege unchanged');
+  g.completeTech(0, 'composite_armor'); assert.deepEqual([tank.marmor, tank.parmor], [6, 8]);
+  g.completeTech(0, 'nanoweave_plating');
+  assert.deepEqual([mech.marmor, mech.parmor], [6, 5]); assert.deepEqual([tank.marmor, tank.parmor], [7, 10]);
+  assert.deepEqual([rail.marmor, rail.parmor], [0, 0], 'siege unchanged');
 });

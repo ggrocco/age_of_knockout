@@ -1,7 +1,8 @@
 // Researchable upgrades. The *mechanic* (research at a building, global effect) follows AoE1;
 // the military tech names echo AoE1's Storage Pit / Government Center tiers, but the exact costs,
 // research times and placements are game-tuned approximations (openage's docs do not contain a
-// clean AoE1 tech tree — see src/data/README.md). No AI-Future techs for now.
+// clean AoE1 tech tree — see src/data/README.md). The Storage Pit has at least one upgrade in every era, Stone to AI
+// Future, listed in era order (the HUD shows them in this order); from Steel Weapons on they have no AoE1 counterpart.
 //
 // effect shapes (all applied exactly once per unit — at spawn and at completion):
 //   { cls: ['inf','cav'], atk: 2 }            -> +atk to units of those classes
@@ -11,13 +12,29 @@
 const c = (food = 0, wood = 0, gold = 0, stone = 0) => ({ food, wood, gold, stone });
 
 export const TECHS = {
-  // --- Storage Pit: military ---
+  // --- Storage Pit: weapons and armor ---
+  hide_armor: { name: 'Hide Armor', building: 'storage_pit', age: 'stone', cost: c(50, 50), time: 25,
+    effect: { cls: ['inf', 'archer'], parmor: 1 }, desc: 'Infantry and ranged foot units gain +1 pierce armor.' },
   bronze_weapons: { name: 'Bronze Weapons', building: 'storage_pit', age: 'tool', cost: c(80, 0, 40), time: 40,
     effect: { cls: ['inf', 'cav'], atk: 2 }, desc: 'Infantry and cavalry deal +2 attack.' },
-  iron_weapons: { name: 'Iron Weapons', building: 'storage_pit', age: 'bronze', cost: c(120, 0, 80), time: 50, requires: 'bronze_weapons',
-    effect: { cls: ['inf', 'cav'], atk: 2 }, desc: 'Infantry and cavalry deal +2 more attack. Needs Bronze Weapons.' },
   bronze_shields: { name: 'Bronze Shields', building: 'storage_pit', age: 'tool', cost: c(0, 60, 60), time: 40,
     effect: { cls: ['inf'], marmor: 1, parmor: 1 }, desc: 'Infantry gain +1 melee and +1 pierce armor.' },
+  iron_weapons: { name: 'Iron Weapons', building: 'storage_pit', age: 'bronze', cost: c(120, 0, 80), time: 50, requires: 'bronze_weapons',
+    effect: { cls: ['inf', 'cav'], atk: 2 }, desc: 'Infantry and cavalry deal +2 more attack. Needs Bronze Weapons.' },
+  scale_barding: { name: 'Scale Barding', building: 'storage_pit', age: 'bronze', cost: c(100, 0, 60), time: 40,
+    effect: { cls: ['cav'], marmor: 1, parmor: 1 }, desc: 'Cavalry gain +1 melee and +1 pierce armor.' },
+  steel_weapons: { name: 'Steel Weapons', building: 'storage_pit', age: 'iron', cost: c(150, 0, 100), time: 50, requires: 'iron_weapons',
+    effect: { cls: ['inf', 'cav'], atk: 2 }, desc: 'Infantry and cavalry deal +2 more attack. Needs Iron Weapons.' },
+  plate_armor: { name: 'Plate Armor', building: 'storage_pit', age: 'medieval', cost: c(180, 0, 120), time: 55,
+    effect: { cls: ['inf', 'cav'], marmor: 2, parmor: 1 }, desc: 'Infantry and cavalry gain +2 melee and +1 pierce armor.' },
+  paper_cartridges: { name: 'Paper Cartridges', building: 'storage_pit', age: 'sail', cost: c(150, 50, 120), time: 50,
+    effect: { cls: ['archer'], atk: 1 }, desc: 'Ranged foot units (archers, musketeers, gunners, drones) deal +1 attack.' },
+  rifled_barrels: { name: 'Rifled Barrels', building: 'storage_pit', age: 'industrial', cost: c(180, 0, 150), time: 55, requires: 'paper_cartridges',
+    effect: { cls: ['archer'], atk: 1 }, desc: 'Ranged foot units deal +1 more attack. Needs Paper Cartridges.' },
+  composite_armor: { name: 'Composite Armor', building: 'storage_pit', age: 'modern', cost: c(200, 0, 180), time: 60,
+    effect: { cls: ['armor'], marmor: 2, parmor: 2 }, desc: 'Tanks gain +2 melee and +2 pierce armor.' },
+  nanoweave_plating: { name: 'Nanoweave Plating', building: 'storage_pit', age: 'future', cost: c(220, 0, 200), time: 65,
+    effect: { cls: ['inf', 'cav', 'archer', 'armor'], marmor: 1, parmor: 2 }, desc: 'Infantry, cavalry, ranged foot units and tanks gain +1 melee and +2 pierce armor.' },
 
   // --- Government Center: military ---
   ballistics: { name: 'Ballistics', building: 'government_center', age: 'bronze', cost: c(0, 80, 120), time: 45,

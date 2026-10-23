@@ -57,6 +57,10 @@ export const ICONS = {
 // Class fallbacks so a future unit never renders a blank tile.
 const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank };
 // Tech tiles reuse a representative existing icon (weapon/shield/arrow/economy) instead of the "?" glyph.
-const TECH_ICON = { bronze_weapons: ICONS.swordsman, iron_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, ballistics: ICONS.bowman, woodworking: ICONS.storage_pit, gold_mining: ICONS.market };
+const TECH_ICON = {
+  hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight,
+  steel_weapons: ICONS.swordsman, plate_armor: ICONS.hoplite, paper_cartridges: ICONS.musketeer, rifled_barrels: ICONS.rifleman,
+  composite_armor: ICONS.tank, nanoweave_plating: ICONS.mech, ballistics: ICONS.bowman, woodworking: ICONS.storage_pit, gold_mining: ICONS.market,
+};
 
 export const icon = (id, cls) => ICONS[id] || TECH_ICON[id] || BY_CLASS[cls] || ICONS.unknown;
