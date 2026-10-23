@@ -92,7 +92,8 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     (Modern) and hoverbikes (AI Future); the Catapult and Trebuchet become a mortar and a rocket battery from the Age of
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers and the King keep one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
-- `src/gallery`: the `buildings.html` design page. `rows.js` (DOM-free, tested) builds the building × era grid from
+- `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
+  gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and
   buildings appear on reload with no page edits.
 - `src/data`: unit/building/age/tech/defence tables. Unit combat and cost stats are checked against openage's AoE1
@@ -107,6 +108,10 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 - New or changed URL param, control, or game rule the player sees: `README.md` and the table above.
 - Import map or static assets in `index.html` / `buildings.html`: the `Dockerfile` `COPY` lines, the smoke-test
   paths in `Jenkinsfile` and the "Assemble site" step in `.github/workflows/pages.yml`.
+- Any building, building stat, upgrade (tech), trained unit, era or building look: the `buildings.html` design page.
+  It reads the data tables, so new rows and cells appear on their own, but a new kind of fact (as "Trains" and
+  "New upgrade" once were) has to be added to `src/gallery/rows.js` and `src/gallery/main.js`. Always open the page in
+  the browser and check the change shows there, even when no gallery file changed.
 - A deliberate change to a `KEPT` building look: regenerate `test/fixtures/kept-buildings.json` (command above).
 - A deviation from AoE1 (stat, rule, tech-tree placement): `src/data/README.md` and `progress.md`.
 - A ruling, known gap or deferred minor issue: append it to `progress.md`.

@@ -170,7 +170,8 @@ real iPhone.
 ![buildings.html: Town Center, House, Granary, Storage Pit and Farm rendered in every era from Stone to Modern](docs/screenshots/gallery.jpg)
 
 Open `http://localhost:8000/buildings.html` to see every building in every era, rendered with the game's own
-models. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
+models. Under each era it lists what the building trains by then and any upgrade it can start researching in that
+era, with what the upgrade does. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
 reads `src/data`, so new eras and buildings appear on reload.
 
 ## How it's built
