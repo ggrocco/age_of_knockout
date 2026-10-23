@@ -41,7 +41,9 @@ quickly replace lost villagers.
 
 ![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
-Before each round the bracket shows the rules, the time limit and your opponent. The other matches in each round are
+Before each round the bracket shows the rules, the time limit and your opponent. **Back to menu** returns to the
+main menu before round 1; from round 2 on the button reads **Leave tournament** and asks to confirm, since leaving
+loses your progress. The other matches in each round are
 played out by bots in a background Worker so the progress screen stays responsive.
 
 | Round | Game type | Goal |

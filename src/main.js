@@ -130,7 +130,16 @@ function bracketHtml(t) {
 function bracketScreen() {
   const t = app.tournament, r = t.round, o = t.opponent;
   updateRoundCaps(LEVELS[t.level], t.timeLimit);
-  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? '<button class="btn" data-auto id="go">Begin Round</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="go">Begin Round</button>'}</div>`);
+  // Before the first round nothing is lost by going back; after it, leaving throws the tournament away, so it asks twice.
+  const started = t.roundIndex > 0, backLabel = started ? 'Leave tournament' : 'Back to menu';
+  const buttons = `<button class="btn" id="back">${backLabel}</button><button class="btn" data-auto id="go">Begin Round</button>`;
+  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? buttons : ''}${bracketHtml(t)}${TOUCH ? '' : buttons}</div>`);
+  const back = document.getElementById('back');
+  back.onclick = () => {
+    if (!started || back.dataset.armed) { app.tournament = null; return menu(); }
+    back.dataset.armed = '1'; back.textContent = 'Confirm leave? Progress is lost';
+    setTimeout(() => { if (back.isConnected) { delete back.dataset.armed; back.textContent = backLabel; } }, 3000);
+  };
   document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, minutes: t.timeLimit, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
