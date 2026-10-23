@@ -70,7 +70,9 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   always terminates. `src/time-limit.js` reads the saved/URL preference and preserves the former checkbox choice.
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
-  drives `?autoplay`.
+  drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
+  sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
+  Center. `test/ai.test.js` checks a lone bot climbs to AI Future within an hour.
 - `src/tournament`: `bracket.js` (bracket, `LEVELS` = each difficulty's five-round opponent ramp) and a headless
   match runner (`sim.js`) used by tests and `test/bot-sim.js`. Browser bracket resolution uses the same runner in a
   module Worker (`worker.js`, managed by `async-sim.js`); no live match state crosses threads.
