@@ -20,6 +20,15 @@ export const ICONS = {
   wonder: svg(`<path d="M5 20.5 12 7l7 13.5z" ${D}/><path d="M8.4 14h7.2M10.2 10.4h3.6"/><path d="M2.5 20.5h19"/><path d="M12 1.4v3.2M10.4 3h3.2"/>`),
   castle: svg(`<path d="M4 21V7.5h2.5v2h2v-2h2.5v2h2v-2h2.5v2h2v-2H20V21z" ${D}/><path d="M9.6 21v-4.2a2.4 2.4 0 0 1 4.8 0V21"/><path d="M2.5 21h19"/><path d="M12 9.5V3"/><path d="M12 3l3.4 1.3L12 5.6z" ${S}/>`),
   factory: svg(`<path d="M3 21v-9l4.5-3v3l4.5-3v3l4.5-3v12z" ${D}/><path d="M17.2 21V5.5h2.6V21"/><path d="M2 21h20"/><path d="M18.4 3.6c-.4-1.5 1.2-2.1 2.4-1.2"/><path d="M5.6 16.4h2M10.1 16.4h2M14.6 16.4h2"/>`),
+  temple: svg(`<path d="M3.5 21v-3.5h3V14h3v-3.5h5V14h3v3.5h3V21z" ${D}/><path d="M12 9.4c-1.5-1.1-1.5-3.1 0-4.8 1.5 1.7 1.5 3.7 0 4.8z" ${S}/><path d="M10.8 21v-2.4h2.4V21M2.5 21h19"/>`),
+  academy: svg(`<path d="M12 6.5c-2.4-1.6-5.5-1.8-8.5-1v13c3-.8 6.1-.6 8.5 1 2.4-1.6 5.5-1.8 8.5-1v-13c-3-.8-6.1-.6-8.5 1z" ${D}/><path d="M12 6.5v13"/><path d="M6 9.4h3.6M6 12.4h3.6M14.4 9.4H18M14.4 12.4H18"/>`),
+  siege_workshop: svg(`<circle cx="8" cy="15.6" r="4.6" ${D}/><path d="M8 11v9.2M3.4 15.6h9.2M4.8 12.4l6.4 6.4M11.2 12.4l-6.4 6.4"/><circle cx="8" cy="15.6" r="1.1" ${S}/><path d="M13.4 12.6 19 7" stroke-width="2"/><path d="M16.6 3.4l4 4-2.2 2.2-4-4z" ${S}/>`),
+  university: svg(`<path d="M2.5 9 12 4.5 21.5 9 12 13.5z" ${D}/><path d="M6.5 11v4.6c3 2.4 8 2.4 11 0V11"/><path d="M21.5 9v5.2"/><circle cx="21.5" cy="15.2" r="1" ${S}/>`),
+  arsenal: svg(`<path d="M3 7c0-1.4 2-2.5 5-2.5s5 1.1 5 2.5v10c0 1.4-2 2.5-5 2.5s-5-1.1-5-2.5z" ${D}/><path d="M3 10.2h10M3 13.8h10"/><circle cx="16.6" cy="19.2" r="1.9" ${S}/><circle cx="20.4" cy="19.2" r="1.9" ${S}/><circle cx="18.5" cy="15.9" r="1.9" ${S}/>`),
+  trading_company: svg(`<path d="M2.8 15.4h18.4l-2.6 4.6H5.4z" ${D}/><path d="M12 15.4V2.8"/><path d="M12 4.6c3.6 2.2 5 5.8 4.8 9.2H12z" ${D}/><path d="M12 6.4c-2.4 1.8-3.4 4.4-3.2 7.4H12"/><path d="M12 2.8l3 1-3 1z" ${S}/>`),
+  railway_station: svg(`<rect x="13" y="6.6" width="6.6" height="10.6" rx=".8" ${D}/><rect x="3" y="10.8" width="10" height="6.4" rx="1" ${D}/><path d="M5.4 10.8V7.4h2.6v3.4M14.8 9h3"/><circle cx="6" cy="19.2" r="1.8"/><circle cx="11" cy="19.2" r="1.8"/><circle cx="16.8" cy="19.2" r="1.8"/><path d="M6.4 5.4c-.4-1.6 1.2-2.4 2.6-1.4"/>`),
+  power_plant: svg(`<path d="M3.5 21c1.4-3.6 1.4-8.6 0-13h9c-1.4 4.4-1.4 9.4 0 13z" ${D}/><path d="M2.5 21h12"/><path d="M6 5.6c-.3-1.5 1.2-2.4 2.5-1.6M9.4 5.2c-.2-1.3 1.1-2 2.2-1.3"/><path d="M19.4 3 16.4 10.4h3l-2 7.2 4.6-9h-3.2L21.4 3z" ${S}/>`),
+  airfield: svg(`<path d="M12 2.5c.9 0 1.4 1 1.4 2.4v4.7l7.6 4.4v1.9l-7.6-2.2v4.4l2.3 1.7v1.6L12 20.4l-3.7 1v-1.6l2.3-1.7v-4.4L3 15.9V14l7.6-4.4V4.9c0-1.4.5-2.4 1.4-2.4z" ${D}/>`),
   mine: svg(`<path d="M3 20.5l5-8.6 4 3 4-5 5 10.6z" ${D}/><path d="M14.2 4.2 5.2 13.2"/><path d="M11.2 3.6c2.8-.4 5.4.8 6.6 3.4-.6-1.2-2.8-1.6-4.4-1.4z" ${D}/><circle cx="17" cy="16.2" r="2.8"/><circle cx="17" cy="16.2" r=".8" ${S}/><path d="M17 13.4v5.6M14.2 16.2h5.6"/><path d="M2 20.5h20"/>`),
   tower: svg(`<path d="M8.5 21V10.5H7V4.5h2.4v2H11v-2h2v2h1.6v-2H17v6h-1.5V21z" ${D}/><rect x="11.3" y="12.4" width="1.4" height="3.2" rx=".5" ${S}/><path d="M10.8 21v-2.6a1.2 1.2 0 0 1 2.4 0V21"/><path d="M5.5 21h13"/>`),
   wall: svg(`<path d="M2.6 20.5V6.5h3.2v2.4h2v-2.4H11v2.4h2V6.5h3.2v2.4h2V6.5h3.2v14z" ${D}/><path d="M2.6 12.7h18.8M2.6 16.6h18.8M9.4 8.9v3.8M15.6 8.9v3.8M6 12.7v3.9M12.4 12.7v3.9M18.6 12.7v3.9M9.4 16.6v3.9M15.6 16.6v3.9"/><path d="M1.5 20.5h21"/>`),
@@ -61,6 +70,8 @@ const TECH_ICON = {
   hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight,
   steel_weapons: ICONS.swordsman, plate_armor: ICONS.hoplite, paper_cartridges: ICONS.musketeer, rifled_barrels: ICONS.rifleman,
   composite_armor: ICONS.tank, nanoweave_plating: ICONS.mech, ballistics: ICONS.bowman, woodworking: ICONS.storage_pit, gold_mining: ICONS.market,
+  sacred_harvest: ICONS.farm, phalanx_drill: ICONS.hoplite, torsion_engines: ICONS.catapult, masonry: ICONS.mine, bayonets: ICONS.musketeer,
+  colonial_trade: ICONS.trading_company, railways: ICONS.railway_station, electrification: ICONS.power_plant, air_support: ICONS.airfield,
 };
 
 export const icon = (id, cls) => ICONS[id] || TECH_ICON[id] || BY_CLASS[cls] || ICONS.unknown;

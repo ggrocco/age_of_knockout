@@ -14,8 +14,19 @@ export const BUILDINGS = {
   stable:            { name: 'Stable', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', trains: ['scout', 'horse_archer', 'knight'], sight: 4 },
   market:            { name: 'Market', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', sight: 4 },
   government_center: { name: 'Government Center', hp: 500, cost: c(0, 175, 0, 100), size: 3, buildTime: 60, age: 'bronze', trains: ['catapult', 'railgun'], drops: ['food', 'wood', 'gold', 'stone'], sight: 5 },
+  // Invented gate buildings (see src/data/README.md): with them every Age from Bronze to Modern has two buildings of its
+  // own, and advancing needs both, as Stone and Tool do. Each researches one upgrade.
+  temple:            { name: 'Temple', hp: 400, cost: c(0, 150, 0, 50), size: 3, buildTime: 45, age: 'bronze', sight: 4 },
+  academy:           { name: 'Academy', hp: 450, cost: c(0, 175, 50), size: 3, buildTime: 50, age: 'iron', sight: 4 },
+  siege_workshop:    { name: 'Siege Workshop', hp: 450, cost: c(0, 200, 0, 50), size: 3, buildTime: 50, age: 'iron', sight: 4 },
   castle:            { name: 'Castle', hp: 1200, cost: c(0, 300, 0, 300), size: 4, buildTime: 90, age: 'medieval', trains: ['trebuchet', 'cannon'], sight: 7, marmor: 6, parmor: 10 },
+  university:        { name: 'University', hp: 600, cost: c(0, 200, 100, 50), size: 3, buildTime: 55, age: 'medieval', sight: 4 },
+  arsenal:           { name: 'Arsenal', hp: 600, cost: c(0, 200, 50, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
+  trading_company:   { name: 'Trading Company', hp: 500, cost: c(0, 250, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
   factory:           { name: 'Factory', hp: 700, cost: c(0, 250, 150, 50), size: 3, buildTime: 60, age: 'industrial', trains: ['field_artillery', 'tank'], sight: 5 },
+  railway_station:   { name: 'Railway Station', hp: 700, cost: c(0, 250, 100, 100), size: 3, buildTime: 60, age: 'industrial', sight: 5 },
+  power_plant:       { name: 'Power Plant', hp: 800, cost: c(0, 200, 150, 150), size: 3, buildTime: 60, age: 'modern', sight: 4 },
+  airfield:          { name: 'Airfield', hp: 800, cost: c(0, 250, 200, 100), size: 3, buildTime: 65, age: 'modern', sight: 8 },
   // Defences (invented). `hp` here is the Tool-era value; addBuilding takes the real HP and the tower's attack from the owner's era (defences.js).
   tower:             { name: 'Tower', hp: TOWER.tool.hp, cost: c(0, 40, 0, 120), size: 2, buildTime: 40, age: 'tool', sight: 10, extra: true, defence: 'tower' },
   wall:              { name: 'Wall', hp: WALL_HP.tool, cost: c(0, 0, 0, 5), size: 1, buildTime: 6, age: 'tool', sight: 2, extra: true, defence: 'wall', marmor: 4, parmor: 10 },

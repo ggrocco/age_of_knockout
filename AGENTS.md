@@ -84,6 +84,8 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     (`arch/stone.js` … `arch/future.js`, built with `arch/kit.js`); `KEPT` lists older looks that stay byte-identical
     (pinned by `test/fixtures/kept-buildings.json`); anything else falls back to `arch/legacy.js` coloured by the
     era palette in `render/styles.js` (`ERA_STYLE`). `buildingStyle` in `models.js` is only that palette's key.
+    The nine gate buildings (Temple to Airfield) are drawn once for every era by `arch/gates.js`, whose `block()` room
+    takes the era's style; `index.js` merges them into `DESIGNS`.
   - Unit looks: a unit is drawn in its owner's era once that is past its own (`unitEra` in `render/era-units.js`);
     the view rebuilds units, like buildings, when the owner ages up. `eraSpec` gives humanoids the era's helmet,
     uniform and weapon finish (a colour remap on the arm parts, via `new B(map)`); cavalry ride horses, then motorbikes

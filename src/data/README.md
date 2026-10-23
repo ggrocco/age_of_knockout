@@ -132,7 +132,32 @@ Empires I, and every number below is an invented, game-tuned approximation (spec
   archer/siege) does apply to the new gunners and siege; the Railgun keeps the longest siege range.
 - **Buildings**: the **Castle** (Medieval, 1200 HP, melee/pierce armor 6/10) trains Trebuchets and Cannons and is the
   building you need to leave the Medieval Age; the **Factory** (Industrial) trains Field Artillery and Tanks and is
-  needed to leave the Industrial Age. The Age of Sail and Modern Age have no gate building of their own.
+  needed to leave the Industrial Age.
+
+## Invented content (gate buildings)
+
+AoE1 asks for two buildings of your current age to advance, but this game's tables gave Bronze, Medieval and Industrial
+one each and Iron, Age of Sail and Modern none, so from Bronze on most age-ups had little or nothing to build. Nine
+buildings were added so that every age but AI Future has exactly two of its own, and `ageUpNeed` is now 2 for every age
+(`ageBuildings` in `sim/commands.js`; the Wonder, Farm, Mine, Tower and Wall still never count). All are invented,
+game-tuned guesses; only the Temple, Academy and Siege Workshop exist in AoE1, where they are Bronze Age buildings (the
+Academy trains Hoplites and the Siege Workshop siege there; here they train nothing).
+
+| Age | Building | Cost (wood/gold/stone) | HP | Build | Upgrade (cost food/wood/gold, time) |
+| --- | --- | --- | --- | --- | --- |
+| Bronze | Temple | 150/0/50 | 400 | 45 s | Sacred Harvest: food gathering x1.2 (0/120/80, 40 s) |
+| Iron | Academy | 175/50/0 | 450 | 50 s | Phalanx Drill: infantry +20 HP (120/0/80, 45 s) |
+| Iron | Siege Workshop | 200/0/50 | 450 | 50 s | Torsion Engines: siege +10 attack (0/150/120, 50 s) |
+| Medieval | University | 200/100/50 | 600 | 55 s | Masonry: stone gathering x1.25 (100/100/0, 40 s) |
+| Age of Sail | Arsenal | 200/50/100 | 600 | 55 s | Bayonets: `archer` class +2 melee armor (150/0/120, 50 s) |
+| Age of Sail | Trading Company | 250/100/0 | 500 | 55 s | Colonial Trade: gold gathering x1.2 (200/150/0, 45 s) |
+| Industrial | Railway Station | 250/100/100 | 700 | 60 s | Railways: every unit's speed x1.1 (200/0/200, 55 s) |
+| Modern | Power Plant | 200/150/150 | 800 | 60 s | Electrification: all gathering x1.1 (250/0/200, 55 s) |
+| Modern | Airfield | 250/200/100 | 800 | 65 s | Air Support: `armor` and `siege` classes +30 HP (200/0/250, 60 s) |
+
+Two new tech effect shapes support them: `hp` (adds to a unit's max HP and current HP) and `speedMul` (multiplies its
+speed). Death Match still starts in the Iron Age, so both players now build an Academy and a Siege Workshop before
+their first age-up.
 - **Death Match** starts both players in the Iron Age (20000 of every resource), so it is the round where these eras
   are played.
 

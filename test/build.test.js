@@ -1,6 +1,6 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
-import { canPlace, ageUpNeed } from '../src/sim/commands.js';
+import { canPlace, ageUpNeed, ageBuildings } from '../src/sim/commands.js';
 import { AGES, AGE_POP_LIMIT, popLimit } from '../src/data/ages.js';
 const freeSpot = (g, p, type, skip = []) => { const t = tc(g, p); for (let r = 3; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(t.x) + dx, y = Math.floor(t.y) + dy; if (skip.some(k => Math.abs(k.x - x) < 4 && Math.abs(k.y - y) < 4)) continue; if (canPlace(g, p, type, x, y)) return { x, y }; } };
 const mine = (g, p, type) => [...g.units.values()].filter(u => u.owner === p && u.type === type);
@@ -75,36 +75,45 @@ test('construct: villagers can help finish an existing foundation', () => {
   assert.equal(g.command(1, { type: 'construct', ids: [], targetId: b.id }).ok, false, 'enemy cannot');
   for (let i = 0; i < 300; i++) g.tick(); assert.equal(b.constructed, true, 'three builders finish a house fast');
 });
-test('ageUpNeed: two buildings of the current Age, fewer when the Age has fewer (Wonder and Farm excluded)', () => {
-  assert.deepEqual(AGES.slice(0, -1).map(ageUpNeed), [2, 2, 1, 0, 1, 0, 1, 0]);
+test('ageUpNeed: every Age but the last needs two buildings of its own (Wonder and Farm excluded)', () => {
+  assert.deepEqual(AGES.slice(0, -1).map(ageUpNeed), [2, 2, 2, 2, 2, 2, 2, 2]);
+  assert.deepEqual(AGES.slice(2, -1).map(ageBuildings), [['government_center', 'temple'], ['academy', 'siege_workshop'], ['castle', 'university'],
+    ['arsenal', 'trading_company'], ['factory', 'railway_station'], ['power_plant', 'airfield']]);
 });
-test('bronze age advances to iron with a Government Center; no Wonder required', () => {
+test('bronze age advances to iron with a Government Center and a Temple; no Wonder required', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.age = 'bronze'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
-  assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', 'needs a bronze building first');
-  const t = tc(g, 0); g.addBuilding('government_center', 0, t.x, t.y + 8, true);
+  assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', 'needs bronze buildings first');
+  const t = tc(g, 0); g.addBuilding('government_center', 0, t.x, t.y + 8, true); g.addBuilding('wonder', 0, t.x - 9, t.y - 9, true);
+  assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', 'the Wonder does not count');
+  g.addBuilding('temple', 0, t.x + 8, t.y, true);
   const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, r.reason);
   for (let i = 0; i < 1100; i++) g.tick();
   assert.equal(p.age, 'iron');
 });
 test('iron advances to medieval; AI Future is the max age', () => {
-  const g = createGame({ seed: 1 }); const p = g.players[0]; p.age = 'iron'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
+  const g = createGame({ seed: 1 }); const p = g.players[0], t = tc(g, 0); p.age = 'iron'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
+  g.addBuilding('academy', 0, t.x, t.y + 8, true); g.addBuilding('siege_workshop', 0, t.x + 8, t.y, true);
   const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, r.reason);
   for (let i = 0; i < 1100; i++) g.tick();
   assert.equal(p.age, 'medieval');
   p.age = 'future'; const again = g.command(0, { type: 'age' }); assert.equal(again.ok, false); assert.equal(again.reason, 'max age');
 });
 const rich = p => { p.res = { food: 9000, wood: 9000, gold: 9000, stone: 9000 }; };
-test('the Castle gates the Age of Sail and the Factory gates Modern', () => {
-  for (const [age, gate] of [['medieval', 'castle'], ['industrial', 'factory']]) {
+test('every Age from Bronze to Modern needs both of its gate buildings, finished', () => {
+  for (const age of AGES.slice(2, -1)) {
     const g = createGame({ seed: 1 }), p = g.players[0], t = tc(g, 0); p.age = age; rich(p);
+    const [a, b] = ageBuildings(age);
     assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', age);
-    g.addBuilding(gate, 0, t.x, t.y - 9, true);
+    g.addBuilding(a, 0, t.x, t.y - 9, true); g.addBuilding(b, 0, t.x + 8, t.y, false);
+    assert.equal(g.command(0, { type: 'age' }).reason, 'needs buildings', `${age}: an unfinished ${b} does not count`);
+    g.addBuilding(b, 0, t.x - 9, t.y + 8, true);
     const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, `${age}: ${r.reason}`);
   }
 });
 test('iron climbs to AI Future through every era', () => {
   const g = createGame({ seed: 1 }), p = g.players[0], t = tc(g, 0); p.age = 'iron';
-  g.addBuilding('castle', 0, t.x, t.y - 9, true); g.addBuilding('factory', 0, t.x + 8, t.y, true);
+  const spots = [[0, -9], [8, 0], [-9, 8], [8, 8], [-9, -9], [8, -9], [0, 8], [-9, 0], [12, 4], [4, 12], [-13, 4], [4, -13]];
+  AGES.slice(3, -1).flatMap(ageBuildings).forEach((type, i) => g.addBuilding(type, 0, t.x + spots[i][0], t.y + spots[i][1], true));
   const seen = [];
   while (p.age !== 'future') {
     rich(p); const r = g.command(0, { type: 'age' }); assert.equal(r.ok, true, `${p.age}: ${r.reason}`);

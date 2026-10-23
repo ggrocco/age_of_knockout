@@ -15,6 +15,7 @@ import * as industrial from './industrial.js';
 import * as modern from './modern.js';
 import * as future from './future.js';
 import { mine } from './mine.js';
+import { GATES } from './gates.js';
 
 // Today's looks that stay, byte-identical (pinned by test/fixtures/kept-buildings.json).
 export const KEPT = {
@@ -25,7 +26,9 @@ export const KEPT = {
 };
 // Per era, type → design(ctx), which draws into ctx and returns its scaffold height (the body's top). Each era module
 // exports one design function per building type.
-export const DESIGNS = { stone, tool, bronze, iron, medieval, sail, industrial, modern, future };
+// The gate buildings (gates.js) have one design for every era from their unlock on, added to each era here.
+export const DESIGNS = Object.fromEntries(Object.entries({ stone, tool, bronze, iron, medieval, sail, industrial, modern, future }).map(([age, mod]) =>
+  [age, { ...mod, ...Object.fromEntries(Object.entries(GATES).filter(([type]) => ageIndex(age) >= ageIndex(BUILDINGS[type].age))) }]));
 
 // Before a building unlocks (gallery, debug) it shows its unlock-era design.
 export const designAge = (type, age) => {
