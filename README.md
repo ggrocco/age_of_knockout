@@ -35,6 +35,8 @@ The difficulty sets the opponent for each of your five rounds:
 | Hard | medium | medium | hard | hard | hard |
 
 Relaxed opponents work at half your speed and wait 30 minutes, and until the Bronze Age, before attacking.
+Easy opponents keep a smaller army than medium and hard ones, but put their economy into reaching the next age and
+quickly replace lost villagers.
 
 ![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 

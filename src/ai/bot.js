@@ -10,10 +10,12 @@ import { parseTimeLimit } from '../time-limit.js';
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
 // towers: how many Towers it keeps near its Town Center from the Tool Age on.
+// ageFirst: gatherers on a surplus resource move to the gold or food the next age-up still needs, and research and
+// the second half of the army only spend what leaves the age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
   relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1 },
-  easy:    { every: 30, villagers: 12, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1 },
+  easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true },
   medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2 },
   hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3 },
 };
@@ -62,7 +64,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   const reach = reachableFrom(game.map, game.map.starts[pid]), k = game.map.size / 64;
   const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => nearestReachable(game.map, reach, { x: Math.round(x * k), y: Math.round(y * k) }))];
   const sentTo = new Map(); // unit id -> sweepIdx of the waypoint it was last sent to
-  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, think };
+  const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, scout: 0, think };
 
   // In the Wonder round, keep the wonder's cost untouched until it is placed.
   const reserved = () => (game.rules && game.rules.id === 'wonder' && !mine('buildings').some(b => b.type === 'wonder')) ? BUILDINGS.wonder.cost : null;
@@ -163,7 +165,7 @@ export function createBot(game, pid, difficulty = 'medium') {
         if (t.building !== b.type || me.techs.has(id) || ageIndex(me.age) < ageIndex(t.age)) continue;
         if (t.requires && !me.techs.has(t.requires)) continue;
         if (done.some(bb => bb.research && bb.research.tech === id)) continue; // another building already on it
-        if (!canPay(t.cost)) continue;
+        if (!canPay(t.cost) || (D.ageFirst && !leavesAgeUp(t.cost))) continue;
         if (cmd({ type: 'research', buildingId: b.id, tech: id })) break;
       }
     }
@@ -177,6 +179,14 @@ export function createBot(game, pid, difficulty = 'medium') {
     // --- idle villagers -> resources
     const idle = vills.filter(v => v.order.type === 'idle');
     if (idle.length) assign(idle, vills, tc, home, done);
+    // ageFirst: a resource piling up while the next age-up waits on another -> every 10 s move one of its gatherers to the
+    // shortfall (gold first), keeping a fifth of the villagers on wood. A pile is 400 over what the age-up takes of it.
+    const nextAge = AGES[ageIndex(me.age) + 1], ageCost = nextAge && !me.ageUp ? AGE_COST[nextAge].cost : null;
+    if (D.ageFirst && roundId !== 'deathmatch' && ageCost && game.time - (bot.shiftedAt ?? -Infinity) >= 200) {
+      const short = ['gold', 'food'].find(k => me.res[k] < ageCost[k]), on = k => vills.filter(v => v.order.type === 'gather' && v.order.kind === k);
+      const from = short && ['wood', 'food', 'stone'].find(k => k !== short && me.res[k] - (ageCost[k] || 0) > 400 && on(k).length > (k === 'wood' ? vills.length * 0.2 : 0));
+      if (from) { bot.shiftedAt = game.time; assign([on(from)[0]], vills, tc, home, done, short); }
+    }
 
     // --- military production
     const armyCap = roundId === 'deathmatch' ? D.dmArmy : D.army;
@@ -186,6 +196,7 @@ export function createBot(game, pid, difficulty = 'medium') {
       for (const b of done) {
         const trains = BUILDINGS[b.type].trains || []; if (b.type === 'town_center' || b.queue.length >= (roundId === 'deathmatch' ? 4 : 2)) continue;
         const u = bestUnit(trains, enemyClass); if (!u || !canPay(UNITS[u].cost) || me.pop >= me.popCap) continue;
+        if (D.ageFirst && armyCount >= armyCap / 2 && !leavesAgeUp(UNITS[u].cost)) continue;
         if (UNITS[u].cls === 'siege' && army.filter(a => a.cls === 'siege').length + done.reduce((n, x) => n + x.queue.filter(q => UNITS[q.unit].cls === 'siege').length, 0) >= 2) continue;
         cmd({ type: 'train', buildingId: b.id, unit: u });
       }
@@ -244,15 +255,16 @@ export function createBot(game, pid, difficulty = 'medium') {
     for (const { p } of patches) for (const i of p.tiles) { const x = i % n, y = (i / n) | 0; if (walkable(x, y) && canPlace(game, pid, 'mine', x, y)) return { x, y }; }
     return null;
   }
-  function assign(idle, vills, tc, home, done) {
+  // force: the resource kind to send them to instead of the one furthest below its share.
+  function assign(idle, vills, tc, home, done, force) {
     const cnt = { food: 0, wood: 0, gold: 0, stone: 0 };
     for (const v of vills) if (v.order.type === 'gather') cnt[v.order.kind]++;
     const known = game.knownResources(pid);
     const early = vills.length < 12 || ageIndex(me.age) === 0;
     for (const v of idle) {
       const total = vills.length || 1;
-      let kind = 'wood', bestDef = -Infinity;
-      for (const k of ['food', 'wood', 'gold', 'stone']) {
+      let kind = force || 'wood', bestDef = -Infinity;
+      if (!force) for (const k of ['food', 'wood', 'gold', 'stone']) {
         const share = early ? (k === 'food' ? 0.5 : k === 'wood' ? 0.5 : k === 'gold' ? 0 : 0) : SHARE[k];
         if (game.rules && game.rules.id === 'deathmatch' && (k === 'gold' || k === 'stone')) continue;
         const def = share * total - cnt[k]; if (def > bestDef) { bestDef = def; kind = k; }
@@ -278,7 +290,13 @@ export function createBot(game, pid, difficulty = 'medium') {
           if (sp && cmd({ type: 'build', ids: [v.id], building: 'mine', x: sp.x, y: sp.y })) { cnt[kind]++; continue; }
         }
       }
-      if (!res) { if (kind !== 'wood') { cnt[kind] = 99; } continue; }
+      if (!res) { // none of this kind explored yet (trees can start just outside the explored radius): walk out and look
+        if (kind !== 'wood') cnt[kind] = 99;
+        const a = bot.scout * 2.4, r = Math.min(30, 12 + 2 * Math.floor(bot.scout++ / 6));
+        const wp = nearestReachable(game.map, reach, { x: Math.round(Math.min(game.map.size - 1, Math.max(0, home.x + r * Math.cos(a)))), y: Math.round(Math.min(game.map.size - 1, Math.max(0, home.y + r * Math.sin(a)))) });
+        cmd({ type: 'move', ids: [v.id], x: wp.x + 0.5, y: wp.y + 0.5 });
+        continue;
+      }
       // far from any dropsite -> build one there first
       if ((res.kind === 'resource' || res.type === 'mine') && dropDist(kind, res, done) > 10) {
         const type = kind === 'food' ? 'granary' : 'storage_pit', sp = spotNear(type, res, false);
