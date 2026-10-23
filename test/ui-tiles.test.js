@@ -52,6 +52,9 @@ test('icon() falls back by unit class, then to a generic glyph', () => {
   assert.equal(icon('made_up_thing'), ICONS.unknown);
   assert.equal(icon('barracks', 'inf'), ICONS.barracks);
 });
+test('every tech tile has a representative icon, not the generic glyph', () => {
+  for (const id of Object.keys(TECHS)) assert.notEqual(icon(id), ICONS.unknown, id);
+});
 test('every unit, building and the age button has a short description', () => {
   for (const id of [...ids, 'age']) { assert.ok(DESC[id], `description for ${id}`); assert.ok(DESC[id].length >= 20 && DESC[id].length <= 200, `${id} length`); }
 });

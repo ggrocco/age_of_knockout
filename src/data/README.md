@@ -84,8 +84,21 @@ toward age-up) have a purpose. The *mechanic* — research at a building, apply 
 AoE1 model; the military tech names echo AoE1's Storage Pit / Government Center tiers. **openage's docs
 do not contain a clean AoE1 tech tree**, so the specific costs, research times and placements are
 game-tuned designed approximations, not sourced values:
-- Storage Pit: **Bronze Weapons** (+2 attack, infantry/cavalry), **Iron Weapons** (+2 more, requires
-  Bronze Weapons), **Bronze Shields** (+1 melee & +1 pierce armor, infantry).
+- Storage Pit, at least one per era (weapons and armor for that era's units):
+  - Stone: **Hide Armor** (+1 pierce armor, infantry and ranged foot units; echoes AoE1's Leather Armor).
+  - Tool: **Bronze Weapons** (+2 attack, infantry/cavalry), **Bronze Shields** (+1 melee & +1 pierce armor,
+    infantry).
+  - Bronze: **Iron Weapons** (+2 more, requires Bronze Weapons), **Scale Barding** (+1 melee & +1 pierce armor,
+    cavalry; echoes AoE1's Scale Armor for cavalry).
+  - Iron: **Steel Weapons** (+2 more, requires Iron Weapons).
+  - Medieval: **Plate Armor** (+2 melee & +1 pierce armor, infantry/cavalry).
+  - Age of Sail: **Paper Cartridges** (+1 attack, ranged foot units: the `archer` class, which also holds
+    Musketeers, Riflemen, Machine Gunners and Drones).
+  - Industrial: **Rifled Barrels** (+1 more, requires Paper Cartridges).
+  - Modern: **Composite Armor** (+2 melee & +2 pierce armor, Tanks).
+  - AI Future: **Nanoweave Plating** (+1 melee & +2 pierce armor, infantry, cavalry, ranged foot units and Tanks).
+
+  Steel Weapons onwards have no AoE1 counterpart: invented. Siege is never upgraded at the Storage Pit.
 - Government Center: **Ballistics** (+1 range, archers & siege).
 - Market: **Woodworking** (+25% wood gather), **Gold Mining** (+25% gold gather).
 

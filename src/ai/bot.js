@@ -196,7 +196,8 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
 
   const SIEGE = ['railgun', 'field_artillery', 'cannon', 'trebuchet', 'catapult'];
-  const RESEARCH_PREF = ['woodworking', 'gold_mining', 'bronze_weapons', 'bronze_shields', 'iron_weapons', 'ballistics'];
+  const RESEARCH_PREF = ['woodworking', 'gold_mining', 'bronze_weapons', 'bronze_shields', 'iron_weapons', 'ballistics', 'hide_armor', 'scale_barding',
+    'steel_weapons', 'plate_armor', 'paper_cartridges', 'rifled_barrels', 'composite_armor', 'nanoweave_plating'];
   // Counter-pick preference lists (openage damage.md classes). Same units, reordered; the era units sit right after the
   // AI Future ones (newest first at each building), and armor (Tanks) is answered with siege and Tanks:
   // vs archers -> tanky melee / pierce-armoured closers; vs cavalry -> spearman (bonus) first;
