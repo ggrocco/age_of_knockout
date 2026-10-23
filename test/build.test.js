@@ -55,7 +55,7 @@ test('population cap grows with houses up to a per-age limit: 50 in Stone, 200 i
 test('age up requires buildings, cost, and gates units', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
   assert.equal(g.command(0, { type: 'age' }).ok, false, 'needs 2 buildings');
-  const vs = mine(g, 0, 'villager'), s = spot(g, 0);
+  const vs = mine(g, 0, 'villager');
   const placed = [];
   for (const [i, type] of ['house', 'granary', 'barracks'].entries()) { const sp = freeSpot(g, 0, type, placed); placed.push(sp); assert.equal(g.command(0, { type: 'build', ids: [vs[i].id], building: type, x: sp.x, y: sp.y }).ok, true, type); }
   for (let i = 0; i < 2000; i++) g.tick();

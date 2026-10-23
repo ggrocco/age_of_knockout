@@ -76,7 +76,6 @@ function nearestDrop(game, u, kind) {
   }
   return best;
 }
-const gatherKind = r => r.gatherType || RES_KIND[r.type];
 
 function doGather(game, u, o) {
   let res = game.entities.get(o.res);

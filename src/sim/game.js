@@ -3,7 +3,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { defenceStats } from '../data/defences.js';
 import { farmStats } from '../data/farms.js';
-import { AGES, popLimit } from '../data/ages.js';
+import { popLimit } from '../data/ages.js';
 import { TECHS, applyUnitEffect } from '../data/techs.js';
 import { updateUnit } from './orders.js';
 import { updateTower, refreshDefences } from './defence.js';
@@ -157,7 +157,7 @@ export function createGame({ seed = 1, rules = null, size = 96, workRate = [1, 1
   recordPileStart(game);
   for (const [i, s] of map.starts.entries()) {
     const tc = game.addBuilding('town_center', i, s.x - 1, s.y - 1, true);
-    for (let k = 0; k < 3; k++) { const sp = game.findSpawn(tc); const u = game.spawnUnit('villager', i, sp.x, sp.y); }
+    for (let k = 0; k < 3; k++) { const sp = game.findSpawn(tc); game.spawnUnit('villager', i, sp.x, sp.y); }
   }
   game.recount(); updateVision(game);
   if (rules && rules.setup) rules.setup(game);

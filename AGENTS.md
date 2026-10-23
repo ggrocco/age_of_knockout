@@ -5,13 +5,14 @@ file and adds only Claude-specific tooling notes; put shared guidance here so th
 
 ## Commands
 
-No build step, bundler or linter. Plain ES modules; three.js is resolved by the import map in `index.html` straight
-from `node_modules`.
+No build step or bundler. Plain ES modules, linted with ESLint (`eslint.config.js`); three.js is resolved by the
+import map in `index.html` straight from `node_modules`.
 
 ```
 npm install
 npm start                                   # node serve.js, then open http://localhost:8000/
 npm test                                    # node --test test/*.test.js
+npm run lint                                # eslint . (CI fails on any error)
 node --test test/econ.test.js               # single test file
 node --test --test-name-pattern="<name>" test/*.test.js   # single test
 node test/bot-sim.js 12                     # bot-vs-bot termination check (12 seeds x 5 rounds)
@@ -153,6 +154,12 @@ agent; it never pushes or deploys.
 `.github/workflows/pages.yml` deploys the same file set to GitHub Pages (https://ggrocco.github.io/age_of_knockout/) on
 every push to `main`, after `npm test`. Pages serves from a `/age_of_knockout/` sub-path, so page and module URLs must
 stay relative.
+
+`.github/workflows/ci.yml` runs on every pull request and push to `main`: `npm test` plus `bot-sim.js 12`, `npm run lint`,
+`npm audit` (fails at moderate or above) with `npm audit signatures`, and on pull requests GitHub's dependency review.
+`.github/workflows/codeql.yml` runs CodeQL (`security-extended`) on the JavaScript and the workflows, on the same events
+and weekly. Keep `npm run lint` clean before pushing; the sim/AI/rounds/data/tournament folders are linted without
+browser globals, so a `window` or `document` there is a lint error.
 
 ## Project docs
 

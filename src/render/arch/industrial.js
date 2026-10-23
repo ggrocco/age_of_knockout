@@ -509,7 +509,7 @@ export function archery_range(ctx) {
 // iron rails comes down from the dock into the cobbled yard, where two more horses stand by an iron trough and hay. A
 // signal stands over the siding.
 export function stable(ctx) {
-  const { b, s, h, t, td } = ctx, y = 0.03;
+  const { b, s, h, t } = ctx, y = 0.03;
   b.box(s, y, s, SETT);
   // The stable: roof and ventilator, the doors and horses, windows, the cart arch and loft door, the flag.
   const x0 = -1.32, x1 = 0.44, z0 = -1.32, z1 = -0.72, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, fl = y + 0.08;

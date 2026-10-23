@@ -14,14 +14,14 @@ test('ranged attacks from range without closing', () => {
   assert.ok(t.hp < t.maxHp); assert.ok(Math.hypot(a.x - t.x, a.y - t.y) > 3);
 });
 test('idle soldier auto-engages nearby enemy', () => {
-  const g = createGame({ seed: 1 }); const a = g.spawnUnit('axeman', 0, 20, 20), t = g.spawnUnit('villager', 1, 24, 20);
+  const g = createGame({ seed: 1 }); g.spawnUnit('axeman', 0, 20, 20); const t = g.spawnUnit('villager', 1, 24, 20);
   for (let i = 0; i < 400; i++) g.tick(); assert.equal(g.entities.has(t.id), false);
 });
 test('buildings can be destroyed; catapult splashes', () => {
   const g = createGame({ seed: 1 }); const home = tcOf(g, 1);
   const cats = [g.spawnUnit('catapult', 0, home.x - 6, home.y + 1)];
   g.command(0, { type: 'attack', ids: [cats[0].id], targetId: home.id });
-  const v = g.spawnUnit('villager', 1, home.x - 2, home.y + 1);
+  g.spawnUnit('villager', 1, home.x - 2, home.y + 1);
   for (let i = 0; i < 3000 && g.entities.has(home.id); i++) g.tick();
   assert.equal(g.entities.has(home.id), false); assert.ok(g.players[0].bdestroyed >= 1);
 });

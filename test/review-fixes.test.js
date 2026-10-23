@@ -25,7 +25,7 @@ test('review#2: relics dropped by a destroyed building land on a free tile and s
   for (let i = 0; i < 400; i++) g.tick(); assert.equal(r.holder, u.id, 'unit picked the relic up');
 });
 test('review#2b: cannot build on a loose relic', () => {
-  const g = createGame({ seed: 1, rules: roundById('relics') }); const t = tcOf(g, 0), sp = spot(g, 0, 'house');
+  const g = createGame({ seed: 1, rules: roundById('relics') }); const sp = spot(g, 0, 'house');
   const r = [...g.relics.values()][0]; r.x = sp.x + 0.5; r.y = sp.y + 0.5;
   assert.equal(canPlace(g, 0, 'house', sp.x, sp.y), false);
 });
