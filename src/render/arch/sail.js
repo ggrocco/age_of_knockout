@@ -473,7 +473,7 @@ const coach = t => {
 // with a weathervane on its hipped roof. In the cobbled yard a team-panelled coach with its pair of horses in team
 // saddle cloths, a pump and trough and a mounting block; a horse looks out of the stable door in the +x end.
 export function stable(ctx) {
-  const { b, mast, s, h, t, td } = ctx, y = 0.03, x0 = -1.32, x1 = 0.96, z0 = -1.32, z1 = -0.6, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, fl = y + 0.07;
+  const { b, mast, s, t } = ctx, y = 0.03, x0 = -1.32, x1 = 0.96, z0 = -1.32, z1 = -0.6, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, fl = y + 0.07;
   b.box(s, y, s, COBBLE);
   const top = block(b, cx, cz, W, D, 0.92, 0.38, { y }), rt = top + 0.38;
   b.box(W + 0.02, 0.03, D + 0.02, WHITE, cx, fl + 0.66, cz);

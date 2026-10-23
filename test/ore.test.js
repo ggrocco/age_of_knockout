@@ -263,7 +263,6 @@ test('respawned piles and patches keep clear of the centre and the starts', () =
 
 // Replays: game A shows where the next respawn would land; game B, same seed and same oreRng, gets an obstacle there
 // first. B draws the same candidates, so it reaches A's pick at the same try and must turn it down.
-const firstNew = (g, before) => [...g.resources.values()].find(r => !before.has(r.id));
 const goldRespawn = seed => { const g = createGame({ seed }); dropPiles(g, 'gold'); return g; };
 const respawnGold = g => { const before = new Set(g.resources.keys()); updateRespawn(g); return piles(g, 'gold').filter(r => !before.has(r.id)); };
 const block = (x, y) => [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];

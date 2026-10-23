@@ -14,6 +14,7 @@ Capture the Relics. Lose once and you're out.
 npm install
 npm start                       # node serve.js, then open http://localhost:8000/
 npm test                        # simulation, rounds, bot, bracket, data and render-model tests
+npm run lint                    # ESLint
 node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rounds
 ```
 
@@ -284,6 +285,18 @@ GitHub's Pages actions. One-time setup: **Settings > Pages > Source: GitHub Acti
 or on a plan that allows Pages for private repositories). Pages caches files for 10 minutes, so the workflow serves
 `styles.css` and `src/` from `v/<content hash>/`, as the Docker image does; a new deploy reaches players within
 about 10 minutes and never mixes old and new modules.
+
+## CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`:
+
+- **Tests**: `npm test` and the `test/bot-sim.js 12` bot-vs-bot check.
+- **Lint**: `npm run lint` (ESLint, `eslint.config.js`).
+- **Security**: `npm audit` (fails on moderate or worse) and `npm audit signatures`; on pull requests, GitHub's
+  dependency review blocks newly added vulnerable dependencies.
+
+`.github/workflows/codeql.yml` runs CodeQL security analysis on the JavaScript and the workflow files on the same
+events and once a week; findings show under **Security > Code scanning**.
 
 ## CI (Jenkins)
 

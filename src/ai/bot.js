@@ -97,11 +97,6 @@ export function createBot(game, pid, difficulty = 'medium') {
     }
     return null;
   }
-  function pickBuilder(vills, near) {
-    let best = null, bd = Infinity;
-    for (const v of vills) { if (v.order.type === 'build') continue; const d = dist(v, near) + (v.order.type === 'idle' ? -5 : 0); if (d < bd) { bd = d; best = v; } }
-    return best;
-  }
   function tryBuild(type, vills, around, nBuilders = 1) {
     const def = BUILDINGS[type];
     if (ageIndex(def.age) > ageIndex(me.age) || !(type === 'wonder' ? canAfford(me, def.cost) : canPay(def.cost))) return false;

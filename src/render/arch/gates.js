@@ -249,7 +249,7 @@ export function arsenal(ctx) {
   const top = block(ctx, { w: 2.2, d: 1.3, hh: 1.2, x: -0.15, z: -0.6 });
   for (const [x, z, w, d] of [[-1.25, 0.6, 0.1, 1.0], [1.25, 0.05, 0.1, 2.3], [-0.8, 1.15, 0.85, 0.1], [0.85, 1.15, 0.8, 0.1]]) b.box(w, 0.35, d, e.trim, x, 0, z);
   if (age === 'sail') {
-    let k = 0; for (let l = 0; l < 3; l++) for (let i = 0; i < 3 - l; i++) for (let j = 0; j < 3 - l; j++) b.add(BALL, P.iron, 0.45 + (i - (2 - l) / 2) * 0.13, 0.065 + l * 0.11, 0.55 + (j - (2 - l) / 2) * 0.13, 0.065, 0.065, 0.065), k++;
+    for (let l = 0; l < 3; l++) for (let i = 0; i < 3 - l; i++) for (let j = 0; j < 3 - l; j++) b.add(BALL, P.iron, 0.45 + (i - (2 - l) / 2) * 0.13, 0.065 + l * 0.11, 0.55 + (j - (2 - l) / 2) * 0.13, 0.065, 0.065, 0.065);
     for (const [x, z] of [[-0.6, 0.55], [-0.85, 0.75], [-0.7, 0.85]]) barrel(b, x, 0, z, 0.1, 0.24);
   } else if (age === 'future') {
     for (const [x, z] of [[0.4, 0.5], [0.7, 0.7]]) b.cylT(0.11, 0.11, 0.06, P.chrome, x, 0, z, 10);
@@ -327,7 +327,7 @@ export function railway_station(ctx) {
 // Power Plant: a turbine hall, a hyperboloid cooling tower with steam over it and a pylon carrying the lines away; in
 // the Future a fusion core glowing in a turning ring instead of the cooling tower.
 export function power_plant(ctx) {
-  const { b, t, extra, age } = ctx, e = ERA[age];
+  const { b, t, extra, age } = ctx;
   const top = block(ctx, { w: 1.3, d: 1.9, hh: 1.1, x: -0.65, z: -0.2 });
   if (age === 'future') {
     b.cylT(0.6, 0.65, 0.2, P.snow, 0.7, 0, -0.4, 16).cylT(0.66, 0.66, 0.03, P.neonC, 0.7, 0.12, -0.4, 16).cylT(0.15, 0.25, 1.0, P.chrome, 0.7, 0.2, -0.4, 10);

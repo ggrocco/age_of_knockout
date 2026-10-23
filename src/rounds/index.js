@@ -51,7 +51,7 @@ export const ROUNDS = [
   { id: 'regicide', name: 'Regicide', desc: 'Kill the enemy king. Protect yours.', capTicks: 30000,
     setup(game) {
       game.roundState = { kings: [] };
-      for (const [i, s] of game.map.starts.entries()) {
+      for (const i of game.map.starts.keys()) {
         const tc = [...game.buildings.values()].find(b => b.owner === i), sp = game.findSpawn(tc);
         game.roundState.kings.push(game.spawnUnit('king', i, sp.x, sp.y).id);
       }
