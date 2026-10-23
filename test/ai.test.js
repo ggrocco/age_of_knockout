@@ -7,7 +7,7 @@ import { UNITS } from '../src/data/units.js';
 import { THINK_EVERY, DIFF, matchOptions } from '../src/ai/bot.js';
 import { updateVision } from '../src/sim/vision.js';
 import { findPath } from '../src/sim/path.js';
-import { centerOf, distPoint, tileOf } from '../src/sim/util.js';
+import { centerOf, distPoint, tileOf, RES_KIND } from '../src/sim/util.js';
 // Runs one bot against an idle opponent; returns the tick of its first attack wave and the tick it reached each age.
 function firstWave(roundId, diff, seed = 1) {
   const rules = roundById(roundId), g = createGame({ seed, rules, ...matchOptions([null, diff]) }), b = createBot(g, 1, diff), ev = THINK_EVERY[diff], ages = {};
@@ -31,6 +31,24 @@ test('a relaxed opponent works at half speed and lengthens the match to 40 min',
 });
 test('easy bot waits for Tool Age before its first wave', () => {
   const r = firstWave('conquest', 'easy'); assert.ok(r.wave !== null); assert.ok(r.wave >= r.ages.tool, `wave ${r.wave} before tool ${r.ages.tool}`);
+});
+test('bot walks out to find trees when none start in its explored area', () => {
+  // Seed 4: the nearest trees sit just outside both starting explored areas.
+  const g = createGame({ seed: 4, rules: roundById('conquest') }), b = createBot(g, 1, 'easy'); g.tick();
+  assert.ok(!g.knownResources(1).some(r => RES_KIND[r.type] === 'wood'), 'seed 4 starts with no tree explored');
+  for (let i = 0; i < 3600; i++) { g.tick(); if (g.time % THINK_EVERY.easy === 3) b.think(); }
+  const vills = [...g.units.values()].filter(u => u.owner === 1 && u.type === 'villager');
+  assert.ok(vills.some(v => v.order.type === 'gather' && v.order.kind === 'wood'), 'someone cuts wood after 3 min');
+  assert.ok(vills.filter(v => v.order.type === 'idle').length <= 1, 'villagers are not left idle');
+});
+test('easy bot ages up steadily: Tool Age within 7 min, Bronze Age within 15 min', () => {
+  // Attacks held back (grace) so the idle opponent survives long enough to watch the climb.
+  const grace = DIFF.easy.grace; DIFF.easy.grace = 1e9;
+  try {
+    const g = createGame({ seed: 1, rules: roundById('conquest') }), b = createBot(g, 1, 'easy'), ages = {};
+    while (g.time < 18000 && !ages.bronze) { g.tick(); if (g.time % THINK_EVERY.easy === 3) b.think(); ages[g.players[1].age] ??= g.time; }
+    assert.ok(ages.tool <= 8400, 'tool at ' + ages.tool); assert.ok(ages.bronze <= 18000, 'bronze at ' + ages.bronze);
+  } finally { DIFF.easy.grace = grace; }
 });
 test('bot builds an economy and army in 10 minutes without command spam', () => {
   const g = createGame({ seed: 5, rules: roundById('conquest') }); const b = createBot(g, 0, 'medium'), o = createBot(g, 1, 'easy');
