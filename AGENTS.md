@@ -84,13 +84,16 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     (`arch/stone.js` … `arch/future.js`, built with `arch/kit.js`); `KEPT` lists older looks that stay byte-identical
     (pinned by `test/fixtures/kept-buildings.json`); anything else falls back to `arch/legacy.js` coloured by the
     era palette in `render/styles.js` (`ERA_STYLE`). `buildingStyle` in `models.js` is only that palette's key.
+    The nine gate buildings (Temple to Airfield) are drawn once for every era by `arch/gates.js`, whose `block()` room
+    takes the era's style; `index.js` merges them into `DESIGNS`.
   - Unit looks: a unit is drawn in its owner's era once that is past its own (`unitEra` in `render/era-units.js`);
     the view rebuilds units, like buildings, when the owner ages up. `eraSpec` gives humanoids the era's helmet,
     uniform and weapon finish (a colour remap on the arm parts, via `new B(map)`); cavalry ride horses, then motorbikes
     (Modern) and hoverbikes (AI Future); the Catapult and Trebuchet become a mortar and a rocket battery from the Age of
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers and the King keep one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
-- `src/gallery`: the `buildings.html` design page. `rows.js` (DOM-free, tested) builds the building × era grid from
+- `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
+  gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and
   buildings appear on reload with no page edits.
 - `src/data`: unit/building/age/tech/defence tables. Unit combat and cost stats are checked against openage's AoE1
@@ -105,6 +108,10 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 - New or changed URL param, control, or game rule the player sees: `README.md` and the table above.
 - Import map or static assets in `index.html` / `buildings.html`: the `Dockerfile` `COPY` lines, the smoke-test
   paths in `Jenkinsfile` and the "Assemble site" step in `.github/workflows/pages.yml`.
+- Any building, building stat, upgrade (tech), trained unit, era or building look: the `buildings.html` design page.
+  It reads the data tables, so new rows and cells appear on their own, but a new kind of fact (as "Trains" and
+  "New upgrade" once were) has to be added to `src/gallery/rows.js` and `src/gallery/main.js`. Always open the page in
+  the browser and check the change shows there, even when no gallery file changed.
 - A deliberate change to a `KEPT` building look: regenerate `test/fixtures/kept-buildings.json` (command above).
 - A deviation from AoE1 (stat, rule, tech-tree placement): `src/data/README.md` and `progress.md`.
 - A ruling, known gap or deferred minor issue: append it to `progress.md`.

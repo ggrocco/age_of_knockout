@@ -2,6 +2,7 @@ import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
 import { secs } from '../src/sim/util.js';
 import { TECHS } from '../src/data/techs.js';
+import { BUILDINGS } from '../src/data/buildings.js';
 import { AGES, ageIndex } from '../src/data/ages.js';
 
 const pit = (g, owner = 0) => g.addBuilding('storage_pit', owner, 10, 10, true);
@@ -104,4 +105,24 @@ test('later Storage Pit upgrades reach their era units', () => {
   g.completeTech(0, 'nanoweave_plating');
   assert.deepEqual([mech.marmor, mech.parmor], [6, 5]); assert.deepEqual([tank.marmor, tank.parmor], [7, 10]);
   assert.deepEqual([rail.marmor, rail.parmor], [0, 0], 'siege unchanged');
+});
+
+test('gate building upgrades: HP and speed apply once, to existing and new units', () => {
+  const g = createGame({ seed: 1 }), p = g.players[0]; p.age = 'modern';
+  const sword = g.spawnUnit('swordsman', 0, 20, 20), tank = g.spawnUnit('tank', 0, 21, 20), vil = g.spawnUnit('villager', 0, 22, 20);
+  sword.hp = 100;
+  g.completeTech(0, 'phalanx_drill'); g.completeTech(0, 'air_support'); g.completeTech(0, 'railways');
+  assert.deepEqual([sword.hp, sword.maxHp], [120, 180], 'a hurt Swordsman gains the 20 HP on top of what it has');
+  assert.equal(tank.maxHp, 270); assert.equal(vil.maxHp, 25, 'villagers get no HP');
+  assert.ok(Math.abs(vil.speed - 1.6 * 1.1) < 1e-9 && Math.abs(tank.speed - 1.8 * 1.1) < 1e-9, 'Railways speeds every unit up 10%');
+  const late = g.spawnUnit('swordsman', 0, 23, 20);
+  assert.equal(late.maxHp, 180); assert.ok(Math.abs(late.speed - 1.6 * 1.1) < 1e-9);
+});
+
+test('every gate building researches an upgrade of its own Age', () => {
+  for (const type of ['temple', 'academy', 'siege_workshop', 'university', 'arsenal', 'trading_company', 'railway_station', 'power_plant', 'airfield']) {
+    const techs = Object.values(TECHS).filter(t => t.building === type);
+    assert.equal(techs.length, 1, type);
+    assert.equal(techs[0].age, BUILDINGS[type].age, type);
+  }
 });

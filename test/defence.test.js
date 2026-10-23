@@ -96,7 +96,7 @@ test('towers and walls do not count toward age-up', () => {
   assert.equal(ageUpNeed('tool'), 2);
   for (const age of AGES) { const need = ageBuildings(age); assert.ok(!need.includes('tower') && !need.includes('wall'), age); }
   assert.deepEqual(ageBuildings('tool'), ['archery_range', 'stable', 'market']);
-  assert.deepEqual(AGES.slice(0, -1).map(ageUpNeed), [2, 2, 1, 0, 1, 0, 1, 0]);
+  assert.deepEqual(AGES.slice(0, -1).map(ageUpNeed), [2, 2, 2, 2, 2, 2, 2, 2]);
 });
 test('finished towers and walls do not satisfy the age-up building requirement', () => {
   const g = createGame({ seed: 1 }), p = g.players[0]; p.age = 'tool'; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };

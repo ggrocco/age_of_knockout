@@ -76,7 +76,25 @@ their finite mode/difficulty limits so the bracket always resolves.
 You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few villagers on a 96-tile map, at a random point on a ring
 around the centre (the opponent mirrors you). Gather food, wood, gold and stone, build houses for population, and
 **advance through nine eras**: Stone, Tool, Bronze, Iron, Medieval, Age of Sail, Industrial, Modern and AI Future.
-Each era unlocks units and buildings and changes how your buildings look. Soldiers trained in an earlier era take on
+Each era unlocks units and buildings and changes how your buildings look. To advance you need a Town Center and
+**two finished buildings of your current era**, as in AoE1, and every era but the last has exactly two of its own:
+
+| Leaving | Build both of |
+| --- | --- |
+| Stone | two of House, Granary, Storage Pit, Barracks |
+| Tool | two of Archery Range, Stable, Market |
+| Bronze | Government Center and Temple |
+| Iron | Academy and Siege Workshop |
+| Medieval | Castle and University |
+| Age of Sail | Arsenal and Trading Company |
+| Industrial | Factory and Railway Station |
+| Modern | Power Plant and Airfield |
+
+The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +20%), Phalanx Drill (Academy, infantry
++20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
+foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster),
+Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks and siege +30 HP). Farms, Mines,
+Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
 catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers and the King keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
@@ -152,7 +170,8 @@ real iPhone.
 ![buildings.html: Town Center, House, Granary, Storage Pit and Farm rendered in every era from Stone to Modern](docs/screenshots/gallery.jpg)
 
 Open `http://localhost:8000/buildings.html` to see every building in every era, rendered with the game's own
-models. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
+models. Under each era it lists what the building trains by then and any upgrade it can start researching in that
+era, with what the upgrade does. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
 reads `src/data`, so new eras and buildings appear on reload.
 
 ## How it's built

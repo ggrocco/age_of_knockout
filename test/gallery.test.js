@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { AGES } from '../src/data/ages.js';
 import { BUILDINGS } from '../src/data/buildings.js';
-import { galleryRows, buildingFacts, trainsBy } from '../src/gallery/rows.js';
+import { galleryRows, buildingFacts, trainsBy, upgradesAt } from '../src/gallery/rows.js';
+import { TECHS } from '../src/data/techs.js';
 
 test('buildings gallery has a row for every building and a cell for every age', () => {
   const rows = galleryRows();
@@ -45,4 +46,12 @@ test('buildings gallery names eras by their title, never "Sail Age"', () => {
   const facts = buildingFacts({ ...BUILDINGS.market, age: 'sail' }).join(' ');
   assert.match(facts, /Age of Sail/); assert.doesNotMatch(facts, /Sail age|Sail Age|Age of Sail age/i);
   assert.match(buildingFacts(BUILDINGS.castle).join(' '), /Medieval Age/);
+});
+
+test('buildings gallery shows each upgrade once, in the age it unlocks at its building', () => {
+  assert.deepEqual(upgradesAt('academy', 'iron'), [{ name: 'Phalanx Drill', desc: TECHS.phalanx_drill.desc }]);
+  assert.deepEqual(upgradesAt('academy', 'medieval'), [], 'not repeated in later ages');
+  assert.deepEqual(upgradesAt('market', 'tool').map(u => u.name), ['Woodworking', 'Gold Mining']);
+  const shown = Object.keys(BUILDINGS).flatMap(type => AGES.flatMap(age => upgradesAt(type, age).map(u => u.name)));
+  assert.deepEqual(shown.sort(), Object.values(TECHS).map(t => t.name).sort(), 'every upgrade appears exactly once');
 });

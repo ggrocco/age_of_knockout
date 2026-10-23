@@ -6,7 +6,7 @@ import { AGES, ageTitle } from '../data/ages.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { buildModel, animate, buildingStyle } from '../render/models.js';
 import { createSkyLighting } from '../render/lighting.js';
-import { galleryRows, buildingFacts, trainsBy } from './rows.js';
+import { galleryRows, buildingFacts, trainsBy, upgradesAt } from './rows.js';
 
 const params = new URLSearchParams(location.search);
 const state = { team: params.get('team') === '1' ? 1 : 0, scale: params.get('scale') === 'true' ? 'true' : 'fit' };
@@ -89,6 +89,7 @@ function buildTable() {
       if (cell.unlocks) btn.append(el('span', { className: 'badge', textContent: 'NEW' }));
       const td = el('td', {}, btn), trains = trainsBy(row.spec, cell.age);
       if (trains.length) td.append(el('div', { className: 'trains', textContent: `Trains: ${trains.join(', ')}` }));
+      for (const u of upgradesAt(row.type, cell.age)) td.append(el('div', { className: 'upgrade' }, 'New upgrade: ', el('strong', { textContent: u.name }), ` (${u.desc})`));
       tr.append(td);
     }
     body.append(tr);

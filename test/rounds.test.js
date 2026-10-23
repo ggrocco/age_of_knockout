@@ -13,7 +13,10 @@ test('both eliminated on the same tick still resolves', () => {
 });
 test('deathmatch starts both players in the Iron Age with 20000 each', () => {
   const g = G('deathmatch'); for (const p of g.players) { assert.equal(p.age, 'iron'); for (const k of ['food', 'wood', 'gold', 'stone']) assert.equal(p.res[k], 20000); }
-  assert.equal(ageUpProblem(g, 0), null, 'the Iron start can advance at once');
+  assert.equal(ageUpProblem(g, 0), 'needs buildings', 'the Iron start builds an Academy and a Siege Workshop first');
+  const tc = [...g.buildings.values()].find(b => b.owner === 0 && b.type === 'town_center');
+  g.addBuilding('academy', 0, tc.x, tc.y + 8, true); g.addBuilding('siege_workshop', 0, tc.x + 8, tc.y, true);
+  assert.equal(ageUpProblem(g, 0), null);
   assert.equal(roundById('deathmatch').desc, 'Start in the Iron Age with 20000 of every resource. Destroy the enemy.');
 });
 test('regicide ends when the king dies', () => {

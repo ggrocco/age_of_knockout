@@ -8,6 +8,8 @@
 //   { cls: ['inf','cav'], atk: 2 }            -> +atk to units of those classes
 //   { cls: ['inf'], marmor: 1, parmor: 1 }    -> +armor
 //   { cls: ['archer','siege'], range: 1 }     -> +range
+//   { cls: ['inf'], hp: 20 }                  -> +max HP (and the same HP now)
+//   { speedMul: 1.1 }                         -> multiplies move speed (no cls: every unit)
 //   { gather: { wood: 1.25 } }                -> multiplies a player's gather rate (not per-unit)
 const c = (food = 0, wood = 0, gold = 0, stone = 0) => ({ food, wood, gold, stone });
 
@@ -45,6 +47,26 @@ export const TECHS = {
     effect: { gather: { wood: 1.25 } }, desc: 'Villagers gather wood 25% faster.' },
   gold_mining: { name: 'Gold Mining', building: 'market', age: 'tool', cost: c(120, 0, 0), time: 30,
     effect: { gather: { gold: 1.25 } }, desc: 'Villagers mine gold 25% faster.' },
+
+  // --- Gate buildings (invented, one upgrade each; see src/data/README.md) ---
+  sacred_harvest: { name: 'Sacred Harvest', building: 'temple', age: 'bronze', cost: c(0, 120, 80), time: 40,
+    effect: { gather: { food: 1.2 } }, desc: 'Villagers gather food 20% faster.' },
+  phalanx_drill: { name: 'Phalanx Drill', building: 'academy', age: 'iron', cost: c(120, 0, 80), time: 45,
+    effect: { cls: ['inf'], hp: 20 }, desc: 'Infantry gain +20 HP.' },
+  torsion_engines: { name: 'Torsion Engines', building: 'siege_workshop', age: 'iron', cost: c(0, 150, 120), time: 50,
+    effect: { cls: ['siege'], atk: 10 }, desc: 'Siege engines and guns deal +10 attack.' },
+  masonry: { name: 'Masonry', building: 'university', age: 'medieval', cost: c(100, 100), time: 40,
+    effect: { gather: { stone: 1.25 } }, desc: 'Villagers quarry stone 25% faster.' },
+  bayonets: { name: 'Bayonets', building: 'arsenal', age: 'sail', cost: c(150, 0, 120), time: 50,
+    effect: { cls: ['archer'], marmor: 2 }, desc: 'Ranged foot units (archers, musketeers, gunners, drones) gain +2 melee armor.' },
+  colonial_trade: { name: 'Colonial Trade', building: 'trading_company', age: 'sail', cost: c(200, 150), time: 45,
+    effect: { gather: { gold: 1.2 } }, desc: 'Villagers mine gold 20% faster.' },
+  railways: { name: 'Railways', building: 'railway_station', age: 'industrial', cost: c(200, 0, 200), time: 55,
+    effect: { speedMul: 1.1 }, desc: 'Every unit moves 10% faster.' },
+  electrification: { name: 'Electrification', building: 'power_plant', age: 'modern', cost: c(250, 0, 200), time: 55,
+    effect: { gather: { food: 1.1, wood: 1.1, gold: 1.1, stone: 1.1 } }, desc: 'Villagers gather every resource 10% faster.' },
+  air_support: { name: 'Air Support', building: 'airfield', age: 'modern', cost: c(200, 0, 250), time: 60,
+    effect: { cls: ['armor', 'siege'], hp: 30 }, desc: 'Tanks and siege gain +30 HP.' },
 };
 
 // Apply a unit effect to one unit. Idempotent per tech: called once when the unit spawns and once
@@ -56,4 +78,6 @@ export function applyUnitEffect(u, eff) {
   if (eff.marmor) u.marmor += eff.marmor;
   if (eff.parmor) u.parmor += eff.parmor;
   if (eff.range) u.range += eff.range;
+  if (eff.hp) { u.maxHp += eff.hp; u.hp += eff.hp; }
+  if (eff.speedMul) u.speed *= eff.speedMul;
 }

@@ -3,6 +3,7 @@
 import { AGES, ageIndex, ageTitle } from '../data/ages.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { UNITS } from '../data/units.js';
+import { TECHS } from '../data/techs.js';
 
 const RES = ['food', 'wood', 'gold', 'stone'];
 
@@ -32,4 +33,9 @@ export function buildingFacts(spec) {
 // Units this building can train by the given age (unknown unit ids are kept, by id).
 export function trainsBy(spec, age) {
   return (spec.trains || []).filter(u => !UNITS[u] || ageIndex(UNITS[u].age) <= ageIndex(age)).map(u => UNITS[u]?.name ?? u);
+}
+
+// Upgrades this building can research from the given age on (those that unlock exactly then), with what they do.
+export function upgradesAt(type, age) {
+  return Object.values(TECHS).filter(t => t.building === type && t.age === age).map(t => ({ name: t.name, desc: t.desc }));
 }

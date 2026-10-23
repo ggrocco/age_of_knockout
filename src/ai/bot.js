@@ -146,8 +146,9 @@ export function createBot(game, pid, difficulty = 'medium') {
       const why = ageUpProblem(game, pid);
       if (!why) cmd({ type: 'age' }); else if (why === 'resources' && ageIndex(me.age) === 0) bot.saving = true;
     }
-    // From Iron on, build what the current era's gate needs (Castle in Medieval, Factory in Industrial); count() includes foundations, so no duplicates.
-    if (ageIndex(me.age) >= ageIndex('iron')) { const req = ageBuildings(me.age), missing = req.filter(t => count(t) < 1); if (missing.length && req.length - missing.length < ageUpNeed(me.age)) tryBuild(missing[0], free, home); }
+    // From Bronze on, build what the current era's gate needs (e.g. the Temple in Bronze, the Academy and Siege Workshop in
+    // Iron); count() includes foundations, so no duplicates. The Wonder round stays in Bronze and saves for its Wonder.
+    if (ageIndex(me.age) >= ageIndex('iron') || (me.age === 'bronze' && roundId !== 'wonder')) { const req = ageBuildings(me.age), missing = req.filter(t => count(t) < 1); if (missing.length && req.length - missing.length < ageUpNeed(me.age)) tryBuild(missing[0], free, home, Math.min(3, Math.floor(free.length / 4) || 1)); }
     if (ageIndex(me.age) >= 1) {
       if (count('archery_range') < 1) tryBuild('archery_range', free, home);
       if (count('stable') < 1) tryBuild('stable', free, home);
@@ -207,8 +208,9 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
 
   const SIEGE = ['railgun', 'field_artillery', 'cannon', 'trebuchet', 'catapult'];
-  const RESEARCH_PREF = ['woodworking', 'gold_mining', 'bronze_weapons', 'bronze_shields', 'iron_weapons', 'ballistics', 'hide_armor', 'scale_barding',
-    'steel_weapons', 'plate_armor', 'paper_cartridges', 'rifled_barrels', 'composite_armor', 'nanoweave_plating'];
+  const RESEARCH_PREF = ['woodworking', 'gold_mining', 'sacred_harvest', 'colonial_trade', 'electrification', 'masonry', 'bronze_weapons', 'bronze_shields',
+    'iron_weapons', 'ballistics', 'hide_armor', 'scale_barding', 'phalanx_drill', 'torsion_engines', 'steel_weapons', 'plate_armor', 'paper_cartridges',
+    'bayonets', 'railways', 'rifled_barrels', 'composite_armor', 'air_support', 'nanoweave_plating'];
   // Counter-pick preference lists (openage damage.md classes). Same units, reordered; the era units sit right after the
   // AI Future ones (newest first at each building), and armor (Tanks) is answered with siege and Tanks:
   // vs archers -> tanky melee / pierce-armoured closers; vs cavalry -> spearman (bonus) first;
