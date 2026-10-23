@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
-import { buildModel, animate, TEAM, MODEL_MATERIAL } from './models.js';
+import { buildModel, animate, unitEra, TEAM, MODEL_MATERIAL } from './models.js';
 import { createModelBatch, PROXY_LAYER } from './batch.js';
 import { prepareCosmetics } from './cosmetics.js';
 import { createContactShadows } from './contact-shadows.js';
@@ -139,9 +139,11 @@ export function createView(container, game) {
   const shadows = createContactShadows(scene, geo.plane, shadowMat, () => effects.invalidate());
   const activeGroups = new Set(), dirtyGroups = new Set();
   let groupSeq = 0;
+  // The era a model is drawn in: its owner's for a building, the unit's look era (era-units.js) for a unit.
+  const lookAge = e => e.kind === 'building' ? game.players[e.owner].age : e.kind === 'unit' ? unitEra(e.type, game.players[e.owner]?.age) : null;
   function makeMesh(e) {
     const g = new THREE.Group(); g.userData = { id: e.id, kind: e.kind, owner: e.owner, hp: e.hp, seq: ++groupSeq };
-    const age = e.kind === 'building' ? game.players[e.owner].age : null;
+    const age = lookAge(e);
     const m = buildModel(e, age); g.add(m.root); g.userData.anim = m.anim; g.userData.age = age;
     g.userData.blob = new THREE.Matrix4().makeTranslation(0, 0.04, 0).multiply(_x).scale(new THREE.Vector3(m.shadow * 2.8, m.shadow * 2.8, 1));
     g.traverse(o => { if (!o.isMesh) return; if (o.material?.blending === THREE.AdditiveBlending) { o.raycast = noRaycast; return; } o.userData.gid = e.id; });
@@ -183,12 +185,13 @@ export function createView(container, game) {
     const list = [...game.visibleEntities(0), ...game.knownResources(0)];
     for (const e of list) {
       seen.add(e.id);
-      let g = view.groups.get(e.id);
-      if (g && e.kind === 'building' && g.userData.age !== game.players[e.owner].age) {
-        removeGroup(g); view.groups.delete(e.id); view.pickables.splice(view.pickables.indexOf(g), 1); g = null;
+      let g = view.groups.get(e.id), turned = null;
+      // On an age-up, buildings and units from earlier eras are rebuilt in the new era's look (units keep their facing).
+      if (g && (e.kind === 'building' || e.kind === 'unit') && g.userData.age !== lookAge(e)) {
+        turned = g.rotation.y; removeGroup(g); view.groups.delete(e.id); view.pickables.splice(view.pickables.indexOf(g), 1); g = null;
       }
       if (!g) {
-        g = makeMesh(e); view.groups.set(e.id, g);
+        g = makeMesh(e); view.groups.set(e.id, g); if (turned !== null) g.rotation.y = turned;
         // Resource proxies are only needed for picking. Their matrices change on depletion,
         // so keep them out of the scene's per-frame hierarchy walk.
         if (e.kind !== 'resource') { scene.add(g); activeGroups.add(g); }

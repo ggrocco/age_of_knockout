@@ -13,9 +13,11 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 const prismCache = new Map();
 function prismGeo(w, h, d) { const k = [w, h, d].join(); if (!prismCache.has(k)) { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(0, h); s.closePath(); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); prismCache.set(k, g); } return prismCache.get(k); }
 
+// An optional colour map recolours every part as it is added (an era finish over a model's own colours).
 export class B {
-  constructor() { this.geos = []; }
+  constructor(map = null) { this.geos = []; this.map = map; }
   add(geo, color, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
+    if (this.map?.has(color)) color = this.map.get(color);
     _q.setFromEuler(_e.set(rx, ry, rz)); _m.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz));
     let g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(_m); g.deleteAttribute('uv');
     const n = g.attributes.position.count, col = new Float32Array(n * 3); _c.set(color);

@@ -4,13 +4,14 @@ import * as THREE from 'three';
 import { styleOf } from './styles.js';
 import { B, C, unit, TEAM, TEAM_DARK, MODEL_MATERIAL, cached, mesh, pivot } from './builder.js';
 import { designOf, archGeos } from './arch/index.js';
-export { TEAM, TEAM_DARK, MODEL_MATERIAL };
+import { unitEra, eraSpec, mountOf, siegeLook, SIEGE_REMAP, pads, motorbike, hoverbike, mortar, rockets } from './era-units.js';
+export { TEAM, TEAM_DARK, MODEL_MATERIAL, unitEra };
 const rng = seed => { let a = (seed * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
 // ---------- humanoids ----------
 function limbs(o, team) {
   const t = TEAM[team], td = TEAM_DARK[team], H = o.scale || 1;
-  const body = new B(), legL = new B(), legR = new B(), armL = new B(), armR = new B();
+  const body = new B(), legL = new B(), legR = new B(), armL = new B(o.remap), armR = new B(o.remap);
   const tunic = o.tunic ?? t, pants = o.pants ?? C.leather;
   body.add(unit.cyl, tunic, 0, 0.57, 0, 0.19, 0.34, 0.115)
     .cylT(0.15, 0.21, 0.2, tunic, 0, 0.32, 0, 10)
@@ -26,6 +27,8 @@ function limbs(o, team) {
   if (o.helmet === 'great') body.cylT(0.135, 0.155, 0.24, C.iron, 0, 0.77, 0, 10).box(0.2, 0.025, 0.03, C.dark, 0, 0.9, 0.14).cone(0.05, 0.12, t, 0, 1.01, 0, 6);
   if (o.helmet === 'tricorn') body.sph(0.13, 0x1f1a16, 0, 0.95, 0, 1, 0.55, 1).cylT(0.21, 0.21, 0.05, 0x1f1a16, 0, 0.95, 0, 3);
   if (o.helmet === 'kepi') body.cylT(0.12, 0.145, 0.13, td, 0, 0.92, 0, 10).box(0.17, 0.02, 0.09, C.dark, 0, 0.93, 0.12);
+  if (o.helmet === 'kettle') body.sph(0.15, C.iron, 0, 0.91, 0, 1, 0.7, 1).cyl(0.22, 0.02, C.iron, 0, 0.9, 0).box(0.03, 0.08, 0.03, t, 0, 0.99, 0);
+  if (o.helmet === 'visor') body.sph(0.155, 0xd8e2e8, 0, 0.9, 0, 1, 0.95, 1.05).box(0.22, 0.05, 0.06, 0x39f3ff, 0, 0.84, 0.14).box(0.04, 0.035, 0.28, t, 0, 1.03, 0);
   if (o.helmet === 'steel') body.sph(0.16, 0x55603a, 0, 0.92, 0, 1, 0.62, 1).cyl(0.2, 0.018, 0x4a5034, 0, 0.9, 0);
   if (o.hat === 'straw') body.cylT(0.05, 0.1, 0.07, C.hay, 0, 0.99, 0, 8).cyl(0.22, 0.02, C.hay, 0, 0.98, 0).box(0.02, 0.03, 0.3, t, 0, 1.0, 0, 0, 0, 0);
   if (o.quiver) body.cyl(0.05, 0.3, C.leather, -0.08, 0.42, -0.14, 0.3).box(0.02, 0.1, 0.02, C.hay, -0.08, 0.72, -0.18);
@@ -43,12 +46,18 @@ function limbs(o, team) {
   if (w === 'musket') armR.box(0.05, 0.055, 0.3, C.wood, 0, -0.39, 0.05).box(0.026, 0.026, 0.78, C.iron, 0, -0.36, 0.48);
   if (w === 'rifle') armR.box(0.045, 0.055, 0.28, C.woodD, 0, -0.39, 0.05).box(0.03, 0.03, 0.56, 0x3a3f44, 0, -0.36, 0.38).box(0.012, 0.03, 0.2, C.iron, 0, -0.36, 0.76);
   if (w === 'mg') armR.box(0.08, 0.09, 0.36, 0x2f3437, 0, -0.42, 0.12).box(0.045, 0.045, 0.62, 0x2f3437, 0, -0.38, 0.5).box(0.1, 0.1, 0.12, 0x55603a, -0.08, -0.47, 0.06);
+  if (w === 'mace') armR.cyl(0.022, 0.5, C.wood, 0, -0.42, 0.14, 1.3).sph(0.075, C.iron, 0, -0.09, 0.4).box(0.19, 0.03, 0.03, C.iron, 0, -0.105, 0.4).box(0.03, 0.19, 0.03, C.iron, 0, -0.185, 0.4);
+  if (w === 'baton') armR.cyl(0.024, 0.44, C.woodD, 0, -0.4, 0.14, 1.3).sph(0.034, C.iron, 0, -0.12, 0.35).box(0.1, 0.02, 0.02, C.iron, 0, -0.33, 0.13);
+  if (w === 'sabre') armR.box(0.025, 0.045, 0.26, C.iron, 0, -0.33, 0.22, 0.24).box(0.025, 0.045, 0.2, C.iron, 0, -0.36, 0.44, 0.02).box(0.14, 0.03, 0.03, C.gold, 0, -0.32, 0.1);
+  if (w === 'bayonet') armR.box(0.045, 0.055, 0.3, C.wood, 0, -0.39, 0.05).box(0.03, 0.03, 0.6, 0x3a3f44, 0, -0.36, 0.4).box(0.014, 0.04, 0.34, C.iron, 0, -0.365, 0.86);
   if (w === 'sling') { armR.cyl(0.008, 0.36, C.leather, 0, -0.35, 0.04, 0.2).sph(0.04, C.stoneD, 0, -0.72, 0.06); }
   // left-hand equipment
   const sh = o.shield;
   if (sh === 'round') armL.add(unit.cyl, td, -0.09, -0.22, 0.13, 0.19, 0.03, 0.19, Math.PI / 2, 0, 0).add(unit.cyl, C.gold, -0.09, -0.22, 0.155, 0.06, 0.03, 0.06, Math.PI / 2, 0, 0).add(unit.cyl, t, -0.09, -0.22, 0.145, 0.15, 0.02, 0.15, Math.PI / 2, 0, 0);
   if (sh === 'big') armL.add(unit.cyl, C.bronze, -0.09, -0.2, 0.13, 0.24, 0.035, 0.24, Math.PI / 2, 0, 0).add(unit.cyl, t, -0.09, -0.2, 0.15, 0.17, 0.02, 0.17, Math.PI / 2, 0, 0).add(unit.cyl, C.gold, -0.09, -0.2, 0.165, 0.05, 0.02, 0.05, Math.PI / 2, 0, 0);
   if (sh === 'rect') armL.box(0.05, 0.42, 0.3, t, -0.1, -0.44, 0.13).box(0.06, 0.1, 0.1, C.iron, -0.1, -0.3, 0.13);
+  if (sh === 'riot') armL.box(0.04, 0.52, 0.32, 0x8aa4b4, -0.1, -0.52, 0.13).box(0.045, 0.05, 0.33, t, -0.1, -0.24, 0.13).box(0.05, 0.03, 0.33, 0x2f3437, -0.1, -0.03, 0.13);
+  if (sh === 'energy') armL.box(0.03, 0.5, 0.32, 0xd8e2e8, -0.1, -0.5, 0.13).box(0.045, 0.42, 0.25, 0x39f3ff, -0.1, -0.46, 0.13).box(0.05, 0.08, 0.08, t, -0.1, -0.29, 0.13);
   if (o.bow) armL.add(unit.tor, C.wood, 0, -0.32, 0.12, 0.36, 0.36, 0.36, 0, 0, -Math.PI / 2).box(0.008, 0.68, 0.008, C.hay, 0, -0.66, 0.12);
   return { body: body.geometry(), legL: legL.geometry(), legR: legR.geometry(), armL: armL.geometry(), armR: armR.geometry(), s: H };
 }
@@ -104,10 +113,12 @@ function trebuchet(team) {
   arm.box(0.07, 0.07, 1.7, C.wood, 0, -0.035, 0.35).box(0.32, 0.3, 0.3, C.stoneD, 0, -0.42, -0.5).cyl(0.01, 0.4, C.leather, 0, -0.4, 1.18).sph(0.08, C.stoneD, 0, -0.42, 1.18);
   return { base: b.geometry(), arm: arm.geometry() };
 }
-function cannon(team, kind) {
-  const t = TEAM[team], art = kind === 'artillery', b = new B(), barrel = new B(), metal = art ? 0x4a5034 : C.bronze;
+// map: the era finish of a gun or tank built in an earlier era (era-units.js); the AI Future ones hover.
+function cannon(team, kind, map = null, hover = false) {
+  const t = TEAM[team], art = kind === 'artillery', b = new B(map), barrel = new B(map), metal = art ? 0x4a5034 : C.bronze;
   b.box(0.36, 0.14, 0.62, art ? 0x55603a : C.wood, 0, 0.26, -0.05).box(0.12, 0.08, 0.8, art ? 0x4a5034 : C.woodD, 0, 0.12, -0.55, -0.25).box(0.38, 0.06, 0.2, t, 0, 0.4, -0.2);
-  for (const x of [-0.3, 0.3]) {
+  if (hover) pads(b, [-0.24, 0.24], [-0.05]);
+  else for (const x of [-0.3, 0.3]) {
     b.add(unit.cyl, art ? 0x2f3437 : C.woodD, x, 0.28, 0, 0.28, 0.06, 0.28, 0, 0, Math.PI / 2).add(unit.cyl, C.iron, x, 0.28, 0, 0.06, 0.09, 0.06, 0, 0, Math.PI / 2);
     if (art) for (let k = 0; k < 4; k++) b.box(0.03, 0.5, 0.04, C.iron, x * 1.02, 0.03, 0, k * Math.PI / 4, 0, 0);
   }
@@ -115,45 +126,64 @@ function cannon(team, kind) {
   barrel.add(unit.cyl, metal, 0, 0, 0.2, art ? 0.06 : 0.09, art ? 1.0 : 0.8, art ? 0.06 : 0.09, Math.PI / 2, 0, 0).add(unit.cyl, metal, 0, 0, -0.2, 0.12, 0.18, 0.12, Math.PI / 2, 0, 0);
   return { base: b.geometry(), barrel: barrel.geometry() };
 }
-function tank(team) {
-  const t = TEAM[team], hull = new B(), turret = new B(), olive = 0x5d6640, dark = 0x2f3437;
-  for (const x of [-0.44, 0.44]) { hull.box(0.22, 0.3, 1.36, dark, x, 0.04, 0); for (let z = -0.5; z <= 0.5; z += 0.25) hull.add(unit.cyl, 0x4a4f52, x * 1.02, 0.17, z, 0.12, 0.24, 0.12, 0, 0, Math.PI / 2); }
+function tank(team, map = null, hover = false) {
+  const t = TEAM[team], hull = new B(map), turret = new B(map), olive = 0x5d6640, dark = 0x2f3437;
+  if (hover) pads(hull, [-0.38, 0.38], [-0.38, 0.38], 0.04);
+  else for (const x of [-0.44, 0.44]) { hull.box(0.22, 0.3, 1.36, dark, x, 0.04, 0); for (let z = -0.5; z <= 0.5; z += 0.25) hull.add(unit.cyl, 0x4a4f52, x * 1.02, 0.17, z, 0.12, 0.24, 0.12, 0, 0, Math.PI / 2); }
   hull.box(0.7, 0.3, 1.26, olive, 0, 0.18, 0).box(0.72, 0.06, 0.32, t, 0, 0.48, -0.38).box(0.66, 0.08, 0.2, 0x4a5034, 0, 0.36, 0.62, -0.5);
   turret.box(0.5, 0.22, 0.56, olive, 0, 0, -0.04).add(unit.cyl, 0x3a3f33, 0, 0.11, 0.6, 0.045, 0.8, 0.045, Math.PI / 2, 0, 0).cyl(0.09, 0.06, 0x4a5034, 0.1, 0.22, -0.12).box(0.18, 0.05, 0.05, t, -0.14, 0.23, -0.24);
   return { hull: hull.geometry(), turret: turret.geometry() };
 }
-function eraSiegeModel(e) {
-  const root = new THREE.Group(), team = e.owner;
+function eraSiegeModel(e, era) {
+  const root = new THREE.Group(), team = e.owner, native = era === unitEra(e.type), map = native ? null : SIEGE_REMAP[era] ?? null, hover = !native && era === 'future';
+  const look = siegeLook(e.type, era);
+  if (look === 'mortar' || look === 'rockets') {
+    const p = cached(`${look}:${team}:${era}`, () => (look === 'mortar' ? mortar : rockets)(team, era)), barrel = pivot(...p.at, p.barrel);
+    barrel.rotation.x = look === 'mortar' ? -0.85 : -0.4; root.add(mesh(p.base), barrel); root.scale.setScalar(1.1);
+    return { root, anim: { type: 'gun', barrel, z: p.at[2] }, shadow: 0.6 };
+  }
+  if (look === 'catapult') {
+    const p = cached('cat' + team, () => catapult(team)), armP = pivot(0, 0.5, -0.05, p.arm); armP.rotation.x = -0.5;
+    root.add(mesh(p.base), armP); root.scale.setScalar(1.15); return { root, anim: { type: 'cat', arm: armP }, shadow: 0.6 };
+  }
   if (e.type === 'tank') {
-    const p = cached('tank' + team, () => tank(team)), hull = new THREE.Group(); hull.add(mesh(p.hull)); const turret = pivot(0, 0.5, 0, p.turret); hull.add(turret); root.add(hull);
+    const p = cached(`tank${team}:${map ? era : ''}`, () => tank(team, map, hover)), hull = new THREE.Group(); hull.add(mesh(p.hull)); const turret = pivot(0, 0.5, 0, p.turret); hull.add(turret); root.add(hull);
     root.scale.setScalar(1.1); return { root, anim: { type: 'tank', hull, turret }, shadow: 0.75 };
   }
   if (e.type === 'trebuchet') {
     const p = cached('treb' + team, () => trebuchet(team)), arm = pivot(0, 1.12, 0, p.arm); arm.rotation.x = -0.6;
     root.add(mesh(p.base), arm); root.scale.setScalar(1.15); return { root, anim: { type: 'treb', arm }, shadow: 0.7 };
   }
-  const kind = e.type === 'field_artillery' ? 'artillery' : 'cannon', p = cached(`gun:${kind}:${team}`, () => cannon(team, kind)), barrel = pivot(0, 0.48, 0.05, p.barrel);
+  const kind = e.type === 'field_artillery' ? 'artillery' : 'cannon', p = cached(`gun:${kind}:${team}:${map ? era : ''}`, () => cannon(team, kind, map, hover)), barrel = pivot(0, 0.48, 0.05, p.barrel);
   barrel.rotation.x = -0.12; root.add(mesh(p.base), barrel); root.scale.setScalar(1.1); return { root, anim: { type: 'gun', barrel }, shadow: 0.6 };
 }
 
-function unitModel(e) {
-  const root = new THREE.Group(), team = e.owner;
+// age: the owner's era. A unit from an earlier era is drawn in this one (era-units.js); without it, its own era.
+function unitModel(e, age) {
+  const root = new THREE.Group(), team = e.owner, era = unitEra(e.type, age);
   if (['drone', 'mech', 'railgun'].includes(e.type)) return futureModel(e);
-  if (['tank', 'trebuchet', 'cannon', 'field_artillery'].includes(e.type)) return eraSiegeModel(e);
-  if (e.cls === 'siege') {
-    const p = cached('cat' + team, () => catapult(team)), armP = pivot(0, 0.5, -0.05, p.arm); armP.rotation.x = -0.5;
-    root.add(mesh(p.base), armP); root.scale.setScalar(1.15); return { root, anim: { type: 'cat', arm: armP }, shadow: 0.6 };
-  }
-  const spec = { ...(HUMAN[e.type] || {}) }; if (spec.cape === 'team') spec.cape = TEAM_DARK[team];
-  const h = cached(`h:${e.type}:${team}`, () => limbs(spec, team));
+  if (e.cls === 'siege' || e.type === 'tank') return eraSiegeModel(e, era);
+  const spec = eraSpec(e.type, { ...(HUMAN[e.type] || {}) }, era); if (spec.cape === 'team') spec.cape = TEAM_DARK[team];
+  const h = cached(`h:${e.type}:${team}:${era}`, () => limbs(spec, team));
   const anim = { type: 'human' };
   if (e.cls === 'cav') {
-    const barded = e.type === 'knight', hs = cached((barded ? 'horse:barded' : 'horse') + team, () => horse(team, barded)), hr = new THREE.Group(); hr.add(mesh(hs.body));
-    anim.type = 'horse'; anim.legs = [[-0.11, 0.42, 0.3], [0.11, 0.42, 0.3], [-0.11, 0.42, -0.3], [0.11, 0.42, -0.3]].map(([x, y, z]) => { const p = pivot(x, y, z, hs.leg); hr.add(p); return p; });
-    const rider = new THREE.Group(); rider.position.y = 0.72; rider.scale.setScalar(0.9);
-    const spec2 = barded ? { tunic: TEAM[team], weapon: 'spear', helmet: 'great', armor: C.iron, shield: 'rect' } : { tunic: TEAM[team], bow: e.type === 'horse_archer', weapon: e.type === 'scout' ? 'spear' : null, helmet: 'leather' };
-    const r = cached(`rider:${e.type}:${team}`, () => limbs(spec2, team)); rider.add(mesh(r.body)); anim.armR = pivot(0.22, 0.7, 0, r.armR); anim.armL = pivot(-0.22, 0.7, 0, r.armL); rider.add(anim.armR, anim.armL);
-    root.add(hr, rider); root.scale.setScalar(1.1); return { root, anim, shadow: 0.55 };
+    const barded = e.type === 'knight', mount = mountOf(era), hr = new THREE.Group(), ride = new THREE.Group();
+    if (mount === 'horse') {
+      const hs = cached((barded ? 'horse:barded' : 'horse') + team, () => horse(team, barded)); hr.add(mesh(hs.body));
+      anim.type = 'horse'; anim.legs = [[-0.11, 0.42, 0.3], [0.11, 0.42, 0.3], [-0.11, 0.42, -0.3], [0.11, 0.42, -0.3]].map(([x, y, z]) => { const p = pivot(x, y, z, hs.leg); hr.add(p); return p; });
+    } else if (mount === 'bike') {
+      const bs = cached(`bike:${barded}:${team}`, () => motorbike(team, barded)); hr.add(mesh(bs.body));
+      anim.type = 'bike'; anim.wheels = [0.42, -0.42].map(z => { const p = pivot(0, 0.2, z, bs.wheel); hr.add(p); return p; });
+    } else {
+      const hs = cached(`hoverbike:${barded}:${team}`, () => hoverbike(team, barded)); hr.add(mesh(hs.body));
+      anim.type = 'hoverbike'; anim.ride = ride;
+    }
+    anim.mount = mount;
+    const rider = new THREE.Group(); rider.position.y = { horse: 0.72, bike: 0.36, hover: 0.5 }[mount]; rider.scale.setScalar(0.9);
+    const base = barded ? { tunic: TEAM[team], weapon: 'spear', helmet: 'great', armor: C.iron, shield: 'rect' } : { tunic: TEAM[team], bow: e.type === 'horse_archer', weapon: e.type === 'scout' ? 'spear' : null, helmet: 'leather' };
+    const spec2 = eraSpec(e.type, base, era);
+    const r = cached(`rider:${e.type}:${team}:${era}`, () => limbs(spec2, team)); rider.add(mesh(r.body)); anim.armR = pivot(0.22, 0.7, 0, r.armR); anim.armL = pivot(-0.22, 0.7, 0, r.armL); rider.add(anim.armR, anim.armL);
+    ride.add(hr, rider); root.add(ride); root.scale.setScalar(1.1); return { root, anim, shadow: 0.55 };
   }
   const inner = new THREE.Group(); inner.scale.setScalar(h.s); root.add(inner);
   inner.add(mesh(h.body)); anim.legL = pivot(-0.09, 0.38, 0, h.legL); anim.legR = pivot(0.09, 0.38, 0, h.legR); anim.armL = pivot(-0.22, 0.7, 0, h.armL); anim.armR = pivot(0.22, 0.7, 0, h.armR);
@@ -299,9 +329,10 @@ function relicModel() {
   const body = mesh(g); root.add(body, glow); return { root, anim: { type: 'relic', glow, body }, shadow: 0.3 };
 }
 
-export function buildModel(e, age = 'stone') {
-  if (e.kind === 'unit') return unitModel(e);
-  if (e.kind === 'building') return buildingModel(e, age);
+// age: the owner's era (buildings default to Stone; units to their own era).
+export function buildModel(e, age) {
+  if (e.kind === 'unit') return unitModel(e, age);
+  if (e.kind === 'building') return buildingModel(e, age ?? 'stone');
   if (e.kind === 'resource') return resourceModel(e);
   return relicModel();
 }
@@ -309,10 +340,12 @@ export function buildModel(e, age = 'stone') {
 // per-frame animation of a model's moving parts
 export function animate(g, e, t, moving) {
   const a = g.userData.anim; if (!a) return;
-  if (a.type === 'human' || a.type === 'horse') {
-    const k = moving ? Math.sin(t * (a.type === 'horse' ? 14 : 11) + e.id) : 0;
+  if (a.type === 'human' || a.mount) {
+    const k = moving ? Math.sin(t * (a.mount ? 14 : 11) + e.id) : 0;
     if (a.type === 'human') { a.legL.rotation.x = k * 0.7; a.legR.rotation.x = -k * 0.7; }
-    else for (let i = 0; i < 4; i++) a.legs[i].rotation.x = (i % 3 === 0 ? k : -k) * 0.8;
+    else if (a.type === 'horse') for (let i = 0; i < 4; i++) a.legs[i].rotation.x = (i % 3 === 0 ? k : -k) * 0.8;
+    else if (a.type === 'bike') { if (moving) for (const w of a.wheels) w.rotation.x = t * 16; }
+    else { a.ride.position.y = 0.05 + Math.sin(t * 3 + e.id) * 0.04; a.ride.rotation.x = moving ? 0.08 : 0; }
     const o = e.order, attacking = o.type === 'attack' && e.cd > e.cooldown - 8, working = o.type === 'gather' && o.phase === 'work' || (o.type === 'build' || o.type === 'repair') && !moving;
     if (a.armL) a.armL.rotation.x = moving ? -k * 0.6 : 0.05 * Math.sin(t * 2 + e.id);
     if (a.armR) {
@@ -330,7 +363,7 @@ export function animate(g, e, t, moving) {
   } else if (a.type === 'treb') {
     const p = Math.max(0, (e.cd - (e.cooldown - 16)) / 16); a.arm.rotation.x = e.order.type === 'attack' && p > 0 ? 1.5 - p * 2.3 : -0.6;
   } else if (a.type === 'gun') {
-    a.barrel.position.z = 0.05 - (e.order.type === 'attack' ? Math.max(0, (e.cd - e.cooldown + 10) / 10) * 0.14 : 0);
+    a.barrel.position.z = (a.z ?? 0.05) - (e.order.type === 'attack' ? Math.max(0, (e.cd - e.cooldown + 10) / 10) * 0.14 : 0);
   } else if (a.type === 'tank') {
     a.turret.position.z = e.order.type === 'attack' ? -Math.max(0, (e.cd - e.cooldown + 8) / 8) * 0.1 : 0;
     a.hull.position.y = moving ? Math.abs(Math.sin(t * 12 + e.id)) * 0.02 : 0;

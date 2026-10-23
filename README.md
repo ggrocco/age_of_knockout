@@ -74,7 +74,9 @@ their finite mode/difficulty limits so the bracket always resolves.
 You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few villagers on a 96-tile map, at a random point on a ring
 around the centre (the opponent mirrors you). Gather food, wood, gold and stone, build houses for population, and
 **advance through nine eras**: Stone, Tool, Bronze, Iron, Medieval, Age of Sail, Industrial, Modern and AI Future.
-Each era unlocks units and buildings and changes how your buildings look.
+Each era unlocks units and buildings and changes how your buildings look. Soldiers trained in an earlier era take on
+the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
+catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers and the King keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
 180 and 200 in AI Future (each house adds 4, the Town Center 10).
 Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 600, 750, 900, 1050, 1250, 1500 and
@@ -196,7 +198,8 @@ The Three.js view uses warm directional lighting, filtered shadows, sky reflecti
 wind-blown grass, and reflective water with animated normals and shoreline foam. High and Ultra add ambient
 occlusion for depth around buildings, foliage and units. Every era has its own building designs, from hide tents and
 thatch through mud brick, terracotta tile, castles, colonial whitewash, industrial brick and modern concrete to AI Future
-glass. Units have articulated equipment, including separate drone, mech and railgun models for AI Future. These are
+glass. Units have articulated equipment, including separate drone, mech and railgun models for AI Future, and fighters
+from earlier eras are redrawn in their owner's current era. These are
 original procedural models (no image or model files), not Age of Empires assets.
 
 Choose **Settings → Graphics quality** on desktop, or open the top-right menu on a phone. Changes apply without
