@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { UNITS } from '../src/data/units.js';
 import { BUILDINGS } from '../src/data/buildings.js';
 import { AGES, ageIndex } from '../src/data/ages.js';
-import { buildModel, animate } from '../src/render/models.js';
+import { buildModel, animate, unitEra } from '../src/render/models.js';
 import { ERA_STYLE } from '../src/render/styles.js';
 
 function checkGeometry(model, label) {
@@ -126,4 +126,50 @@ test('the Mine has finite geometry in every era and animates only while dug', ()
     e.constructed = false; e.progress = 0.4; animate(g, e, 3, false);
     assert.equal(cart.p.visible, false); assert.equal(wheel.p.visible, false);
   }
+});
+
+const unitColors = model => { const out = []; model.root.traverse(o => { if (o.isMesh) out.push(...o.geometry.attributes.color.array); }); return out.join(); };
+const unitOf = (type, owner = 0) => ({ ...UNITS[type], kind: 'unit', type, owner, id: 5, carry: { amount: 0 }, cd: 39, cooldown: 40 });
+test('a unit is drawn in its owner era once that is past its own; villagers and the King keep one look', () => {
+  assert.equal(unitEra('scout', 'stone'), 'tool');
+  assert.equal(unitEra('scout', 'tool'), 'tool');
+  assert.equal(unitEra('scout', 'future'), 'future');
+  assert.equal(unitEra('tank', 'iron'), 'modern');
+  assert.equal(unitEra('villager', 'future'), 'stone');
+  assert.equal(unitEra('king', 'modern'), 'stone');
+  assert.equal(unitEra('clubman', undefined), 'stone');
+});
+test('every unit renders and animates in every era, for both teams', () => {
+  for (const age of AGES) for (const owner of [0, 1]) for (const type of Object.keys(UNITS)) {
+    const e = unitOf(type, owner), model = buildModel(e, age), g = new THREE.Group(); g.add(model.root); g.userData.anim = model.anim;
+    for (const order of [{ type: 'idle' }, { type: 'move' }, { type: 'attack' }]) {
+      e.order = order; animate(g, e, 2.5, order.type === 'move'); g.updateMatrixWorld(true);
+      g.traverse(o => assert.ok(o.matrixWorld.elements.every(Number.isFinite), `${type}/${age}: invalid animation transform`));
+    }
+    checkGeometry(model, `${type}/${age}/${owner}`);
+  }
+});
+test('a unit in its own era looks as it always did', () => {
+  for (const type of Object.keys(UNITS)) assert.equal(unitColors(buildModel(unitOf(type), UNITS[type].age)), unitColors(buildModel(unitOf(type))), type);
+});
+test('fighters from earlier eras re-skin in every later era', () => {
+  for (const type of ['clubman', 'slinger', 'bowman', 'spearman', 'hoplite', 'swordsman', 'scout', 'horse_archer', 'knight', 'crossbowman', 'musketeer', 'catapult', 'trebuchet', 'cannon']) {
+    // The Catapult stays a stone-thrower through the Medieval Age; it becomes a mortar from the Age of Sail.
+    const chain = AGES.filter(a => ageIndex(a) >= ageIndex(UNITS[type].age) && !(type === 'catapult' && a === 'medieval'));
+    for (let i = 1; i < chain.length; i++) assert.ok(unitColors(buildModel(unitOf(type), chain[i])) !== unitColors(buildModel(unitOf(type), chain[i - 1])), `${type} ${chain[i]}`);
+  }
+});
+test('late-era mounts and siege chassis replace horses and stone-throwers', () => {
+  const kind = (type, age) => buildModel(unitOf(type), age).anim.type;
+  assert.equal(kind('scout', 'industrial'), 'horse');
+  assert.equal(kind('scout', 'modern'), 'bike');
+  assert.equal(kind('knight', 'future'), 'hoverbike');
+  assert.equal(kind('catapult', 'medieval'), 'cat');
+  assert.equal(kind('catapult', 'sail'), 'gun');
+  assert.equal(kind('trebuchet', 'future'), 'gun');
+  // A hoverbike floats; a motorbike's wheels turn only while it moves.
+  const bike = buildModel(unitOf('scout'), 'modern'), g = new THREE.Group(); g.userData.anim = bike.anim;
+  const e = { ...unitOf('scout'), order: { type: 'idle' } }, [w] = bike.anim.wheels;
+  animate(g, e, 1, false); const still = w.rotation.x; animate(g, e, 2, false); assert.equal(w.rotation.x, still);
+  animate(g, e, 3, true); assert.notEqual(w.rotation.x, still);
 });
