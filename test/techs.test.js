@@ -106,6 +106,13 @@ test('later Storage Pit upgrades reach their era units', () => {
   assert.deepEqual([mech.marmor, mech.parmor], [6, 5]); assert.deepEqual([tank.marmor, tank.parmor], [7, 10]);
   assert.deepEqual([rail.marmor, rail.parmor], [0, 0], 'siege unchanged');
 });
+test('the Armored Train takes the armor upgrades, not the old weapon ones', () => {
+  const g = createGame({ seed: 1 }), tr = g.spawnUnit('armored_train', 0, 20, 20);
+  for (const t of ['bronze_weapons', 'iron_weapons', 'bronze_shields', 'paper_cartridges']) g.completeTech(0, t);
+  assert.deepEqual([tr.atk, tr.marmor, tr.parmor], [8, 3, 4], 'infantry, cavalry and ranged foot upgrades skip it');
+  g.completeTech(0, 'composite_armor'); g.completeTech(0, 'air_support'); g.completeTech(0, 'nanoweave_plating');
+  assert.deepEqual([tr.marmor, tr.parmor, tr.maxHp], [6, 8, 250]);
+});
 
 test('gate building upgrades: HP and speed apply once, to existing and new units', () => {
   const g = createGame({ seed: 1 }), p = g.players[0]; p.age = 'modern';

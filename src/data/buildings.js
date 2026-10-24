@@ -24,7 +24,7 @@ export const BUILDINGS = {
   arsenal:           { name: 'Arsenal', hp: 600, cost: c(0, 200, 50, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
   trading_company:   { name: 'Trading Company', hp: 500, cost: c(0, 250, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
   factory:           { name: 'Factory', hp: 700, cost: c(0, 250, 150, 50), size: 3, buildTime: 60, age: 'industrial', trains: ['field_artillery', 'tank'], sight: 5 },
-  railway_station:   { name: 'Railway Station', hp: 700, cost: c(0, 250, 100, 100), size: 3, buildTime: 60, age: 'industrial', sight: 5 },
+  railway_station:   { name: 'Railway Station', hp: 700, cost: c(0, 250, 100, 100), size: 3, buildTime: 60, age: 'industrial', trains: ['armored_train'], sight: 5 },
   power_plant:       { name: 'Power Plant', hp: 800, cost: c(0, 200, 150, 150), size: 3, buildTime: 60, age: 'modern', sight: 4 },
   airfield:          { name: 'Airfield', hp: 800, cost: c(0, 250, 200, 100), size: 3, buildTime: 65, age: 'modern', trains: ['drone'], sight: 8 },
   // Defences (invented). `hp` here is the Tool-era value; addBuilding takes the real HP and the tower's attack from the owner's era (defences.js).

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { styleOf } from './styles.js';
 import { B, C, unit, TEAM, TEAM_DARK, MODEL_MATERIAL, cached, mesh, pivot } from './builder.js';
 import { designOf, archGeos } from './arch/index.js';
-import { unitEra, eraSpec, mountOf, siegeLook, SIEGE_REMAP, pads, motorbike, hoverbike, mortar, rockets } from './era-units.js';
+import { unitEra, eraSpec, mountOf, siegeLook, SIEGE_REMAP, pads, motorbike, hoverbike, mortar, rockets, armoredTrain } from './era-units.js';
 export { TEAM, TEAM_DARK, MODEL_MATERIAL, unitEra };
 const rng = seed => { let a = (seed * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
@@ -150,6 +150,10 @@ function eraSiegeModel(e, era) {
     const p = cached(`tank${team}:${map ? era : ''}`, () => tank(team, map, hover)), hull = new THREE.Group(); hull.add(mesh(p.hull)); const turret = pivot(0, 0.5, 0, p.turret); hull.add(turret); root.add(hull);
     root.scale.setScalar(1.1); return { root, anim: { type: 'tank', hull, turret }, shadow: 0.75 };
   }
+  if (e.type === 'armored_train') {
+    const p = cached(`train:${team}:${era}`, () => armoredTrain(team, era)), hull = new THREE.Group(); hull.add(mesh(p.hull)); const turret = pivot(...p.at, p.turret); hull.add(turret); root.add(hull);
+    root.scale.setScalar(1.1); return { root, anim: { type: 'tank', hull, turret }, shadow: 0.85 };
+  }
   if (e.type === 'trebuchet') {
     const p = cached('treb' + team, () => trebuchet(team)), arm = pivot(0, 1.12, 0, p.arm); arm.rotation.x = -0.6;
     root.add(mesh(p.base), arm); root.scale.setScalar(1.15); return { root, anim: { type: 'treb', arm }, shadow: 0.7 };
@@ -162,7 +166,7 @@ function eraSiegeModel(e, era) {
 function unitModel(e, age) {
   const root = new THREE.Group(), team = e.owner, era = unitEra(e.type, age);
   if (['drone', 'mech', 'railgun'].includes(e.type)) return futureModel(e);
-  if (e.cls === 'siege' || e.type === 'tank') return eraSiegeModel(e, era);
+  if (e.cls === 'siege' || e.cls === 'armor') return eraSiegeModel(e, era);
   const spec = eraSpec(e.type, { ...(HUMAN[e.type] || {}) }, era); if (spec.cape === 'team') spec.cape = TEAM_DARK[team];
   const h = cached(`h:${e.type}:${team}:${era}`, () => limbs(spec, team));
   const anim = { type: 'human' };

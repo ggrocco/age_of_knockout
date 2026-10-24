@@ -34,9 +34,9 @@ export const TECHS = {
   rifled_barrels: { name: 'Rifled Barrels', building: 'storage_pit', age: 'industrial', cost: c(180, 0, 150), time: 55, requires: 'paper_cartridges',
     effect: { cls: ['archer'], atk: 1 }, desc: 'Ranged foot units deal +1 more attack. Needs Paper Cartridges.' },
   composite_armor: { name: 'Composite Armor', building: 'storage_pit', age: 'modern', cost: c(200, 0, 180), time: 60,
-    effect: { cls: ['armor'], marmor: 2, parmor: 2 }, desc: 'Tanks gain +2 melee and +2 pierce armor.' },
+    effect: { cls: ['armor'], marmor: 2, parmor: 2 }, desc: 'Tanks and Armored Trains gain +2 melee and +2 pierce armor.' },
   nanoweave_plating: { name: 'Nanoweave Plating', building: 'storage_pit', age: 'future', cost: c(220, 0, 200), time: 65,
-    effect: { cls: ['inf', 'cav', 'archer', 'armor'], marmor: 1, parmor: 2 }, desc: 'Infantry, cavalry, ranged foot units and tanks gain +1 melee and +2 pierce armor.' },
+    effect: { cls: ['inf', 'cav', 'archer', 'armor'], marmor: 1, parmor: 2 }, desc: 'Infantry, cavalry, ranged foot units, Tanks and Armored Trains gain +1 melee and +2 pierce armor.' },
 
   // --- Government Center: military ---
   ballistics: { name: 'Ballistics', building: 'government_center', age: 'bronze', cost: c(0, 80, 120), time: 45,
@@ -66,7 +66,7 @@ export const TECHS = {
   electrification: { name: 'Electrification', building: 'power_plant', age: 'modern', cost: c(250, 0, 200), time: 55,
     effect: { gather: { food: 1.1, wood: 1.1, gold: 1.1, stone: 1.1 } }, desc: 'Villagers gather every resource 10% faster.' },
   air_support: { name: 'Air Support', building: 'airfield', age: 'modern', cost: c(200, 0, 250), time: 60,
-    effect: { cls: ['armor', 'siege'], hp: 30 }, desc: 'Tanks and siege gain +30 HP.' },
+    effect: { cls: ['armor', 'siege'], hp: 30 }, desc: 'Tanks, Armored Trains and siege gain +30 HP.' },
 };
 
 // Apply a unit effect to one unit. Idempotent per tech: called once when the unit spawns and once

@@ -54,8 +54,8 @@ exactly:
 - **Reload times not reconciled.** The sim uses per-class attack cooldowns (archer 40 / siege 80 /
   other 30 ticks), not AoE1's per-unit reload times (e.g. Bowman 1.4 s = 28 ticks, Scout 0.9 s = 18,
   Catapult 5 s = 100). Kept class-based to preserve the cooldown model and its test; a known fidelity gap.
-  Two invented era units override the class default with their own `cooldown`: the Machine Gunner (12 ticks, rapid
-  fire) and the Tank (40 ticks).
+  Three invented era units override the class default with their own `cooldown`: the Machine Gunner (12 ticks, rapid
+  fire), the Armored Train (20 ticks) and the Tank (40 ticks).
 
 ## Combat model (melee/pierce armor + attack type)
 
@@ -125,9 +125,9 @@ Empires I, and every number below is an invented, game-tuned approximation (spec
   1200 food / 1200 gold / 300 stone (60 s) to 1800/1500/400 (70 s) so it stays the most expensive.
 - **Units**: Knight (cavalry, Stable), Crossbowman (ranged, Archery Range), Trebuchet (siege, Castle) in Medieval;
   Musketeer (ranged, Barracks) and Cannon (siege, Castle) in the Age of Sail; Rifleman (ranged, Barracks) and Field
-  Artillery (siege, Factory) in Industrial; Machine Gunner (ranged, Barracks) and Tank in Modern. Gunpowder infantry use
+  Artillery (siege, Factory) and the Armored Train (armored, Railway Station) in Industrial; Machine Gunner (ranged, Barracks) and Tank in Modern. Gunpowder infantry use
   the `archer` class (ranged, pierce damage).
-- **`armor` class** (label "Armored") exists only for the Tank, so the ancient class-based rules skip it: Bronze/Iron
+- **`armor` class** (label "Armored") holds only the Tank and the Armored Train, so the ancient class-based rules skip it: Bronze/Iron
   Weapons (inf/cav), Bronze Shields (inf) and the Spearman's +8 vs cavalry do not apply. Ballistics (+1 range,
   archer/siege) does apply to the new gunners and siege; the Railgun keeps the longest siege range.
 - **Buildings**: the **Castle** (Medieval, 1200 HP, melee/pierce armor 6/10) trains Trebuchets and Cannons and is the
@@ -151,7 +151,7 @@ Academy trains Hoplites and the Siege Workshop siege there; here they train noth
 | Medieval | University | 200/100/50 | 600 | 55 s | Masonry: stone gathering x1.25 (100/100/0, 40 s) |
 | Age of Sail | Arsenal | 200/50/100 | 600 | 55 s | Bayonets: `archer` class +2 melee armor (150/0/120, 50 s) |
 | Age of Sail | Trading Company | 250/100/0 | 500 | 55 s | Colonial Trade: gold gathering x1.2 (200/150/0, 45 s) |
-| Industrial | Railway Station | 250/100/100 | 700 | 60 s | Railways: every unit's speed x1.1 (200/0/200, 55 s) |
+| Industrial | Railway Station | 250/100/100 | 700 | 60 s | Railways: every unit's speed x1.1 (200/0/200, 55 s); trains the Armored Train |
 | Modern | Power Plant | 200/150/150 | 800 | 60 s | Electrification: all gathering x1.1 (250/0/200, 55 s) |
 | Modern | Airfield | 250/200/100 | 800 | 65 s | Air Support: `armor` and `siege` classes +30 HP (200/0/250, 60 s) |
 
@@ -160,6 +160,17 @@ speed). Death Match still starts in the Iron Age, so both players now build an A
 their first age-up.
 - **Death Match** starts both players in the Iron Age (20000 of every resource), so it is the round where these eras
   are played.
+
+## Invented content (Armored Train)
+
+The **Armored Train** (Industrial Age, trained at the Railway Station) is invented; AoE1 has nothing like it. It is an
+`armor`-class unit, so Composite Armor, Air Support and Nanoweave Plating reach it and the old infantry/cavalry weapon
+and armor upgrades and the Spearman's bonus do not. Stats: 220 HP, 8 pierce attack every 20 ticks (8 damage per
+second), range 6, armor 3 melee / 4 pierce, speed 1.3, sight 8, cost 120 food / 80 wood / 120 gold, 45 s. It arrives
+an Age before the Tank and is weaker than it (Tank: 240 HP, 11 damage per second, 4/6 armor, speed 1.8) but fires
+more often, so it suits clearing infantry. There are no rails: it drives over open ground like any other unit. Its
+look follows the owner's era: a steam locomotive in Industrial, an olive-drab diesel in Modern, a hovering maglev in
+AI Future.
 
 ## Invented content (defences)
 
