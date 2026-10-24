@@ -109,7 +109,7 @@ Effects apply once per unit (at spawn and when a tech completes for already-buil
 
 The **AI Future age** (the 5th age, after Iron) and the units **Combat Drone**, **Mech Walker** and
 **Railgun** are invented for this game; they do not exist in the original Age of Empires I. Drones are
-trained at the Archery Range, Mech Walkers at the Barracks and Railguns at the Government Center.
+trained at the Airfield (a Modern Age building; the Archery Range until 2026-10-24), Mech Walkers at the Barracks and Railguns at the Government Center.
 Their costs and stats are guesses like the rest of the table, as is the age-up cost (1200 food,
 1200 gold, 300 stone, 60 s).
 

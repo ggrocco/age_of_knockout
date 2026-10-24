@@ -135,10 +135,12 @@ test('era units are age-gated at their buildings', () => {
 });
 test('future units are age-gated and trainable at their buildings', () => {
   const g = createGame({ seed: 1 }); const p = g.players[0]; p.res = { food: 5000, wood: 5000, gold: 5000, stone: 5000 };
-  const t = tc(g, 0), ar = g.addBuilding('archery_range', 0, t.x + 8, t.y, true), gc = g.addBuilding('government_center', 0, t.x, t.y + 8, true), bk = g.addBuilding('barracks', 0, t.x - 8, t.y, true);
-  p.age = 'iron'; assert.equal(g.command(0, { type: 'train', buildingId: ar.id, unit: 'drone' }).ok, false, 'drone needs future');
+  const t = tc(g, 0), af = g.addBuilding('airfield', 0, t.x + 8, t.y, true), gc = g.addBuilding('government_center', 0, t.x, t.y + 8, true), bk = g.addBuilding('barracks', 0, t.x - 8, t.y, true);
+  const ar = g.addBuilding('archery_range', 0, t.x + 8, t.y + 8, true);
+  p.age = 'modern'; assert.equal(g.command(0, { type: 'train', buildingId: af.id, unit: 'drone' }).ok, false, 'drone needs future');
   p.age = 'future';
-  for (const [b, u] of [[ar, 'drone'], [bk, 'mech'], [gc, 'railgun']]) assert.equal(g.command(0, { type: 'train', buildingId: b.id, unit: u }).ok, true, u);
+  for (const [b, u] of [[af, 'drone'], [bk, 'mech'], [gc, 'railgun']]) assert.equal(g.command(0, { type: 'train', buildingId: b.id, unit: u }).ok, true, u);
+  assert.equal(g.command(0, { type: 'train', buildingId: ar.id, unit: 'drone' }).ok, false, 'the Archery Range no longer trains drones');
 });
 test('railgun cannot carry relics', () => {
   const g = createGame({ seed: 1 }); const r = g.spawnRelic(20.5, 20.5), u = g.spawnUnit('railgun', 0, 20.5, 20.5);

@@ -94,7 +94,7 @@ Each era unlocks units and buildings and changes how your buildings look. To adv
 The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +20%), Phalanx Drill (Academy, infantry
 +20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
 foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster),
-Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks and siege +30 HP). Farms, Mines,
+Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks and siege +30 HP). The Airfield also trains the Combat Drone once you reach AI Future. Farms, Mines,
 Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
 catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers and the King keep one look.

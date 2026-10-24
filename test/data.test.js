@@ -34,7 +34,7 @@ test('ageTitle is the sentence form of an era', () => {
   assert.equal(ageLabel('sail'), 'Age of Sail');
 });
 test('future units: class, age and training building', () => {
-  const want = { drone: ['archer', 'archery_range'], mech: ['inf', 'barracks'], railgun: ['siege', 'government_center'] };
+  const want = { drone: ['archer', 'airfield'], mech: ['inf', 'barracks'], railgun: ['siege', 'government_center'] };
   for (const [id, [cls, bld]] of Object.entries(want)) {
     assert.equal(UNITS[id].age, 'future', id); assert.equal(UNITS[id].cls, cls, id);
     assert.ok(BUILDINGS[bld].trains.includes(id), `${bld} trains ${id}`);
