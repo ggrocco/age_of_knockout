@@ -272,19 +272,94 @@ test('a hard Death Match army breaks into a walled, towered base', () => {
   assert.ok(brokeIn(), `inside the ring or the Town Center hit within 3000 ticks (gave up at ${ticks})`);
 });
 
-test('the bot never builds walls', () => {
-  for (const diffs of [['relaxed', 'easy'], ['medium', 'hard']]) {
-    const g = createGame({ seed: 1, rules: roundById('deathmatch') }), bots = diffs.map((d, i) => createBot(g, i, d)), seen = new Set(), send = g.command;
-    g.command = (pid, c) => { seen.add(c.type); return send(pid, c); };
-    let towers = 0;
-    for (let i = 0; i < 6000 && !g.result; i++) {
-      g.tick();
-      diffs.forEach((d, k) => { if (g.time % THINK_EVERY[d] === (k * 3) % THINK_EVERY[d]) bots[k].think(); });
-      assert.ok(![...g.buildings.values()].some(x => x.type === 'wall'), `${diffs}: no wall, ever`);
-      towers = Math.max(towers, towersOf(g, 0).length + towersOf(g, 1).length);
-    }
-    assert.ok(!seen.has('wall'), `${diffs}: never a wall command`); assert.ok(seen.has('build'), `${diffs}: control: they do build`);
-    assert.ok(towers >= 2, `${diffs}: control: towers, yes (peak ${towers})`);
+// Tiles reachable on foot (4-way) from the open tile beside a building, over ground that is not water or occupied.
+function reachFrom(g, b) {
+  const n = g.map.size, open = (x, y) => x >= 0 && y >= 0 && x < n && y < n && g.map.tiles[y * n + x] !== 1 && !g.occAt(x, y), seen = new Uint8Array(n * n);
+  let s = null;
+  for (let y = b.y - 1; y <= b.y + b.size && !s; y++) for (let x = b.x - 1; x <= b.x + b.size; x++) if (open(x, y)) { s = { x, y }; break; }
+  const queue = [s.y * n + s.x]; seen[queue[0]] = 1;
+  for (let k = 0; k < queue.length; k++) {
+    const x = queue[k] % n, y = (queue[k] / n) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(x + dx, y + dy) && !seen[(y + dy) * n + x + dx]) { seen[(y + dy) * n + x + dx] = 1; queue.push((y + dy) * n + x + dx); }
+  }
+  return (x, y) => seen[y * n + x] === 1;
+}
+const wallsOf = (g, pid) => [...g.buildings.values()].filter(b => b.owner === pid && b.type === 'wall');
+
+test('the bot screens each finished tower with a wall line, rebuilds lost segments and never walls in its own base', () => {
+  const { g, run, tc } = eraBot('tool', ['barracks', 'archery_range'], 6000);
+  const towers = towersOf(g, 0).filter(t => t.constructed), walls = wallsOf(g, 0);
+  assert.equal(towers.length, 3, 'control: 3 finished towers');
+  // Towers can stand side by side; a screen tile next to another building is left out, so not every tower gets a full line.
+  assert.ok(walls.filter(w => w.constructed).length >= 4, `finished wall segments (${walls.length})`);
+  for (const w of walls) assert.ok(towers.some(t => distPoint(w.x + 0.5, w.y + 0.5, t) <= 3), `wall at ${w.x},${w.y} screens a tower`);
+  const reach = reachFrom(g, tc);
+  for (const b of g.buildings.values()) if (b.owner === 0 && b.type !== 'wall') {
+    let ok = false; for (let y = b.y - 1; y <= b.y + b.size && !ok; y++) for (let x = b.x - 1; x <= b.x + b.size; x++) if (reach(x, y)) { ok = true; break; }
+    assert.ok(ok, `${b.type} at ${b.x},${b.y} can still be walked to from the Town Center`);
+  }
+  for (const u of g.units.values()) if (u.owner === 0) assert.ok(reach(Math.floor(u.x), Math.floor(u.y)), `${u.type} at ${u.x},${u.y} is not walled in`);
+  const lost = walls.find(w => w.constructed), at = { x: lost.x, y: lost.y }; g.damage(lost, lost.hp, null);
+  run(1500);
+  assert.ok(wallsOf(g, 0).some(w => w.x === at.x && w.y === at.y && w.constructed), 'the destroyed segment is rebuilt');
+  const stone = eraBot('stone', ['barracks'], 3000);
+  assert.equal(wallsOf(stone.g, 0).length, 0, 'no wall before the Tool Age');
+});
+
+test('both bots build walls in a Death Match', () => {
+  const g = createGame({ seed: 1, rules: roundById('deathmatch') }), diffs = ['medium', 'hard'], bots = diffs.map((d, i) => createBot(g, i, d)), seen = new Set(), send = g.command;
+  g.command = (pid, c) => { const r = send(pid, c); if (r.ok) seen.add(pid + c.type); return r; };
+  for (let i = 0; i < 6000 && !g.result; i++) { g.tick(); diffs.forEach((d, k) => { if (g.time % THINK_EVERY[d] === (k * 3) % THINK_EVERY[d]) bots[k].think(); }); }
+  assert.ok(seen.has('0wall') && seen.has('1wall'), 'each bot issued a wall line');
+});
+
+test('a foundation left without a builder is finished; one nobody can reach is deleted', () => {
+  const { g, run, tc } = eraBot('tool', ['barracks'], 300), n = g.map.size;
+  const spot = (w, near) => { for (let r = 6; r < 30; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = near.x + dx, y = near.y + dy; let ok = x > 2 && y > 2 && x + w < n - 3 && y + w < n - 3;
+    for (let j = y - 2; j < y + w + 2 && ok; j++) for (let i = x - 2; i < x + w + 2; i++) if (g.map.tiles[j * n + i] !== 0 || g.occAt(i, j) || g.reserved.has(j * n + i)) { ok = false; break; }
+    if (ok) return { x, y };
+  } };
+  const a = spot(3, tc), open = g.addBuilding('stable', 0, a.x, a.y, false);
+  const c = spot(2, { x: tc.x + 12, y: tc.y + 12 }), shut = g.addBuilding('granary', 0, c.x, c.y, false); // 2 x 2, in a two-tile moat
+  for (let y = c.y - 2; y <= c.y + 3; y++) for (let x = c.x - 2; x <= c.x + 3; x++) if (x < c.x || x > c.x + 1 || y < c.y || y > c.y + 1) g.map.tiles[y * n + x] = 1;
+  g.recount();
+  run(6000);
+  assert.ok(open.constructed, 'the abandoned Stable foundation was finished');
+  assert.ok(shut.dead, 'the moated Granary foundation was deleted');
+});
+
+test('a damaged building is repaired, and a lost Town Center is rebuilt', () => {
+  const { g, run, tc } = eraBot('tool', ['barracks', 'archery_range'], 300), bar = [...g.buildings.values()].find(b => b.owner === 0 && b.type === 'barracks');
+  bar.hp = bar.maxHp * 0.4;
+  run(2400);
+  assert.equal(bar.hp, bar.maxHp, 'the Barracks is back to full HP');
+  g.damage(tc, tc.hp, null); assert.ok(tc.dead);
+  run(6000);
+  assert.ok([...g.buildings.values()].some(b => b.owner === 0 && b.type === 'town_center' && b.constructed), 'a new Town Center stands');
+});
+
+test('a Tool Age bot builds a Market and Granary, researches Woodworking and Gold Mining, and trains a pair of Scouts', () => {
+  let scouts = 0;
+  const { g, p, types } = eraBot('tool', ['barracks', 'archery_range', 'stable'], 6000, true, { each: g => { scouts = Math.max(scouts, [...g.units.values()].filter(u => u.owner === 0 && u.type === 'scout').length); } });
+  for (const t of ['market', 'granary']) assert.ok([...g.buildings.values()].some(b => b.owner === 0 && b.type === t && b.constructed), `built a ${t}`);
+  for (const t of ['woodworking', 'gold_mining']) assert.ok(p.techs.has(t), `researched ${t}`);
+  assert.ok(types.has('scout'), 'trained a Scout'); assert.ok(scouts <= 2, `never more than 2 Scouts (peak ${scouts})`);
+});
+
+test('the siege places go to the best siege the bot can train: a Trebuchet before a Catapult', () => {
+  const { b, types } = eraBot('medieval', ['government_center', 'castle'], 3000);
+  assert.ok(types.has('trebuchet'), `trained a Trebuchet (saw ${[...types].join(',')})`);
+  assert.deepEqual(Object.keys(b.why).filter(k => k.startsWith('train')), [], 'no rejected train commands');
+});
+
+test('a bot left alone climbs every era to AI Future within an hour', () => {
+  for (const [diff, seed] of [['medium', 1], ['hard', 2]]) {
+    const g = createGame({ seed, rules: { ...roundById('conquest'), check: () => null }, ...matchOptions([diff, null]), capTicks: Infinity });
+    const b = createBot(g, 0, diff), p = g.players[0], ages = new Set();
+    while (g.time < 72000 && p.age !== 'future') { g.tick(); if (g.time % THINK_EVERY[diff] === 0) b.think(); ages.add(p.age); }
+    assert.equal(p.age, 'future', `${diff} seed ${seed}: reached ${p.age} in 60 min`);
+    assert.equal(ages.size, 9, `${diff} seed ${seed}: passed through every era`);
   }
 });
 

@@ -41,7 +41,9 @@ quickly replace lost villagers.
 
 ![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
-Before each round the bracket shows the rules, the time limit and your opponent. The other matches in each round are
+Before each round the bracket shows the rules, the time limit and your opponent. **Back to menu** returns to the
+main menu before round 1; from round 2 on the button reads **Leave tournament** and asks to confirm, since leaving
+loses your progress. The other matches in each round are
 played out by bots in a background Worker so the progress screen stays responsive.
 
 | Round | Game type | Goal |
@@ -109,6 +111,9 @@ every Farm you already have grows to the new size and keeps its share of food le
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
 where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
+The opponent puts a short wall line in front of each of its towers, on the side facing you, so attackers walk round it
+under fire or stop to break it; it never walls in its own base, and it rebuilds lost sections. It also repairs damaged
+buildings, finishes foundations its builders left, and rebuilds a lost Town Center.
 
 **Mines and rocky ground.** The map has grey rocky ground: gold veins (yellow flecks) and quarries (grey).
 From the Tool Age a villager can build a **Mine** (100 wood, 50 stone) on one; only rocky ground will take it. Right-click

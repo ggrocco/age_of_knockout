@@ -3,15 +3,14 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
-import { canPlace, canAfford, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
+import { canPlace, canAfford, canRepair, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
 import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
 import { parseTimeLimit } from '../time-limit.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
 // towers: how many Towers it keeps near its Town Center from the Tool Age on.
-// ageFirst: gatherers on a surplus resource move to the gold or food the next age-up still needs, and research and
-// the second half of the army only spend what leaves the age-up affordable.
+// ageFirst: research and the second half of the army only spend what leaves the next age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
   relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1 },
@@ -84,6 +83,9 @@ export function createBot(game, pid, difficulty = 'medium') {
     return Object.keys(cost).every(k => !cost[k] || me.res[k] - cost[k] >= (need[k] || 0));
   };
 
+  // More villagers as the eras go on (the age-ups and buildings cost more): +2 a era from the Iron Age, +12 in AI Future.
+  const villagerTarget = () => D.villagers + 2 * Math.max(0, ageIndex(me.age) - ageIndex('bronze'));
+
   function spotNear(type, around, margin = true) {
     const def = BUILDINGS[type], c = around;
     for (let r = 3; r < 16; r++) for (let dy = -r; dy <= r; dy += 1) for (let dx = -r; dx <= r; dx += 1) {
@@ -106,6 +108,96 @@ export function createBot(game, pid, difficulty = 'medium') {
     return cmd({ type: 'build', ids: chosen.map(v => v.id), building: type, x: sp.x, y: sp.y });
   }
 
+  // A wall screen in front of each finished tower: a straight line of WALL_SCREEN tiles, one open row out from the tower
+  // on the side facing the enemy start, so attackers walk round it under the tower's fire or stop to break it. Lost
+  // segments are put back. Walls have no gates and our own units never break our own walls, so a tile next to one of our
+  // other buildings is left out, and the whole line is dropped if it would cut off any ground we can walk on now.
+  const WALL_SCREEN = 6, wallSkip = new Map(); // tower id -> tick its screen was last found to cut off ground
+  function screenTiles(t) {
+    const c = centerOf(t), dx = enemyStart.x + 0.5 - c.x, dy = enemyStart.y + 0.5 - c.y, out = [];
+    if (Math.abs(dx) >= Math.abs(dy)) { const x = dx > 0 ? t.x + t.size + 1 : t.x - 2; for (let k = 0; k < WALL_SCREEN; k++) out.push({ x, y: t.y - 2 + k }); }
+    else { const y = dy > 0 ? t.y + t.size + 1 : t.y - 2; for (let k = 0; k < WALL_SCREEN; k++) out.push({ x: t.x - 2 + k, y }); }
+    return out;
+  }
+  const nextToBuilding = (x, y) => {
+    for (let j = y - 1; j <= y + 1; j++) for (let i = x - 1; i <= x + 1; i++) { const e = game.entities.get(game.occAt(i, j)); if (e && e.kind === 'building' && e.type !== 'wall') return true; }
+    return false;
+  };
+  // Tiles reachable on foot (4-way: paths never cut corners) from the open tile `from`, with the `extra` tile indices also blocked;
+  // wall foundations count as walls already.
+  function openArea(from, extra) {
+    const n = game.map.size, seen = new Uint8Array(n * n), open = i => game.map.tiles[i] !== 1 && !game.occAt(i % n, (i / n) | 0) && !game.reserved.has(i) && !extra.has(i);
+    const s = from.y * n + from.x; if (!open(s)) return seen;
+    const queue = [s]; seen[s] = 1;
+    for (let k = 0; k < queue.length; k++) {
+      const i = queue[k], x = i % n, y = (i / n) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, j = ny * n + nx;
+        if (nx >= 0 && ny >= 0 && nx < n && ny < n && !seen[j] && open(j)) { seen[j] = 1; queue.push(j); }
+      }
+    }
+    return seen;
+  }
+  const countOf = a => a.reduce((s, v) => s + v, 0);
+  // True when walling `tiles` leaves every tile we can reach from beside the Town Center still reachable.
+  function keepsGroundOpen(tc, tiles) {
+    const n = game.map.size, extra = new Set(tiles.map(t => t.y * n + t.x)), r = { x0: tc.x - 1, y0: tc.y - 1, x1: tc.x + tc.size, y1: tc.y + tc.size };
+    let from = null;
+    for (let y = r.y0; y <= r.y1 && !from; y++) for (let x = r.x0; x <= r.x1; x++) {
+      const i = y * n + x;
+      if ((x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1) && x >= 0 && y >= 0 && x < n && y < n && game.map.tiles[i] !== 1 && !game.occAt(x, y) && !game.reserved.has(i) && !extra.has(i)) { from = { x, y }; break; }
+    }
+    if (!from) return false;
+    const before = openArea(from, new Set()), after = countOf(openArea(from, extra));
+    return after === countOf(before) - [...extra].filter(i => before[i]).length;
+  }
+  function wallTowers(tc, free) {
+    if (ageIndex(me.age) < ageIndex(BUILDINGS.wall.age)) return;
+    for (const t of mine('buildings')) {
+      if (t.type !== 'tower' || !t.constructed || game.time - (wallSkip.get(t.id) ?? -Infinity) < 1200) continue;
+      const tiles = screenTiles(t).filter(p => canPlace(game, pid, 'wall', p.x, p.y) && !nextToBuilding(p.x, p.y));
+      if (!tiles.length) continue;
+      const cost = { stone: BUILDINGS.wall.cost.stone * tiles.length };
+      if (!canPay(cost) || !leavesAgeUp(cost)) return;
+      if (!keepsGroundOpen(tc, tiles)) { wallSkip.set(t.id, game.time); continue; }
+      const v = free.filter(u => u.order.type !== 'repair').sort((a, b) => dist(a, tiles[0]) - dist(b, tiles[0]))[0];
+      if (v) cmd({ type: 'wall', ids: [v.id], tiles });
+      return; // one screen per think
+    }
+  }
+
+  // Foundations nobody is working on (the builder died, was pulled away, or gave up on the way) get the nearest free
+  // villager again: count() includes foundations, so an abandoned House or gate building would otherwise block every later
+  // one (and the age-up). One that has made no progress after three such calls, and none for 2 minutes, is unreachable:
+  // delete it (count() then lets a new one go somewhere else).
+  const stall = new Map(); // foundation id -> { progress, since, sends }
+  function finishFoundations(buildings, vills) {
+    for (const id of stall.keys()) { const b = game.entities.get(id); if (!b || b.constructed) stall.delete(id); }
+    const working = new Set();
+    for (const v of vills) for (let o = v.order; o && (o.type === 'build' || o.type === 'repair'); o = o.resume) { working.add(o.target); for (const id of o.queue || []) working.add(id); }
+    let sent = 0;
+    for (const b of buildings) {
+      if (b.constructed || b.type === 'wonder') continue; // the Wonder round staffs its Wonder itself
+      let s = stall.get(b.id);
+      if (!s || b.progress > s.progress) stall.set(b.id, s = { progress: b.progress, since: game.time, sends: 0 });
+      else if (s.sends >= 3 && game.time - s.since > 2400) { if (cmd({ type: 'delete', id: b.id })) stall.delete(b.id); continue; }
+      if (working.has(b.id) || sent >= 2 || s.sends >= 3) continue; // three calls with no progress: wait to delete it
+      const v = vills.filter(u => u.order.type !== 'build' && u.order.type !== 'repair').sort((a, c) => dist(a, b) - dist(c, b))[0];
+      if (v && cmd({ type: 'construct', ids: [v.id], targetId: b.id })) { s.sends++; sent++; working.add(b.id); }
+    }
+  }
+
+  // The most damaged finished building under 70% HP with no enemy soldier within 8 tiles of it gets the nearest free
+  // villager (two for a Town Center or Castle), one building at a time, while we can pay for it. They go back to work after.
+  function repairDamaged(done, vills, enemies) {
+    if (vills.some(v => v.order.type === 'repair')) return;
+    const danger = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ');
+    const b = done.filter(x => x.hp < x.maxHp * 0.7 && canRepair(me, x.type) && !danger.some(e => distPoint(e.x, e.y, x) < 8)).sort((a, c) => a.hp / a.maxHp - c.hp / c.maxHp)[0];
+    if (!b) return;
+    const ids = vills.filter(v => v.order.type !== 'build' && v.order.type !== 'repair').sort((a, c) => dist(a, b) - dist(c, b)).slice(0, b.type === 'town_center' || b.type === 'castle' ? 2 : 1).map(v => v.id);
+    if (ids.length) cmd({ type: 'repair', ids, targetId: b.id });
+  }
+
   function think() {
     if (game.result) return;
     const tc = mine('buildings').find(b => b.type === 'town_center' && b.constructed), anyBase = tc || mine('buildings').find(b => b.constructed);
@@ -119,7 +211,7 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- economy: villagers
     const queuedVills = done.reduce((n, b) => n + b.queue.filter(q => q.unit === 'villager').length, 0);
-    if (tc && !(bot.saving && vills.length >= 14) && vills.length + queuedVills < D.villagers && tc.queue.length < 2 && canAfford(me, UNITS.villager.cost) && me.pop < me.popCap) cmd({ type: 'train', buildingId: tc.id, unit: 'villager' });
+    if (tc && !(bot.saving && vills.length >= 14) && vills.length + queuedVills < villagerTarget() && tc.queue.length < 2 && canAfford(me, UNITS.villager.cost) && me.pop < me.popCap) cmd({ type: 'train', buildingId: tc.id, unit: 'villager' });
 
     // --- houses
     const housesBuilding = buildings.filter(b => b.type === 'house' && !b.constructed).length;
@@ -127,8 +219,16 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- buildings & age
     const free = vills.filter(v => v.order.type !== 'build');
+    // A lost Town Center is rebuilt: it trains the villagers and no age-up happens without one.
+    if (!tc && !buildings.some(b => b.type === 'town_center') && vills.length) tryBuild('town_center', vills, home, Math.min(4, vills.length));
     if (vills.length >= 5 && count('barracks') < 1) tryBuild('barracks', free, home);
-    if (vills.length >= 7 && count('storage_pit') < 1 && count('granary') < 1) tryBuild('storage_pit', free, home);
+    if (vills.length >= 7 && count('storage_pit') < 1) tryBuild('storage_pit', free, home);
+    // A Granary by the nearest berries (within 12 tiles of home, else at home, where the Farms go) shortens food trips.
+    // Not before the Bronze age-up is paid for: earlier it slows the climb by a minute or more.
+    if (((me.ageUp && ageIndex(me.age) >= 1) || ageIndex(me.age) >= 2) && count('granary') < 1 && roundId !== 'wonder') {
+      const berry = game.knownResources(pid).filter(r => r.type === 'berry' && r.amount > 0 && dist(r, home) <= 12).sort((a, b) => dist(a, home) - dist(b, home))[0];
+      tryBuild('granary', free, berry || home);
+    }
     const dm = roundId === 'deathmatch'; // rich start: mass production buildings instead of a slow economy
     if (dm && vills.length >= 5) {
       if (count('barracks') < 4) tryBuild('barracks', free, home);
@@ -147,11 +247,16 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (ageIndex(me.age) >= 1) {
       if (count('archery_range') < 1) tryBuild('archery_range', free, home);
       if (count('stable') < 1) tryBuild('stable', free, home);
+      // The Market (Woodworking, Gold Mining) waits until the Bronze age-up is paid for, so it never slows that age-up.
+      if (count('market') < 1 && (me.ageUp || ageIndex(me.age) >= 2)) tryBuild('market', free, home);
     }
     if (ageIndex(me.age) >= 2 && count('government_center') < 1 && roundId !== 'wonder') tryBuild('government_center', free, home);
     // Towers near the Town Center (tryBuild refuses before the Tool Age). count() includes foundations, so a lost tower is
     // rebuilt and a slow one is not doubled. After the age-up and the era's buildings above, and never out of the next age-up.
     if (tc && count('tower') < D.towers && leavesAgeUp(BUILDINGS.tower.cost)) tryBuild('tower', free, home);
+    if (tc) wallTowers(tc, free);
+    finishFoundations(buildings, vills);
+    if (!bot.saving) repairDamaged(done, vills, enemies);
 
     // --- research upgrades (economy first, then military; canPay respects wonder reservation)
     if (!bot.saving) for (const b of done) {
@@ -175,12 +280,13 @@ export function createBot(game, pid, difficulty = 'medium') {
     // --- idle villagers -> resources
     const idle = vills.filter(v => v.order.type === 'idle');
     if (idle.length) assign(idle, vills, tc, home, done);
-    // ageFirst: a resource piling up while the next age-up waits on another -> every 10 s move one of its gatherers to the
-    // shortfall (gold first), keeping a fifth of the villagers on wood. A pile is 400 over what the age-up takes of it.
+    // A resource piling up while the next age-up waits on another -> every 10 s move one of its gatherers to the shortfall
+    // (gold first, then food, stone, wood), keeping a fifth of the villagers on wood. A pile is 400 over what the age-up
+    // takes of it. Without this a bot sits on thousands of food in the late eras while the gold for the age-up never comes.
     const nextAge = AGES[ageIndex(me.age) + 1], ageCost = nextAge && !me.ageUp ? AGE_COST[nextAge].cost : null;
-    if (D.ageFirst && roundId !== 'deathmatch' && ageCost && game.time - (bot.shiftedAt ?? -Infinity) >= 200) {
-      const short = ['gold', 'food'].find(k => me.res[k] < ageCost[k]), on = k => vills.filter(v => v.order.type === 'gather' && v.order.kind === k);
-      const from = short && ['wood', 'food', 'stone'].find(k => k !== short && me.res[k] - (ageCost[k] || 0) > 400 && on(k).length > (k === 'wood' ? vills.length * 0.2 : 0));
+    if (ageCost && game.time - (bot.shiftedAt ?? -Infinity) >= 200) {
+      const short = ['gold', 'food', 'stone', 'wood'].find(k => me.res[k] < ageCost[k]), on = k => vills.filter(v => v.order.type === 'gather' && v.order.kind === k);
+      const from = short && ['food', 'wood', 'stone', 'gold'].find(k => k !== short && me.res[k] - (ageCost[k] || 0) > 400 && on(k).length > (k === 'wood' ? vills.length * 0.2 : 0));
       if (from) { bot.shiftedAt = game.time; assign([on(from)[0]], vills, tc, home, done, short); }
     }
 
@@ -189,10 +295,15 @@ export function createBot(game, pid, difficulty = 'medium') {
     const armyCount = army.length + done.reduce((n, b) => n + b.queue.filter(q => UNITS[q.unit].cls !== 'civ').length, 0);
     const enemyClass = dominantEnemyClass(enemies); // counter-pick against what we can see
     if (!bot.saving && armyCount < armyCap && (vills.length >= D.villagers * 0.6 || roundId === 'deathmatch' || roundId === 'wonder')) {
-      for (const b of done) {
-        const trains = BUILDINGS[b.type].trains || []; if (b.type === 'town_center' || b.queue.length >= (roundId === 'deathmatch' ? 4 : 2)) continue;
-        const u = bestUnit(trains, enemyClass); if (!u || !canPay(UNITS[u].cost) || me.pop >= me.popCap) continue;
+      // Buildings whose pick ranks higher go first, so the best siege takes the two siege places (a Castle's Trebuchet before
+      // a Government Center's Catapult) and the best unit gets the resources when they run short.
+      const pref = PREF[enemyClass] || PREF.default;
+      const picks = done.filter(b => b.type !== 'town_center' && b.queue.length < (roundId === 'deathmatch' ? 4 : 2))
+        .map(b => ({ b, u: bestUnit(BUILDINGS[b.type].trains || [], enemyClass) })).filter(p => p.u).sort((a, c) => pref.indexOf(a.u) - pref.indexOf(c.u));
+      for (const { b, u } of picks) {
+        if (!canPay(UNITS[u].cost) || me.pop >= me.popCap) continue;
         if (D.ageFirst && armyCount >= armyCap / 2 && !leavesAgeUp(UNITS[u].cost)) continue;
+        if (u === 'scout' && army.filter(a => a.type === 'scout').length + done.reduce((n, x) => n + x.queue.filter(q => q.unit === 'scout').length, 0) >= 2) continue; // a pair is plenty
         if (UNITS[u].cls === 'siege' && army.filter(a => a.cls === 'siege').length + done.reduce((n, x) => n + x.queue.filter(q => UNITS[q.unit].cls === 'siege').length, 0) >= 2) continue;
         cmd({ type: 'train', buildingId: b.id, unit: u });
       }
@@ -211,12 +322,12 @@ export function createBot(game, pid, difficulty = 'medium') {
   // vs archers -> tanky melee / pierce-armoured closers; vs cavalry -> spearman (bonus) first;
   // vs infantry -> pierce archers (infantry has no pierce armour); vs siege -> fast closers.
   const PREF = {
-    default: ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'swordsman', 'hoplite', 'catapult', 'drone', 'crossbowman', 'horse_archer', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
-    archer:  ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'drone', 'crossbowman', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
-    cav:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'axeman', 'clubman', 'slinger'],
-    inf:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
-    siege:   ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'horse_archer', 'drone', 'crossbowman', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
-    armor:   ['railgun', 'mech', 'field_artillery', 'tank', 'armored_train', 'cannon', 'trebuchet', 'machine_gunner', 'rifleman', 'knight', 'musketeer', 'catapult', 'drone', 'crossbowman', 'swordsman', 'hoplite', 'horse_archer', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    default: ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'swordsman', 'hoplite', 'catapult', 'drone', 'crossbowman', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    archer:  ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'drone', 'crossbowman', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
+    cav:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'axeman', 'scout', 'clubman', 'slinger'],
+    inf:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'scout', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
+    siege:   ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'horse_archer', 'scout', 'drone', 'crossbowman', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    armor:   ['railgun', 'mech', 'field_artillery', 'tank', 'armored_train', 'cannon', 'trebuchet', 'machine_gunner', 'rifleman', 'knight', 'musketeer', 'catapult', 'drone', 'crossbowman', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
   };
   function dominantEnemyClass(enemies) {
     const n = {};
