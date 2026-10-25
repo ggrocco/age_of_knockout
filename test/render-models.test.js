@@ -80,7 +80,7 @@ test('resources and relics have finite geometry and independent animations', () 
 });
 
 test('era units get their own models, not catapult or horse fallbacks', () => {
-  const kinds = { tank: 'tank', trebuchet: 'treb', cannon: 'gun', field_artillery: 'gun', knight: 'horse', catapult: 'cat' };
+  const kinds = { tank: 'tank', armored_train: 'tank', trebuchet: 'treb', cannon: 'gun', field_artillery: 'gun', knight: 'horse', catapult: 'cat' };
   for (const [type, kind] of Object.entries(kinds)) assert.equal(buildModel({ ...UNITS[type], kind: 'unit', type, owner: 0, id: 1 }).anim.type, kind, type);
 });
 test('a fast-firing unit still alternates its attack pose', () => {
@@ -153,7 +153,7 @@ test('a unit in its own era looks as it always did', () => {
   for (const type of Object.keys(UNITS)) assert.equal(unitColors(buildModel(unitOf(type), UNITS[type].age)), unitColors(buildModel(unitOf(type))), type);
 });
 test('fighters from earlier eras re-skin in every later era', () => {
-  for (const type of ['clubman', 'slinger', 'bowman', 'spearman', 'hoplite', 'swordsman', 'scout', 'horse_archer', 'knight', 'crossbowman', 'musketeer', 'catapult', 'trebuchet', 'cannon']) {
+  for (const type of ['clubman', 'slinger', 'bowman', 'spearman', 'hoplite', 'swordsman', 'scout', 'horse_archer', 'knight', 'crossbowman', 'musketeer', 'catapult', 'trebuchet', 'cannon', 'armored_train']) {
     // The Catapult stays a stone-thrower through the Medieval Age; it becomes a mortar from the Age of Sail.
     const chain = AGES.filter(a => ageIndex(a) >= ageIndex(UNITS[type].age) && !(type === 'catapult' && a === 'medieval'));
     for (let i = 1; i < chain.length; i++) assert.ok(unitColors(buildModel(unitOf(type), chain[i])) !== unitColors(buildModel(unitOf(type), chain[i - 1])), `${type} ${chain[i]}`);

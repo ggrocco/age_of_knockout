@@ -116,6 +116,28 @@ export function mortar(team, era) {
   return { base: b.geometry(), barrel: barrel.geometry(), at: [0, y + 0.36, 0.05] };
 }
 
+// Armored Train (Industrial): a riveted locomotive on bogies, boiler and smokestack in front, a casemate with firing slits
+// behind and a twin machine-gun cupola on top (hull, turret; the turret's pivot sits at z 0 so the recoil can move it).
+// Modern repaints it olive drab with a slab-sided diesel nose; the AI Future one is a chrome maglev on hover pads.
+export function armoredTrain(team, era) {
+  const t = TEAM[team], hover = era === 'future', steam = !hover && era !== 'modern', hull = new B(), turret = new B();
+  const plate = hover ? CHROME : steam ? 0x4a4f55 : OLIVE, dark = hover ? DARK : steam ? 0x2a2d30 : OLIVE_D, trim = hover ? NEON : steam ? C.bronze : GUNMETAL;
+  const y = hover ? 0.2 : 0.26;
+  if (hover) pads(hull, [-0.22, 0.22], [-0.5, 0.5], 0.2);
+  else {
+    hull.box(0.5, 0.08, 1.7, dark, 0, 0.18, 0).box(0.46, 0.1, 0.06, trim, 0, 0.08, 0.86, -0.5);
+    for (const x of [-0.27, 0.27]) for (const z of [-0.62, -0.36, 0.36, 0.62]) hull.add(unit.cyl, POLY, x, 0.13, z, 0.13, 0.06, 0.13, 0, 0, Math.PI / 2).add(unit.cyl, trim, x * 1.12, 0.13, z, 0.04, 0.02, 0.04, 0, 0, Math.PI / 2);
+  }
+  if (steam) hull.add(unit.cyl, plate, 0, y + 0.2, 0.5, 0.2, 0.7, 0.2, Math.PI / 2, 0, 0).add(unit.cyl, trim, 0, y + 0.2, 0.86, 0.17, 0.03, 0.17, Math.PI / 2, 0, 0)
+    .cyl(0.06, 0.24, dark, 0, y + 0.36, 0.7).cyl(0.085, 0.05, dark, 0, y + 0.58, 0.7).sph(0.045, C.gold, 0, y + 0.42, 0.86);
+  else hull.box(0.56, 0.3, 0.62, plate, 0, y, 0.46).box(0.56, 0.06, 0.26, dark, 0, y + 0.24, 0.8, -0.5).box(0.4, 0.04, 0.03, trim, 0, y + 0.14, 0.78);
+  hull.box(0.62, 0.44, 1.0, plate, 0, y, -0.35).box(0.64, 0.07, 1.02, t, 0, y + 0.3, -0.35).box(0.64, 0.03, 1.02, dark, 0, y + 0.42, -0.35).box(0.66, 0.025, 1.04, trim, 0, y + 0.38, -0.35);
+  for (const z of [-0.7, -0.35, 0]) hull.box(0.66, 0.04, 0.12, dark, 0, y + 0.18, z);
+  turret.cyl(0.17, 0.16, plate, 0, 0, -0.35).cyl(0.18, 0.03, dark, 0, 0.16, -0.35).box(0.1, 0.03, 0.1, t, 0, 0.19, -0.42);
+  for (const x of [-0.05, 0.05]) turret.add(unit.cyl, dark, x, 0.08, -0.07, 0.025, 0.36, 0.025, Math.PI / 2, 0, 0).add(unit.cyl, trim, x, 0.08, 0.12, 0.03, 0.03, 0.03, Math.PI / 2, 0, 0);
+  return { hull: hull.geometry(), turret: turret.geometry(), at: [0, y + 0.44, 0] };
+}
+
 // Trebuchet from the Age of Sail on: a rocket battery. Sail and Industrial fire Congreve rockets from a two-wheeled
 // trough; Modern is a launcher box of tubes on a four-wheeled carriage, the AI Future one a hover sled.
 export function rockets(team, era) {

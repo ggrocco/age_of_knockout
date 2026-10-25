@@ -10,7 +10,7 @@ export const BUILDINGS = {
   // Invented. Only on ore ground: what it yields (gatherType) and how much is left (amount) come from the patch under it (sim/ore.js).
   mine:              { name: 'Mine', hp: 150, cost: c(0, 100, 0, 50), size: 2, buildTime: 30, age: 'tool', sight: 3, extra: true, ore: true },
   barracks:          { name: 'Barracks', hp: 350, cost: c(0, 125), size: 3, buildTime: 30, age: 'stone', trains: ['clubman', 'slinger', 'axeman', 'spearman', 'hoplite', 'swordsman', 'musketeer', 'rifleman', 'machine_gunner', 'mech'], sight: 4 },
-  archery_range:     { name: 'Archery Range', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', trains: ['bowman', 'crossbowman', 'drone'], sight: 4 },
+  archery_range:     { name: 'Archery Range', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', trains: ['bowman', 'crossbowman'], sight: 4 },
   stable:            { name: 'Stable', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', trains: ['scout', 'horse_archer', 'knight'], sight: 4 },
   market:            { name: 'Market', hp: 350, cost: c(0, 150), size: 3, buildTime: 40, age: 'tool', sight: 4 },
   government_center: { name: 'Government Center', hp: 500, cost: c(0, 175, 0, 100), size: 3, buildTime: 60, age: 'bronze', trains: ['catapult', 'railgun'], drops: ['food', 'wood', 'gold', 'stone'], sight: 5 },
@@ -24,9 +24,9 @@ export const BUILDINGS = {
   arsenal:           { name: 'Arsenal', hp: 600, cost: c(0, 200, 50, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
   trading_company:   { name: 'Trading Company', hp: 500, cost: c(0, 250, 100), size: 3, buildTime: 55, age: 'sail', sight: 4 },
   factory:           { name: 'Factory', hp: 700, cost: c(0, 250, 150, 50), size: 3, buildTime: 60, age: 'industrial', trains: ['field_artillery', 'tank'], sight: 5 },
-  railway_station:   { name: 'Railway Station', hp: 700, cost: c(0, 250, 100, 100), size: 3, buildTime: 60, age: 'industrial', sight: 5 },
+  railway_station:   { name: 'Railway Station', hp: 700, cost: c(0, 250, 100, 100), size: 3, buildTime: 60, age: 'industrial', trains: ['armored_train'], sight: 5 },
   power_plant:       { name: 'Power Plant', hp: 800, cost: c(0, 200, 150, 150), size: 3, buildTime: 60, age: 'modern', sight: 4 },
-  airfield:          { name: 'Airfield', hp: 800, cost: c(0, 250, 200, 100), size: 3, buildTime: 65, age: 'modern', sight: 8 },
+  airfield:          { name: 'Airfield', hp: 800, cost: c(0, 250, 200, 100), size: 3, buildTime: 65, age: 'modern', trains: ['drone'], sight: 8 },
   // Defences (invented). `hp` here is the Tool-era value; addBuilding takes the real HP and the tower's attack from the owner's era (defences.js).
   tower:             { name: 'Tower', hp: TOWER.tool.hp, cost: c(0, 40, 0, 120), size: 2, buildTime: 40, age: 'tool', sight: 10, extra: true, defence: 'tower' },
   wall:              { name: 'Wall', hp: WALL_HP.tool, cost: c(0, 0, 0, 5), size: 1, buildTime: 6, age: 'tool', sight: 2, extra: true, defence: 'wall', marmor: 4, parmor: 10 },

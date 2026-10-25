@@ -22,7 +22,7 @@ test('every unit, building and the age button has its own svg icon', () => {
     assert.match(s, /^<svg[^>]*viewBox="0 0 24 24"/, id); assert.ok(s.endsWith('</svg>'), id);
   }
 });
-const ERA_IDS = ['knight', 'crossbowman', 'trebuchet', 'musketeer', 'cannon', 'rifleman', 'field_artillery', 'machine_gunner', 'tank', 'castle', 'factory'];
+const ERA_IDS = ['knight', 'crossbowman', 'trebuchet', 'musketeer', 'cannon', 'rifleman', 'field_artillery', 'machine_gunner', 'tank', 'armored_train', 'castle', 'factory'];
 test('era units and buildings have their own icon and description', () => {
   for (const id of ERA_IDS) { assert.match(ICONS[id] || '', /^<svg[^>]*viewBox="0 0 24 24"/, id); assert.ok(DESC[id] && DESC[id].length >= 20 && DESC[id].length <= 200, id); }
   assert.equal(new Set(ERA_IDS.map(id => ICONS[id])).size, ERA_IDS.length, 'each glyph is its own');

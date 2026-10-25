@@ -122,7 +122,7 @@ function eraBot(age, buildings, ticks = 9000, pin = true, { res = 9000, each = (
 }
 test('bot trains every new era unit at its building', () => {
   const table = [['medieval', ['stable', 'archery_range', 'castle'], ['knight', 'crossbowman', 'trebuchet']], ['sail', ['barracks', 'castle'], ['musketeer', 'cannon']],
-    ['industrial', ['barracks', 'factory'], ['rifleman', 'field_artillery']], ['modern', ['barracks', 'factory'], ['machine_gunner', 'tank']]];
+    ['industrial', ['barracks', 'factory', 'railway_station'], ['rifleman', 'field_artillery', 'armored_train']], ['modern', ['barracks', 'factory'], ['machine_gunner', 'tank']]];
   for (const [age, buildings, want] of table) {
     const { b, types } = eraBot(age, buildings);
     for (const u of want) assert.ok(types.has(u), `${age}: trained ${u} (saw ${[...types].join(',')})`);

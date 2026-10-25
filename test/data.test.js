@@ -34,7 +34,7 @@ test('ageTitle is the sentence form of an era', () => {
   assert.equal(ageLabel('sail'), 'Age of Sail');
 });
 test('future units: class, age and training building', () => {
-  const want = { drone: ['archer', 'archery_range'], mech: ['inf', 'barracks'], railgun: ['siege', 'government_center'] };
+  const want = { drone: ['archer', 'airfield'], mech: ['inf', 'barracks'], railgun: ['siege', 'government_center'] };
   for (const [id, [cls, bld]] of Object.entries(want)) {
     assert.equal(UNITS[id].age, 'future', id); assert.equal(UNITS[id].cls, cls, id);
     assert.ok(BUILDINGS[bld].trains.includes(id), `${bld} trains ${id}`);
@@ -44,7 +44,8 @@ test('future units: class, age and training building', () => {
 test('era units: era, class and training building', () => {
   const want = { knight: ['medieval', 'cav', 'stable'], crossbowman: ['medieval', 'archer', 'archery_range'], trebuchet: ['medieval', 'siege', 'castle'],
     musketeer: ['sail', 'archer', 'barracks'], cannon: ['sail', 'siege', 'castle'], rifleman: ['industrial', 'archer', 'barracks'],
-    field_artillery: ['industrial', 'siege', 'factory'], machine_gunner: ['modern', 'archer', 'barracks'], tank: ['modern', 'armor', 'factory'] };
+    field_artillery: ['industrial', 'siege', 'factory'], machine_gunner: ['modern', 'archer', 'barracks'], tank: ['modern', 'armor', 'factory'],
+    armored_train: ['industrial', 'armor', 'railway_station'] };
   for (const [id, [age, cls, bld]] of Object.entries(want)) { assert.equal(UNITS[id].age, age, id); assert.equal(UNITS[id].cls, cls, id); assert.ok(BUILDINGS[bld].trains.includes(id), `${bld} trains ${id}`); }
   assert.equal(BUILDINGS.castle.age, 'medieval'); assert.equal(BUILDINGS.factory.age, 'industrial');
   for (const [id, u] of Object.entries(UNITS)) if (u.cls === 'siege' && id !== 'railgun') assert.ok(u.range < UNITS.railgun.range, id);

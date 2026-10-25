@@ -318,16 +318,16 @@ export function createBot(game, pid, difficulty = 'medium') {
     'iron_weapons', 'ballistics', 'hide_armor', 'scale_barding', 'phalanx_drill', 'torsion_engines', 'steel_weapons', 'plate_armor', 'paper_cartridges',
     'bayonets', 'railways', 'rifled_barrels', 'composite_armor', 'air_support', 'nanoweave_plating'];
   // Counter-pick preference lists (openage damage.md classes). Same units, reordered; the era units sit right after the
-  // AI Future ones (newest first at each building), and armor (Tanks) is answered with siege and Tanks:
+  // AI Future ones (newest first at each building), and armor (Tanks, Armored Trains) is answered with siege and Tanks:
   // vs archers -> tanky melee / pierce-armoured closers; vs cavalry -> spearman (bonus) first;
   // vs infantry -> pierce archers (infantry has no pierce armour); vs siege -> fast closers.
   const PREF = {
-    default: ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'swordsman', 'hoplite', 'catapult', 'drone', 'crossbowman', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
-    archer:  ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'drone', 'crossbowman', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
-    cav:     ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'axeman', 'scout', 'clubman', 'slinger'],
-    inf:     ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'scout', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
-    siege:   ['mech', 'railgun', 'tank', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'horse_archer', 'scout', 'drone', 'crossbowman', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
-    armor:   ['railgun', 'mech', 'field_artillery', 'tank', 'cannon', 'trebuchet', 'machine_gunner', 'rifleman', 'knight', 'musketeer', 'catapult', 'drone', 'crossbowman', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    default: ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'swordsman', 'hoplite', 'catapult', 'drone', 'crossbowman', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    archer:  ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'drone', 'crossbowman', 'axeman', 'spearman', 'clubman', 'bowman', 'slinger'],
+    cav:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'spearman', 'swordsman', 'hoplite', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'axeman', 'scout', 'clubman', 'slinger'],
+    inf:     ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'drone', 'crossbowman', 'bowman', 'horse_archer', 'scout', 'slinger', 'hoplite', 'swordsman', 'axeman', 'spearman', 'clubman'],
+    siege:   ['mech', 'railgun', 'tank', 'armored_train', 'machine_gunner', 'field_artillery', 'rifleman', 'cannon', 'musketeer', 'knight', 'trebuchet', 'catapult', 'horse_archer', 'scout', 'drone', 'crossbowman', 'hoplite', 'swordsman', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
+    armor:   ['railgun', 'mech', 'field_artillery', 'tank', 'armored_train', 'cannon', 'trebuchet', 'machine_gunner', 'rifleman', 'knight', 'musketeer', 'catapult', 'drone', 'crossbowman', 'swordsman', 'hoplite', 'horse_archer', 'scout', 'axeman', 'bowman', 'spearman', 'clubman', 'slinger'],
   };
   function dominantEnemyClass(enemies) {
     const n = {};
