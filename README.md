@@ -44,7 +44,9 @@ quickly replace lost villagers.
 Before each round the bracket shows the rules, the time limit and your opponent. **Back to menu** returns to the
 main menu before round 1; from round 2 on the button reads **Leave tournament** and asks to confirm, since leaving
 loses your progress. The other matches in each round are
-played out by bots in a background Worker so the progress screen stays responsive.
+played out by bots in a background Worker so the progress screen stays responsive. If the Worker cannot run or is
+stopped (a phone may suspend it), the remaining matches are played on the page instead, with the same results; if the
+round still cannot be finished, **Try again** replays it without losing your result.
 
 | Round | Game type | Goal |
 | --- | --- | --- |
