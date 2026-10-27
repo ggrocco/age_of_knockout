@@ -147,10 +147,13 @@ async function afterMatch(won) {
   show(`<div class="card"><h2>${won ? 'Round won' : 'Round lost'}</h2><p>Simulating the rest of the bracket&hellip;</p><div class="prog"><i id="pbar"></i></div><p id="ptxt"></p></div>`);
   const simulator = createAsyncSimulator();
   try {
-    await t.resolveAsync(won, { simulate: simulator.simulate, onProgress: (d, n) => { document.getElementById('pbar').style.width = (d / n * 100) + '%'; document.getElementById('ptxt').textContent = `${d} / ${n} matches`; } });
-  } catch {
-    show('<div class="card"><h2>Unable to finish the bracket</h2><p>Please start a new tournament.</p><button class="btn" id="recover">Back to menu</button></div>');
-    document.getElementById('recover').onclick = menu; return;
+    await t.resolveAsync(won, { simulate: simulator.simulate, onProgress: (d, n) => { const bar = document.getElementById('pbar'), txt = document.getElementById('ptxt'); if (bar) bar.style.width = (d / n * 100) + '%'; if (txt) txt.textContent = `${d} / ${n} matches`; } });
+  } catch (error) {
+    // The bracket is untouched until every match has a result, so the same round can be simulated again.
+    console.error('Bracket simulation failed', error);
+    show('<div class="card"><h2>Unable to finish the bracket</h2><p>The other matches of this round could not be simulated. Your result is kept.</p><button class="btn" id="retry">Try again</button><button class="btn" id="recover">Back to menu</button></div>');
+    document.getElementById('retry').onclick = () => afterMatch(won);
+    document.getElementById('recover').onclick = () => { app.tournament = null; menu(); }; return;
   } finally { simulator.dispose(); }
   if (!t.over) return bracketScreen();
   const champ = !!t.champion;

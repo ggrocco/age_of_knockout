@@ -18,21 +18,28 @@ export function createTournament(seed = 1, level = 'normal', { noTimeLimit = fal
   const ramp = LEVELS[level] || LEVELS.normal;
   const rng = makeRng(seed);
   const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : ['easy', 'medium', 'hard'][rng.int(3)] }));
+  let resolving = false;
   const t = {
     seed, level, timeLimit, noTimeLimit: timeLimit === 0, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
     get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },
-    // Supports either a synchronous headless runner or an asynchronous Worker runner.
+    // Supports either a synchronous headless runner or an asynchronous Worker runner. Nothing changes until every
+    // match has an outcome, so after a failure the same round can simply be resolved again.
     async resolveAsync(humanWon, { onProgress, simulate = simulateMatch } = {}) {
+      if (resolving) throw new Error('round is already being resolved');
       if (!humanWon) return this.resolve(false);
-      const ri = this.roundIndex, round = ROUNDS[ri], cache = new Map(), total = (this.alive.length - 2) / 2; let done = 0;
-      for (let i = 2; i < this.alive.length; i += 2) {
-        await new Promise(r => setTimeout(r, 0));
-        const s = this.seed * 1000 + ri * 50 + i; cache.set(s, await simulate(round.id, s, [this.alive[i].difficulty, this.alive[i + 1].difficulty]));
-        onProgress?.(++done, total);
-      }
-      return this.resolve(humanWon, (id, s) => cache.get(s));
+      if (this.over) throw new Error('tournament is over');
+      resolving = true;
+      try {
+        const ri = this.roundIndex, round = ROUNDS[ri], cache = new Map(), total = (this.alive.length - 2) / 2; let done = 0;
+        for (let i = 2; i < this.alive.length; i += 2) {
+          await new Promise(r => setTimeout(r, 0));
+          const s = this.seed * 1000 + ri * 50 + i; cache.set(s, await simulate(round.id, s, [this.alive[i].difficulty, this.alive[i + 1].difficulty]));
+          try { onProgress?.(++done, total); } catch { /* a progress display must not lose the round */ }
+        }
+        return this.resolve(humanWon, (id, s) => cache.get(s));
+      } finally { resolving = false; }
     },
     // Record the outcome of the human's match, simulate every other match of the round, advance.
     resolve(humanWon, simulate = simulateMatch) {
@@ -44,6 +51,7 @@ export function createTournament(seed = 1, level = 'normal', { noTimeLimit = fal
       for (let i = 2; i < this.alive.length; i += 2) {
         const a = this.alive[i], b = this.alive[i + 1];
         const m = simulate(round.id, seed * 1000 + ri * 50 + i, [a.difficulty, b.difficulty]);
+        if (!m) throw new Error(`no result for ${a.name} vs ${b.name} in ${round.id}`); // checked before anything changes
         const w = m.winner === 1 ? b : a; next.push(w); results.push({ a: a.name, b: b.name, winner: w.name, reason: m.reason });
       }
       this.history.push({ round: round.id, results });
