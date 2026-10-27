@@ -182,6 +182,18 @@ models. Under each era it lists what the building trains by then and any upgrade
 era, with what the upgrade does. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
 reads `src/data`, so new eras and buildings appear on reload.
 
+## Age Ladder
+
+![ages.html: the Stone to Medieval Ages with the buildings and units each one brings](docs/screenshots/age-ladder.jpg)
+
+[Open the Age Ladder](https://ggrocco.github.io/age_of_knockout/ages.html) (or `http://localhost:8000/ages.html`) to see
+every Age side by side: the buildings and units it brings, rendered with the game's own models; which buildings you
+need to leave it and what advancing costs; its upgrades; and what grows by itself on arrival (population limit, Farms,
+Towers, Walls). Tap a building, unit or upgrade to trace everything its building trains and researches across the Ages.
+Below the map, a chart prices each age-up (research plus the cheapest gate buildings) and a list shows where the
+ladder trips players, checked against the data on every load. Like the buildings page, it reads `src/data`, so changes
+show up on reload.
+
 ## How it's built
 
 ```mermaid
@@ -280,7 +292,7 @@ For a custom deadline, use `?round=1&timeLimit=60` for a one-hour quick match or
 docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PORT=9000 to change)
 ```
 
-The image is static files only (`index.html`, `buildings.html`, `styles.css`, `favicon.svg`, `src/`, the two
+The image is static files only (`index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/`, the two
 three.js folders the import map uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .`
 builds the same image.
 
