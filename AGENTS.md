@@ -42,6 +42,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused/results, immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
+| `ages.html?team=1` | Age Ladder page, red team models |
 
 `window.__app` exposes the live app; `window.__app.match.game` is the running sim.
 
@@ -99,19 +100,25 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and
   buildings appear on reload with no page edits.
+- `src/ladder`: the `ages.html` Age Ladder page (published at https://ggrocco.github.io/age_of_knockout/ages.html): per
+  Age, the buildings and units it brings (rendered through `src/gallery/stage.js`, the render stage it shares with
+  `buildings.html`), the gate buildings and cost to advance, upgrades, what grows on arrival, the price of each age-up and
+  the evolution problems the data shows. `model.js` is DOM-free and tested (`test/ladder.test.js`); each finding is a
+  check on the data, so it drops off the page once fixed.
 - `src/data`: unit/building/age/tech/defence tables. Unit combat and cost stats are checked against openage's AoE1
   manual data; buildings, Slinger, Spearman, age-up costs, techs, towers/walls and all AI Future content are
   **unverified or invented approximations**. `src/data/README.md` records every deviation from AoE1.
 
-Tests cover the sim, rounds, bot, bracket, data tables, render-model geometry, gallery rows and pure input helpers
+Tests cover the sim, rounds, bot, bracket, data tables, render-model geometry, gallery rows, the Age Ladder model and pure input helpers
 headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and visual quality have no automated tests.
 
 ## When you change X, also update Y
 
 - New or changed URL param, control, or game rule the player sees: `README.md` and the table above.
-- Import map or static assets in `index.html` / `buildings.html`: the `Dockerfile` `COPY` lines, the smoke-test
+- Import map or static assets in `index.html` / `buildings.html` / `ages.html`, or a new page: the `Dockerfile` `COPY` lines, the smoke-test
   paths in `Jenkinsfile` and the "Assemble site" step in `.github/workflows/pages.yml`.
-- Any building, building stat, upgrade (tech), trained unit, era or building look: the `buildings.html` design page.
+- Any building, building stat, upgrade (tech), trained unit, era or building look: the `buildings.html` design page,
+  and the `ages.html` Age Ladder for anything about Ages (unlocks, gates, age-up costs, what grows on arrival).
   It reads the data tables, so new rows and cells appear on their own, but a new kind of fact (as "Trains" and
   "New upgrade" once were) has to be added to `src/gallery/rows.js` and `src/gallery/main.js`. Always open the page in
   the browser and check the change shows there, even when no gallery file changed.
@@ -145,7 +152,7 @@ Shortcuts:
 
 ## Deployment
 
-`Dockerfile` copies only `index.html`, `buildings.html`, `styles.css`, `favicon.svg`, `src/` and the two three.js
+`Dockerfile` copies only `index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/` and the two three.js
 folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. Its `test` stage
 (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
 

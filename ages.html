@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#231a11">
+<title>Age Ladder</title>
+<link rel="icon" href="data:,">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<style>
+  /* The design pages' parchment-on-stone look (buildings.html), plus one colour per Age. */
+  :root {
+    --stone:#2a2118; --stone2:#3b2e20; --bronze:#c8a052; --parch:#e8d9b0; --dim:#9c8c6c; --ink:#14100a; --cellbg:#1b150e; --line:#33281b; --new:#4ade80;
+    --food:#d0644b; --wood:#7fae4f; --gold:#e3b33b; --stone-res:#a7a69a; --high:#e0644c; --med:#d99a36; --low:#8fa7ae; --hi:#f4d36b;
+    --e-stone:#8d8474; --e-tool:#a5763f; --e-bronze:#c27a2c; --e-iron:#7d8c96; --e-medieval:#8f68a6; --e-sail:#3a87ad; --e-industrial:#9a6242; --e-modern:#6c8a4a; --e-future:#22bdd1;
+    --mono: ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--ink); color:var(--parch); font-family:Georgia,'Palatino Linotype',serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background:linear-gradient(#3b2e20,#231a11); border-bottom:2px solid var(--bronze); }
+  header h1 { margin:0; font-size:20px; font-weight:normal; color:var(--bronze); letter-spacing:.03em; }
+  header p { margin:0; flex:1 1 260px; font-size:13px; color:var(--dim); }
+  header a, footer a { color:var(--parch); }
+  .seg { display:inline-flex; border:1px solid var(--bronze); border-radius:3px; overflow:hidden; }
+  .seg span { padding:4px 8px; font-size:12px; color:var(--dim); }
+  .seg button { background:#2a1f13; color:var(--parch); border:0; border-left:1px solid #5a4327; padding:4px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:linear-gradient(#7a5a33,#4a3620); }
+  button:focus-visible { outline:2px solid var(--bronze); outline-offset:2px; }
+  main { display:grid; gap:34px; padding:18px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+  h2 { margin:0; font-size:22px; font-weight:normal; color:var(--bronze); letter-spacing:.02em; }
+  section { display:grid; gap:12px; min-width:0; }
+  .head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 16px; }
+  .note { margin:0; font-size:13px; color:var(--dim); max-width:72ch; }
+  .strata { display:flex; height:6px; border-radius:2px; overflow:hidden; }
+  .strata span { flex:1; }
+  #trace { font-size:13px; color:var(--dim); }
+  #trace strong { color:var(--parch); font-weight:normal; }
+  #trace button { margin-left:6px; background:#2a1f13; color:var(--parch); border:1px solid var(--bronze); border-radius:3px; padding:2px 8px; font:inherit; font-size:12px; cursor:pointer; }
+
+  /* the map: Ages as columns, the row labels pinned on the left */
+  .wrap { overflow-x:auto; border:1px solid #4a3a26; border-radius:4px; }
+  #matrix { display:grid; grid-template-columns:150px repeat(var(--cols, 9), 272px); width:max-content; }
+  #matrix > div { padding:10px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--cellbg); min-width:0; }
+  #matrix .rl { position:sticky; left:0; z-index:2; background:var(--stone); color:var(--parch); font-size:14px; display:flex; flex-direction:column; gap:4px; }
+  #matrix .rl small { font-size:12px; color:var(--dim); }
+  #matrix .eh { position:relative; background:var(--stone2); padding-top:14px; }
+  #matrix .eh::before { content:""; position:absolute; inset:0 0 auto; height:5px; background:var(--era); }
+  .eh .n { font:12px var(--mono); color:var(--dim); }
+  .eh .t { display:block; font-size:19px; color:var(--bronze); margin-top:2px; }
+  .eh .then { display:block; font-size:12px; color:var(--dim); }
+  .cell { display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-start; gap:6px; font-size:13px; }
+  .none { color:var(--dim); font-style:italic; }
+  .rule { width:100%; font:12px var(--mono); color:var(--parch); }
+  .sub { font-size:11.5px; color:var(--dim); }
+  .tag { font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.04em; padding:0 5px; border-radius:3px; background:#2c2318; color:var(--dim); }
+  .tag.gate { background:color-mix(in srgb, var(--era) 45%, #000); color:var(--parch); }
+  .tag.old { background:#4a3518; color:#f0cf8a; }
+
+  .objs { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; width:100%; }
+  .obj { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:0 0 6px; border:1px solid #3e301f; border-radius:3px; background:#20271b; color:inherit; font:inherit; text-align:left; cursor:pointer; min-width:0; }
+  .obj canvas { display:block; width:100%; min-width:0; aspect-ratio:240/184; height:auto; border-bottom:1px solid #3e301f; }
+  .obj .name { padding:3px 7px 0; font-size:13px; color:var(--parch); }
+  .obj .sub, .obj .tag { margin:0 7px; }
+  .obj:hover { border-color:var(--bronze); }
+  .chip { display:inline-flex; flex-wrap:wrap; align-items:baseline; gap:2px 6px; max-width:100%; padding:4px 8px; border:1px solid #4a3a26; border-radius:3px; background:#241c13; color:var(--parch); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+  .chip:hover { border-color:var(--bronze); }
+  #matrix .on { background:var(--hi); border-color:var(--hi); color:var(--ink); }
+  #matrix .on .sub, #matrix .on .name { color:var(--ink); }
+  #matrix.tracing [data-b]:not(.on) { opacity:.35; }
+  .cost { display:flex; flex-wrap:wrap; gap:4px 10px; width:100%; font:600 12.5px var(--mono); font-variant-numeric:tabular-nums; }
+  .cost i { display:inline-block; width:8px; height:8px; margin-right:4px; border-radius:2px; }
+  .grow { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; width:100%; margin:0; font-size:12.5px; }
+  .grow dt { color:var(--dim); }
+  .grow dd { margin:0; text-align:right; font:12.5px var(--mono); font-variant-numeric:tabular-nums; }
+  .grow em { font-style:normal; color:var(--new); }
+  .r-food { background:var(--food); fill:var(--food); } .r-wood { background:var(--wood); fill:var(--wood); }
+  .r-gold { background:var(--gold); fill:var(--gold); } .r-stone { background:var(--stone-res); fill:var(--stone-res); }
+
+  /* charts */
+  .two { display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(0, 1fr); gap:24px; align-items:start; }
+  .panel { display:grid; gap:12px; padding:16px; border:1px solid #4a3a26; border-radius:4px; background:var(--stone); min-width:0; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 14px; font:12px var(--mono); color:var(--dim); }
+  .legend i { display:inline-block; width:10px; height:10px; margin-right:5px; border-radius:2px; vertical-align:-1px; }
+  svg text { font:11.5px var(--mono); fill:var(--parch); }
+  svg .axis { fill:var(--dim); font-size:11px; } svg .val { font-weight:600; }
+  svg .grid { stroke:var(--line); stroke-width:1; }
+  svg .area { fill:var(--bronze); opacity:.15; } svg .line { fill:none; stroke:var(--bronze); stroke-width:1.6; } svg .end { fill:none; stroke:var(--parch); stroke-width:1.4; }
+  .sparks { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .spark { display:grid; gap:4px; padding:10px; border-radius:3px; background:var(--cellbg); min-width:0; }
+  .spark .lab { font:11px var(--mono); text-transform:uppercase; letter-spacing:.05em; color:var(--dim); }
+  .spark .val { font-size:20px; color:var(--parch); }
+  .spark small { margin-left:5px; font:12px var(--mono); color:var(--dim); }
+
+  /* problems */
+  .finds { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap:12px; }
+  .find { display:grid; align-content:start; gap:8px; padding:14px; border:1px solid #4a3a26; border-radius:4px; background:var(--stone); }
+  .find header { display:flex; align-items:center; gap:10px; padding:0; background:none; border:0; }
+  .find h3 { margin:0; font-size:16px; font-weight:normal; color:var(--parch); }
+  .find p { margin:0; font-size:14px; line-height:1.45; }
+  .find .fix { padding-top:8px; border-top:1px dashed #4a3a26; font-size:13.5px; color:#d8c9a0; }
+  .find .fix b { margin-right:6px; font:600 11px var(--mono); text-transform:uppercase; letter-spacing:.08em; color:var(--bronze); }
+  .sev { padding:3px 7px; border-radius:3px; font:600 10.5px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--ink); }
+  .sev.high { background:var(--high); } .sev.med { background:var(--med); } .sev.low { background:var(--low); }
+  footer { padding:14px max(16px, env(safe-area-inset-left)); border-top:1px solid var(--line); font-size:13px; color:var(--dim); }
+  @media (max-width:860px) { .two { grid-template-columns:minmax(0, 1fr); } #matrix { grid-template-columns:110px repeat(var(--cols, 9), 236px); } }
+  @media (max-width:420px) { .sparks { grid-template-columns:minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Age Ladder</h1>
+  <p>Every Age: what it brings, what leaving it needs and costs, and what grows on arrival. Built live from <code>src/data</code> and the game's own models. <a href="buildings.html">Buildings by Era</a> · <a href="./">Play the game</a></p>
+  <div class="seg" role="group" aria-label="Team colour"><span>Team</span><button data-team="0">Blue</button><button data-team="1">Red</button></div>
+</header>
+<main>
+  <section>
+    <div class="strata" id="strata" aria-hidden="true"></div>
+    <div class="head"><h2>What each Age brings</h2><span id="trace">Tap a building, unit or upgrade to trace everything its building trains and researches across the Ages.</span></div>
+    <div class="wrap"><div id="matrix"></div></div>
+  </section>
+  <section class="two">
+    <div class="panel">
+      <div class="head"><h2>Price of each jump</h2>
+        <div class="seg" role="group" aria-label="What to count" id="price-mode"><button data-gates="0">Age-up only</button><button data-gates="1">Plus cheapest gates</button></div></div>
+      <div class="legend"><span><i class="r-food"></i>Food</span><span><i class="r-wood"></i>Wood</span><span><i class="r-gold"></i>Gold</span><span><i class="r-stone"></i>Stone</span><span>time = research + gate builds, one villager</span></div>
+      <div id="price"></div>
+    </div>
+    <div class="panel">
+      <h2>Grows by itself on arrival</h2>
+      <p class="note">No research needed: these change for every existing building the moment the Age-up finishes.</p>
+      <div class="sparks" id="sparks"></div>
+    </div>
+  </section>
+  <section>
+    <div class="head"><h2>Where the ladder trips players</h2></div>
+    <p class="note">Checked against the data tables on every load; a problem disappears from this list once the data no longer shows it.</p>
+    <div class="finds" id="findings"></div>
+  </section>
+</main>
+<footer>Advancing out of an Age needs a finished Town Center and 2 different finished buildings of that Age (Farm, Mine, Tower, Wall and Wonder never count). Tower damage per second = attack × 20 ticks ÷ cooldown ticks.</footer>
+<script type="module" src="src/ladder/main.js"></script>
+</body>
+</html>
