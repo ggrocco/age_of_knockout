@@ -9,3 +9,8 @@ for (const r of ROUNDS) test(`bots finish ${r.id} on 3 seeds`, () => {
     assert.ok([0, 1].includes(m.winner)); assert.ok(m.ticks <= m.cap + 50); assert.ok(m.maxRejects <= 20, 'reject spam ' + m.maxRejects);
   }
 });
+// The same on an island map, where every attack and relic run goes by Transport Ship.
+for (const r of ROUNDS) test(`bots finish ${r.id} on an island map`, () => {
+  const m = simulateMatch(r.id, 1, ['medium', 'medium'], { mapType: 'islands' });
+  assert.equal(m.ended, true); assert.deepEqual(m.errors, []); assert.ok([0, 1].includes(m.winner)); assert.ok(m.maxRejects <= 20, 'reject spam ' + m.maxRejects);
+});

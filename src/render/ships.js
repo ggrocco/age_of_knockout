@@ -1,6 +1,7 @@
 // Ships (the Dock's units), bow to +z like every unit, hull resting on the water at y = 0. Each keeps one look in every
 // era (era-units.js unitEra leaves them in their own). Parts that move: the War Galley's two banks of oars, the
-// Frigate's and Destroyer's guns (recoil on a shot); the whole hull bobs and rolls (CPU, or the GPU's bob in a match).
+// Frigate's and Destroyer's guns (recoil on a shot), the Transport Ship's passengers (one figure on deck for each one
+// aboard); the whole hull bobs and rolls (CPU, or the GPU's bob in a match).
 import * as THREE from 'three';
 import { B, C, TEAM, TEAM_DARK, cached, mesh, pivot, unit } from './builder.js';
 
@@ -24,6 +25,15 @@ const parts = {
     b.add(unit.cyl, C.woodD, 0, 0.42, -0.5, 0.015, 0.6, 0.015, 1.1, 0, 0).box(0.2, 0.2, 0.02, C.hay, 0, 0.12, -0.78);
     b.box(0.16, 0.08, 0.14, C.woodD, 0.08, 0.19, 0.12).sph(0.035, 0xb8c4cc, 0.08, 0.3, 0.12, 1.4, 0.5, 0.6);
     return { body: b.geometry() };
+  },
+  transport_ship(team) { // a broad, deep-bellied cargo cog: a hold amidships, a square team sail, a ramp at the bow
+    const t = TEAM[team], b = hull(new B(), 0.66, 1.6, 0.3, C.wood, t), person = new B();
+    b.box(0.58, 0.02, 1.1, DECK, 0, 0.28, -0.12).box(0.62, 0.22, 0.3, C.woodD, 0, 0.28, -0.62).box(0.64, 0.03, 0.32, t, 0, 0.5, -0.62);
+    for (const k of [-1, 1]) b.box(0.03, 0.1, 1.1, C.woodD, k * 0.31, 0.3, -0.12);
+    b.box(0.4, 0.03, 0.26, C.woodD, 0, 0.32, 0.62, -0.5).cyl(0.03, 1.1, C.woodD, 0, 0.28, -0.25).box(0.7, 0.03, 0.03, C.woodD, 0, 1.3, -0.24)
+      .box(0.66, 0.5, 0.02, t, 0, 0.78, -0.22).box(0.66, 0.06, 0.025, SAIL, 0, 1.18, -0.22);
+    person.cylT(0.045, 0.06, 0.16, t, 0, 0, 0, 8).sph(0.045, C.skin, 0, 0.21, 0);
+    return { body: b.geometry(), person: person.geometry() };
   },
   war_galley(team) { // a Bronze Age bireme: long low hull, a bronze ram, a painted eye, a square team sail and the stern curl
     const t = TEAM[team], td = TEAM_DARK[team], b = hull(new B(), 0.5, 1.7, 0.22, HULL, OCHRE), oar = new B();
@@ -64,6 +74,7 @@ export function shipModel(e) {
   const root = new THREE.Group(), p = cached(`ship:${e.type}:${e.owner}`, () => parts[e.type](e.owner)), body = new THREE.Group();
   body.add(mesh(p.body)); root.add(body);
   const anim = { type: 'ship', body };
+  if (p.person) anim.crew = [-0.15, 0.15].flatMap(x => [0.32, 0.12, -0.08, -0.28].map(z => { const m = pivot(x, 0.3, z, p.person); m.visible = false; body.add(m); return m; }));
   if (p.oar) anim.oars = [-1, 1].flatMap(k => [-0.45, -0.15, 0.15].map(z => { const o = pivot(k * 0.25, 0.22, z, p.oar); o.scale.x = k; body.add(o); return o; }));
   if (p.guns) { anim.gun = pivot(...p.gunsAt, p.guns); body.add(anim.gun); }
   if (p.turret) { anim.gun = pivot(...p.turretAt, p.turret); anim.aft = pivot(...p.aftAt, p.aft); anim.aft.rotation.y = Math.PI; body.add(anim.gun, anim.aft); }
@@ -77,6 +88,7 @@ export function animateShip(g, a, e, t, moving) {
   if (!g.userData.gpuCosmetics) a.body.position.y = Math.sin(t * 3 + e.id) * 0.025; // the GPU's bob: sin(time * 3 + phase)
   a.body.rotation.z = Math.sin(t * 1.3 + e.id * 0.7) * 0.035;
   if (a.oars) for (const o of a.oars) o.rotation.y = moving ? Math.sin(t * 6 + e.id) * 0.45 : 0;
+  if (a.crew) a.crew.forEach((m, i) => { m.visible = i < (e.cargo?.length ?? 0); });
   const kick = e.order?.type === 'attack' && e.cooldown ? Math.max(0, (e.cd - e.cooldown + 8) / 8) : 0;
   if (a.gun && a.aft) a.gun.position.z = 0.55 - kick * 0.06;
   else if (a.gun) a.gun.scale.x = 1 - kick * 0.12; // the Frigate's broadside runs in on both sides

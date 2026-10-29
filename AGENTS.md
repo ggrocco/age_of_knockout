@@ -16,6 +16,7 @@ npm run lint                                # eslint . (CI fails on any error)
 node --test test/econ.test.js               # single test file
 node --test --test-name-pattern="<name>" test/*.test.js   # single test
 node test/bot-sim.js 12                     # bot-vs-bot termination check (12 seeds x 5 rounds)
+node test/bot-sim.js 12 medium,medium islands   # the same on island maps (transports and ferries)
 node test/era-reach.js 12 deathmatch        # measurement, not a test: how far bots climb the eras
 docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
@@ -32,6 +33,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `?round=1..5` | Skip the menus, start that round as a quick match |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent bot for `?round=` (default `medium`) |
 | `&seed=N` | Replay a map; omitted = random map and start position |
+| `?map=rivers\|islands` | Map type for quick matches and tournaments (else the saved menu pick, else Rivers) |
 | `&speed=N` | Game speed multiplier |
 | `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets it (default `hard`) |
 | `?autotour=1` | Whole tournament on autopilot, clicking through every screen |
@@ -79,7 +81,10 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
   sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
-  Center. `test/ai.test.js` checks a lone bot climbs to AI Future within an hour.
+  Center, a Dock with Fishing Ships and a fleet of the newest warship, and Transport Ship ferries (`ferryWork`: attack
+  waves to an enemy across the sea, relic squads to the central island, relic carriers home). Soldiers only get orders
+  for targets on their own land mass (`landMasses`). `test/ai.test.js` checks a lone bot climbs to AI Future within an
+  hour; `test/naval.test.js` checks its navy and ferries.
 - `src/tournament`: `bracket.js` (bracket, `LEVELS` = each difficulty's five-round opponent ramp) and a headless
   match runner (`sim.js`) used by tests and `test/bot-sim.js`. Browser bracket resolution uses the same runner in a
   module Worker (`worker.js`, managed by `async-sim.js`); no live match state crosses threads.
@@ -131,6 +136,9 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 - A deliberate change to a `KEPT` building look: regenerate `test/fixtures/kept-buildings.json` (command above).
 - A deviation from AoE1 (stat, rule, tech-tree placement): `src/data/README.md` and `progress.md`.
 - A ruling, known gap or deferred minor issue: append it to `progress.md`.
+- Any new unit, building, upgrade, command or game mechanic: teach the bot (`src/ai/bot.js`) to use it in the same
+  change, and prove it with a test or a `test/bot-sim.js` run that shows the bot actually does (the bot is the
+  opponent in every match and plays every bracket match, so content it ignores is content the game never uses).
 
 ## Testing in the browser (required)
 

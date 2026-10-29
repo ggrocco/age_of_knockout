@@ -16,6 +16,7 @@ npm start                       # node serve.js, then open http://localhost:8000
 npm test                        # simulation, rounds, bot, bracket, data and render-model tests
 npm run lint                    # ESLint
 node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rounds
+node test/bot-sim.js 12 medium,medium islands   # the same on island maps
 ```
 
 No build step: plain ES modules, with three.js loaded through the import map in `index.html`.
@@ -127,7 +128,14 @@ once that third would be under 400 no new pair appears, and at most 8 gold and 4
 total, new mirrored piles appear (a block for each side, away from both bases and the centre). The opponent digs Mines on
 its own half of the map when its piles run low.
 
-**Water and ships.** A river runs across every map between the two bases, from edge to edge, opening into a lake
+**Maps.** The menu's Map setting (saved, like the time limit; `?map=` overrides it) picks the map for quick matches and
+the whole tournament, the bracket's other matches included:
+
+- **Rivers** (default): the river map below, where soldiers can always walk to the enemy.
+- **Islands**: each side starts on its own island, and a third island in the middle holds the relics and rich gold
+  and stone. No ground joins them: build a Dock and Transport Ships to attack, fetch relics or claim the centre.
+
+**Water and ships.** On a river map a river runs between the two bases, from edge to edge, opening into a lake
 past each ford, and each player has a home bay off it, a short walk from the Town Center. There is always a way to
 attack on foot: soldiers wade the light-blue **shallows** over the centre (where the relics are) and at a ford on each
 side, and only deep water stops them. From the Bronze Age a villager can build a **Dock** (100 wood) on deep water
@@ -137,6 +145,7 @@ fleets can meet:
 | Ship | Age | Cost | Role |
 | --- | --- | --- | --- |
 | War Galley | Bronze | 135 wood, 30 gold | Oared warship, shoots arrows |
+| Transport Ship | Bronze | 150 wood | Carries 8 soldiers or villagers; unarmed |
 | Fishing Ship | Medieval | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock |
 | Frigate | Age of Sail | 200 wood, 100 gold | Cannon broadsides that splash and batter buildings by the water |
 | Destroyer | Modern | 150 wood, 200 gold | Fast, armoured, long-ranged guns that splash |
@@ -145,6 +154,13 @@ A ship can hit anything within its range of the water, ships first; soldiers on 
 attacks, but a ship in the shallows can be attacked by anyone, and Towers shoot ships too. Ships alone don't keep a
 beaten side in the game (a Dock does). The opponent builds a Dock in its bay, fishes from the Medieval Age, and keeps a
 small fleet that answers yours and patrols to your bay during its attacks.
+
+**Transport Ships.** Right-click your Transport Ship with soldiers or villagers selected (tap it on a phone) and they
+walk to it and board; it sails to the shore nearest them if it is out at sea. With it selected, right-click the far
+shore to land everyone there (they walk on to the spot you clicked), or press **Unload** to land them on the nearest
+shore. Passengers are out of sight and can't be attacked, but if the ship sinks everyone aboard is lost; a relic they
+carried washes up on the nearest land. A relic carrier landed at home takes the relic on to a Town Center. On an island
+map the opponent ferries its attack waves to your island and sends squads to fetch the relics from the centre.
 
 ### Controls (desktop)
 
@@ -178,7 +194,7 @@ siege, and villagers at the back.
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
-tree/mine/farm = gather, fish = fish with Fishing Ships, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
+tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
 Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap
@@ -289,6 +305,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 | `?round=1..5` | Start that round as a quick match, skipping the menus |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent for `?round=` (default `medium`) |
 | `&seed=N` | Replay a map; without it every match gets a fresh map and start position |
+| `?map=rivers\|islands` | Map type, overriding the saved menu pick (default Rivers) |
 | `&speed=N` | Game speed multiplier |
 | `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets its difficulty (default `hard`) |
 | `?autotour=1` | Whole tournament on autopilot |

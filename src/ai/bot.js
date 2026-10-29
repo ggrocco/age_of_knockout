@@ -12,14 +12,15 @@ import { parseTimeLimit } from '../time-limit.js';
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
 // towers: how many Towers it keeps near its Town Center from the Tool Age on.
-// fleet: warships it keeps from the Bronze Age on (two more once it has seen enemy ships); fishers: Fishing Ships from the Medieval Age.
+// fleet: warships it keeps from the Bronze Age on (two more once it has seen enemy ships); fishers: Fishing Ships from the Medieval Age;
+// transports: Transport Ships it keeps when the enemy (or, in the relics round, a relic) is across the sea.
 // ageFirst: research and the second half of the army only spend what leaves the next age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
-  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1, fleet: 1, fishers: 2 },
-  easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true, fleet: 2, fishers: 2 },
-  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2, fleet: 3, fishers: 3 },
-  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3, fleet: 4, fishers: 4 },
+  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1, fleet: 1, fishers: 2, transports: 1 },
+  easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true, fleet: 2, fishers: 2, transports: 1 },
+  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2, fleet: 3, fishers: 3, transports: 2 },
+  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3, fleet: 4, fishers: 4, transports: 2 },
 };
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
@@ -48,6 +49,24 @@ function reachableFrom(map, start) {
   }
   return seen;
 }
+// Each walkable tile's land mass (4-neighbour, deep water parts them; -1 on deep water), from the bare map: on an island
+// map the home islands and the central island are separate land masses, on a river map there is one.
+function landMasses(map) {
+  const n = map.size, id = new Int32Array(n * n).fill(-1);
+  for (let s = 0, next = 0; s < n * n; s++) {
+    if (map.tiles[s] === 1 || id[s] >= 0) continue;
+    const queue = [s]; id[s] = next;
+    for (let k = 0; k < queue.length; k++) {
+      const i = queue[k], x = i % n, y = (i / n) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, j = ny * n + nx;
+        if (nx >= 0 && ny >= 0 && nx < n && ny < n && id[j] < 0 && map.tiles[j] !== 1) { id[j] = next; queue.push(j); }
+      }
+    }
+    next++;
+  }
+  return id;
+}
 // Nearest tile (by square rings) in the reachable set.
 function nearestReachable(map, reach, p) {
   const n = map.size;
@@ -64,6 +83,9 @@ export function createBot(game, pid, difficulty = 'medium') {
   // Fixed sweep points can fall in a lake; every unit sent there would search the whole map for a path, so snap them to reachable land.
   // The points are laid out for a 64-tile map and scaled to the real size.
   const reach = reachableFrom(game.map, game.map.starts[pid]), k = game.map.size / 64;
+  // Which land mass a point is on; soldiers only get orders for targets on their own (a transport ferries the rest).
+  const mass = landMasses(game.map), massOf = p => mass[Math.floor(p.y) * game.map.size + Math.floor(p.x)], homeMass = massOf(game.map.starts[pid]);
+  const sameLand = (a, b) => massOf(a) === massOf(b), overSea = massOf(enemyStart) !== homeMass;
   const sweep = [enemyStart, ...[[16, 16], [48, 16], [16, 48], [48, 48], [32, 32], [32, 10], [32, 54], [10, 32], [54, 32]].map(([x, y]) => nearestReachable(game.map, reach, { x: Math.round(x * k), y: Math.round(y * k) }))];
   const sentTo = new Map(); // unit id -> sweepIdx of the waypoint it was last sent to
   const bot = { saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, scout: 0, think };
@@ -77,7 +99,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (r.ok) bot.rejects = 0; else { const k = c.type + ':' + (c.building || c.unit || '') + ':' + r.reason; bot.why[k] = (bot.why[k] || 0) + 1; bot.rejects++; bot.maxRejects = Math.max(bot.maxRejects, bot.rejects); }
     return r.ok;
   }
-  const mine = kind => [...game[kind].values()].filter(e => e.owner === pid);
+  const mine = kind => [...game[kind].values()].filter(e => e.owner === pid && !e.aboard); // passengers take no orders
   const count = type => mine('buildings').filter(b => b.type === type).length;
   // True when paying `cost` still leaves, of each resource it spends, what the next age-up costs (from the Age of Sail on
   // that includes stone). No reserve while an age-up is already paid for and running, or at the last age.
@@ -294,7 +316,9 @@ export function createBot(game, pid, difficulty = 'medium') {
     }
 
     // --- military production
-    const armyCap = roundId === 'deathmatch' ? D.dmArmy : D.army;
+    // Across the sea nobody can land before they have a Transport Ship: until ours is out, keep a small home guard and put
+    // the rest into reaching the Dock's age (a full army would only wait on the beach).
+    const armyCap = Math.min(roundId === 'deathmatch' ? D.dmArmy : D.army, overSea && !ships.some(u => u.cargo) ? 6 : Infinity);
     const armyCount = army.length + done.reduce((n, b) => n + b.queue.filter(q => UNITS[q.unit].cls !== 'civ' && !UNITS[q.unit].naval).length, 0);
     const enemyClass = dominantEnemyClass(enemies); // counter-pick against what we can see
     if (!bot.saving && armyCount < armyCap && (vills.length >= D.villagers * 0.6 || roundId === 'deathmatch' || roundId === 'wonder')) {
@@ -314,7 +338,7 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- military orders
     orderArmy(army, enemies, home, roundId, vis);
-    navy(ships, done, buildings, free, enemies, home, roundId);
+    navy(ships, done, buildings, free, enemies, home, roundId, army);
   }
 
   // ---- the navy: a Dock in the home bay, Fishing Ships, and a small fleet that patrols to the enemy's bay ----
@@ -335,10 +359,10 @@ export function createBot(game, pid, difficulty = 'medium') {
     }
     return out.sort((a, b) => a.d - b.d);
   }
-  function navy(ships, done, buildings, free, enemies, home, roundId) {
+  function navy(ships, done, buildings, free, enemies, home, roundId, army) {
     if (ageIndex(me.age) < ageIndex(BUILDINGS.dock.age) || roundId === 'wonder') return; // the Wonder round saves for its Wonder
     const docks = done.filter(b => b.type === 'dock');
-    if (!buildings.some(b => b.type === 'dock') && !bot.saving && free.length >= 6 && leavesAgeUp(BUILDINGS.dock.cost) && canPay(BUILDINGS.dock.cost)) {
+    if (!buildings.some(b => b.type === 'dock') && (overSea || (!bot.saving && free.length >= 6 && leavesAgeUp(BUILDINGS.dock.cost))) && canPay(BUILDINGS.dock.cost)) { // across the sea it comes first
       dockSpots ??= findDockSpots();
       const sp = dockSpots.find(p => canPlace(game, pid, 'dock', p.x, p.y));
       const v = sp && free.filter(u => u.order.type !== 'repair').sort((a, b) => dist(a, sp) - dist(b, sp))[0];
@@ -350,7 +374,12 @@ export function createBot(game, pid, difficulty = 'medium') {
     }
     if (!docks.length) return;
     const dock = docks[0], queued = type => done.reduce((k, b) => k + b.queue.filter(q => q.unit === type).length, 0);
-    const fishers = ships.filter(u => u.type === 'fishing_ship'), fleet = ships.filter(u => u.cls === 'ship');
+    const fishers = ships.filter(u => u.type === 'fishing_ship'), fleet = ships.filter(u => u.cls === 'ship'), transports = ships.filter(u => u.cargo);
+    // Transport Ships, first in the Dock's queue, when there is somewhere to go that soldiers can't walk to.
+    const relicsAcross = roundId === 'relics' && [...game.relics.values()].some(r => massOf(r) !== homeMass);
+    if ((overSea || relicsAcross) && transports.length + queued('transport_ship') < D.transports && dock.queue.length < 2 && canPay(UNITS.transport_ship.cost)
+      && me.pop < me.popCap) cmd({ type: 'train', buildingId: dock.id, unit: 'transport_ship' });
+    ferryWork(transports, army, enemies, home, roundId);
     // Fishing Ships: train up to `fishers`, and send idle ones to the nearest fish we know of.
     const fish = game.knownResources(pid).filter(r => r.type === 'fish' && r.amount > 0);
     if (ageIndex(me.age) >= ageIndex(UNITS.fishing_ship.age) && fish.length && fishers.length + queued('fishing_ship') < D.fishers && dock.queue.length < 2
@@ -359,7 +388,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     // Warships: the newest we can build, up to `fleet` (two more once enemy ships show up), never out of the next age-up.
     const enemyShips = enemies.filter(e => e.kind === 'unit' && e.naval), want = D.fleet + (enemyShips.length ? 2 : 0);
     const best = SHIPS.find(t => ageIndex(UNITS[t].age) <= ageIndex(me.age));
-    if (!bot.saving && fleet.length + SHIPS.reduce((k, t) => k + queued(t), 0) < want && dock.queue.length < 2 && canPay(UNITS[best].cost)
+    if (!bot.saving && (transports.length >= ((overSea || relicsAcross) ? D.transports : 0)) && fleet.length + SHIPS.reduce((k, t) => k + queued(t), 0) < want && dock.queue.length < 2 && canPay(UNITS[best].cost)
       && (!D.ageFirst || leavesAgeUp(UNITS[best].cost)) && me.pop < me.popCap) cmd({ type: 'train', buildingId: dock.id, unit: best });
     // Idle warships take the nearest target they can reach (enemy ships first), else, while a land wave is on, sail to the
     // enemy's bay (the mirror of our Dock) and back to our Dock in turn.
@@ -378,6 +407,59 @@ export function createBot(game, pid, difficulty = 'medium') {
     }
   }
   const fleetLeg = new Map(), sentLeg = new Map(); // ship id -> the leg (0 to the enemy's bay, 1 home) it is on, and was last sent on
+
+  // Ferries. Each Transport Ship takes one job at a time: bring relic carriers stranded on another island home; take a
+  // squad to an island with loose relics nobody of ours is on; or, while a land wave is on and the enemy is across the
+  // sea, take the soldiers waiting at home to the enemy's shore. A job loads (the passengers board; the transport comes to
+  // the shore nearest them), sails (unloads at the shore nearest the destination) and ends once the hold is empty. It is
+  // dropped if nobody ends up aboard, and a hold that won't unload where it was sent is unloaded at home.
+  const ferry = bot.ferry = new Map(), ferried = new Set(); // transport id -> job; ids of units in a job (orderArmy leaves them be)
+  function ferryWork(transports, army, enemies, home, roundId) {
+    for (const id of ferry.keys()) if (!transports.some(t => t.id === id)) ferry.delete(id);
+    ferried.clear();
+    for (const j of ferry.values()) for (const id of j.ids) ferried.add(id);
+    const cap = UNITS.transport_ship.carries;
+    for (const t of transports) {
+      let job = ferry.get(t.id);
+      if (!job && t.cargo.length) { // passengers with no job (a stray who boarded late): take them where the soldiers are going
+        job = { stage: 'sail', ids: [...t.cargo], dest: bot.waveActive && overSea ? { x: enemyStart.x, y: enemyStart.y } : { x: home.x, y: home.y }, since: game.time, tries: 0 };
+        ferry.set(t.id, job); cmd({ type: 'unload', transportId: t.id, x: job.dest.x, y: job.dest.y });
+        continue;
+      }
+      if (!job) {
+        const free = army.filter(u => !ferried.has(u.id) && u.order.type === 'idle');
+        const carriers = free.filter(u => u.relic !== null && massOf(u) !== homeMass);
+        const loose = roundId === 'relics' && [...game.relics.values()].find(r => r.holder === null && r.stored === null && massOf(r) !== homeMass
+          && !army.some(u => sameLand(u, r) && u.relic === null) && ![...ferry.values()].some(j => j.relic === r.id));
+        const waiting = free.filter(u => u.relic === null && massOf(u) === homeMass);
+        let ids = null, dest = null, relic = null, wave = false;
+        if (carriers.length) { ids = carriers.slice(0, cap); dest = home; }
+        else if (loose && waiting.length) { ids = waiting.filter(u => u.cls !== 'siege').sort((a, b) => dist(a, t) - dist(b, t)).slice(0, Math.min(cap, 5)); dest = loose; relic = loose.id; }
+        else if (bot.waveActive && overSea && waiting.length >= Math.min(4, cap)) { ids = waiting.sort((a, b) => dist(a, t) - dist(b, t)).slice(0, cap); dest = enemyStart; wave = true; }
+        if (!ids?.length) continue;
+        ids = ids.slice(0, cap - t.cargo.length);
+        job = { stage: 'load', ids: ids.map(u => u.id), dest: { x: dest.x, y: dest.y }, relic, wave, since: game.time, tries: 0 };
+        ferry.set(t.id, job); for (const id of job.ids) ferried.add(id);
+        cmd({ type: 'board', ids: job.ids, transportId: t.id });
+        continue;
+      }
+      if (job.stage === 'load') {
+        const alive = job.ids.map(id => game.entities.get(id)).filter(u => u && !u.dead), on = alive.filter(u => u.aboard === t.id);
+        const coming = alive.filter(u => !u.aboard && u.order.type === 'board' && u.order.target === t.id);
+        // A wave sails as one convoy: a loaded transport waits for the others still taking on soldiers.
+        const convoy = job.wave && [...ferry].some(([id, j]) => id !== t.id && j.wave && j.stage === 'load' && j.ids.some(i => { const u = game.entities.get(i); return u && !u.dead && !u.aboard && u.order.type === 'board'; }));
+        if (on.length && ((!coming.length && !convoy) || game.time - job.since > 900)) { // everyone who is coming is aboard (or they took too long)
+          job.ids = on.map(u => u.id); job.stage = 'sail'; job.since = game.time;
+          cmd({ type: 'unload', transportId: t.id, x: job.dest.x, y: job.dest.y });
+          for (const u of coming) cmd({ type: 'move', ids: [u.id], x: u.x, y: u.y }); // the late ones stay behind for the next trip
+        } else if (!coming.length || game.time - job.since > 2400) ferry.delete(t.id);
+      } else if (!t.cargo.length) ferry.delete(t.id); // all ashore
+      else if (t.order.type === 'idle') { // the unload stopped short: try again, then bring them home
+        if (++job.tries > 3) job.dest = { x: home.x, y: home.y };
+        cmd({ type: 'unload', transportId: t.id, x: job.dest.x, y: job.dest.y });
+      }
+    }
+  }
 
   const SIEGE = ['railgun', 'field_artillery', 'cannon', 'trebuchet', 'catapult'];
   const RESEARCH_PREF = ['woodworking', 'gold_mining', 'sacred_harvest', 'colonial_trade', 'electrification', 'masonry', 'bronze_weapons', 'bronze_shields',
@@ -433,7 +515,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   function assign(idle, vills, tc, home, done, force) {
     const cnt = { food: 0, wood: 0, gold: 0, stone: 0 };
     for (const v of vills) if (v.order.type === 'gather') cnt[v.order.kind]++;
-    const known = game.knownResources(pid);
+    const known = game.knownResources(pid).filter(r => sameLand(r, home)); // nothing across the sea
     const early = vills.length < 12 || ageIndex(me.age) === 0;
     for (const v of idle) {
       const total = vills.length || 1;
@@ -482,20 +564,20 @@ export function createBot(game, pid, difficulty = 'medium') {
 
   function orderArmy(army, enemies, home, roundId, vis) {
     if (!army.length) return;
-    const threats = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval && dist(e, home) < 14); // ships are the towers' and the fleet's
+    const threats = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval && dist(e, home) < 14 && sameLand(e, home)); // ships are the towers' and the fleet's
     const idle = army.filter(u => u.order.type === 'idle');
     // relics: send the nearest free soldier to each loose relic (idle or mid-wave), one per relic
     if (roundId === 'relics') {
       const assigned = new Set(army.filter(a => a.order.type === 'relic').map(a => a.order.relic));
       for (const r of game.relics.values()) {
         if (r.holder !== null || r.stored !== null || assigned.has(r.id)) continue;
-        const u = army.filter(a => a.relic === null && a.cls !== 'siege' && a.order.type !== 'relic').sort((a, b) => dist(a, r) - dist(b, r))[0];
+        const u = army.filter(a => a.relic === null && a.cls !== 'siege' && a.order.type !== 'relic' && sameLand(a, r)).sort((a, b) => dist(a, r) - dist(b, r))[0];
         if (u && dist(u, r) < 40) { cmd({ type: 'relic', ids: [u.id], relicId: r.id }); assigned.add(r.id); }
       }
     }
     if (threats.length) {
       const t = threats.sort((a, b) => dist(a, home) - dist(b, home))[0];
-      for (const u of idle) cmd({ type: 'attack', ids: [u.id], targetId: t.id });
+      for (const u of idle) if (sameLand(u, t)) cmd({ type: 'attack', ids: [u.id], targetId: t.id });
       return;
     }
     const combat = army;
@@ -504,32 +586,37 @@ export function createBot(game, pid, difficulty = 'medium') {
     const needWave = rush ? 5 : roundId === 'deathmatch' ? D.dmWave : D.wave;
     const needTime = Math.max(D.grace, rush ? 3600 : roundId === 'deathmatch' ? 9000 : D.attackAt);
     if (!bot.waveActive && game.time >= needTime && ageIndex(me.age) >= ageIndex(D.attackAge) && combat.length >= needWave) bot.waveActive = true;
-    if (bot.waveActive && combat.length < 3) bot.waveActive = false;
+    const afloat = [...game.units.values()].filter(u => u.owner === pid && u.aboard).length; // a wave at sea is still a wave
+    if (bot.waveActive && combat.length + afloat < 3) bot.waveActive = false;
     if (!bot.waveActive) return;
     const cx = combat.reduce((s, u) => s + u.x, 0) / combat.length, cy = combat.reduce((s, u) => s + u.y, 0) / combat.length, c = { x: cx, y: cy };
-    let target = null;
-    const king = roundId === 'regicide' ? enemies.find(e => e.type === 'king') : null;
-    const wonder = roundId === 'wonder' ? enemies.find(e => e.type === 'wonder') : null;
-    let vault = null;
-    if (roundId === 'relics') { const ids = new Set([...game.relics.values()].filter(r => r.stored !== null && game.relicOwner(r) === enemy).map(r => r.stored)); vault = enemies.find(e => ids.has(e.id)); }
-    if (king) target = king; else if (wonder) target = wonder; else if (vault) target = vault;
-    if (!target) target = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0]
-      || enemies.filter(e => e.kind === 'building').sort((a, b) => dist(a, c) - dist(b, c))[0]
-      || enemies.filter(e => e.kind === 'unit' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0];
+    // The wave's target, chosen among the enemies on land mass m (the King, Wonder or relic vault first, then the nearest
+    // soldier, building, anyone); soldiers on each land mass take that mass's target.
+    const vaults = roundId === 'relics' ? new Set([...game.relics.values()].filter(r => r.stored !== null && game.relicOwner(r) === enemy).map(r => r.stored)) : new Set();
+    const targetOn = m => {
+      const here = enemies.filter(e => massOf(e.kind === 'building' ? centerOf(e) : e) === m);
+      const key = here.find(e => (roundId === 'regicide' && e.type === 'king') || (roundId === 'wonder' && e.type === 'wonder') || vaults.has(e.id));
+      return key || here.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0]
+        || here.filter(e => e.kind === 'building').sort((a, b) => dist(a, c) - dist(b, c))[0]
+        || here.filter(e => e.kind === 'unit' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0];
+    };
+    const targets = new Map(), targetFor = u => { const m = massOf(u); if (!targets.has(m)) targets.set(m, targetOn(m)); return targets.get(m); };
     // Siege goes for the defences first: a siege unit with no attack order of its own (idle, on a sweep move, or only
     // auto-aggro on something else) takes the finished enemy tower nearest it that we can see. A commanded attack, a
     // breach (an attack with `resume`) and an attack already on a tower are kept.
     const towers = enemies.filter(e => e.type === 'tower' && e.constructed), onTower = new Set();
     if (towers.length) for (const u of combat) {
-      const o = u.order, on = o.type === 'attack' ? game.entities.get(o.target) : null;
-      if (u.cls !== 'siege' || !(o.type === 'idle' || o.type === 'move' || (o.auto && on?.type !== 'tower'))) continue;
-      const t = towers.reduce((best, e) => distPoint(u.x, u.y, e) < distPoint(u.x, u.y, best) ? e : best);
+      const o = u.order, on = o.type === 'attack' ? game.entities.get(o.target) : null, near = towers.filter(e => sameLand(u, centerOf(e)));
+      if (u.cls !== 'siege' || !near.length || !(o.type === 'idle' || o.type === 'move' || (o.auto && on?.type !== 'tower'))) continue;
+      const t = near.reduce((best, e) => distPoint(u.x, u.y, e) < distPoint(u.x, u.y, best) ? e : best);
       if (cmd({ type: 'attack', ids: [u.id], targetId: t.id })) onTower.add(u.id);
     }
     let advanced = false;
     for (const u of idle) {
-      if (u.relic !== null || onTower.has(u.id)) continue;
+      if (u.relic !== null || onTower.has(u.id) || ferried.has(u.id)) continue;
+      const target = targetFor(u);
       if (target) cmd({ type: 'attack', ids: [u.id], targetId: target.id });
+      else if (massOf(u) !== massOf(enemyStart)) continue; // nothing to fight on this land: wait for a transport
       else {
         let wp = sweep[bot.sweepIdx % sweep.length];
         // Idle short of the waypoint it was sent to means the move failed: go on to the next one rather than

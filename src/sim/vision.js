@@ -10,6 +10,7 @@ export function updateVision(game) {
   const n = game.map.size;
   for (const p of game.players) p.visible.fill(0);
   for (const list of [game.units, game.buildings]) for (const e of list.values()) {
+    if (e.aboard) continue; // a transport's hold sees nothing; the ship has its own sight
     const vis = game.players[e.owner].visible, c = centerOf(e), r = Math.ceil(e.sight + (e.size ? e.size / 2 : 0)), d = disc(r);
     const cx = Math.floor(c.x), cy = Math.floor(c.y);
     for (let dy = -r; dy <= r; dy++) {

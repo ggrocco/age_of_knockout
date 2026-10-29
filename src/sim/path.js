@@ -25,9 +25,11 @@ export function findPath(map, blocked, from, to, isGoal, naval = false) {
   const { gen, seen, closed, g, prev } = buffers(n);
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };
   const open = new Heap(); const s = from.y * n + from.x; g[s] = 0; seen[s] = gen; open.push({ i: s, f: h(from.x, from.y) });
-  let expanded = 0; const maxExpand = Math.max(6000, n * n); // a search may cover the whole map
-  while (open.size && expanded++ < maxExpand) {
-    const { i } = open.pop(); if (closed[i] === gen) continue; closed[i] = gen;
+  // A search may cover the whole map: it counts the tiles it expands, not the stale heap entries it skips (open sea makes
+  // many), so a reachable goal is always found.
+  let expanded = 0; const maxExpand = Math.max(6000, n * n);
+  while (open.size && expanded < maxExpand) {
+    const { i } = open.pop(); if (closed[i] === gen) continue; closed[i] = gen; expanded++;
     const x = i % n, y = (i / n) | 0;
     if (goal(x, y)) { const out = []; for (let k = i; k !== s; k = prev[k]) out.push({ x: k % n, y: (k / n) | 0 }); return out.reverse(); }
     for (const [dx, dy] of DIRS) {

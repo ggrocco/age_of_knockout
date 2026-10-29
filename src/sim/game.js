@@ -16,9 +16,9 @@ import { secs, rectOf, centerOf, passable } from './util.js';
 const opensFoundation = type => BUILDINGS[type].defence === 'wall';
 
 // workRate: per-player speed of gathering, building, training, research and age-ups (a handicap, 1 = normal).
-// capTicks: round time limit, defaults to the round's own.
-export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 1], capTicks = rules?.capTicks } = {}) {
-  const map = generateMap(seed, size), n = map.size, occ = new Int32Array(n * n), reserved = new Set();
+// capTicks: round time limit, defaults to the round's own. mapType: 'rivers' or 'islands' (map.js).
+export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 1], capTicks = rules?.capTicks, mapType = 'rivers' } = {}) {
+  const map = generateMap(seed, size, mapType), n = map.size, occ = new Int32Array(n * n), reserved = new Set();
   const game = {
     seed, map, rules, capTicks, time: 0, result: null, nextId: 1,
     entities: new Map(), units: new Map(), buildings: new Map(), resources: new Map(), relics: new Map(),
@@ -56,7 +56,7 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
     game.entities.set(e.id, e); game.buildings.set(e.id, e);
     if (!constructed && opensFoundation(type)) { for (const i of cells(e)) reserved.add(i); return e; } // units may stand on it until it is finished
     mark(e, e.id);
-    for (const u of game.units.values()) if (u.x >= x && u.x <= x + e.size && u.y >= y && u.y <= y + e.size) { const sp = game.findSpawn(e, u.naval); u.x = sp.x; u.y = sp.y; u.path = null; }
+    for (const u of game.units.values()) if (!u.aboard && u.x >= x && u.x <= x + e.size && u.y >= y && u.y <= y + e.size) { const sp = game.findSpawn(e, u.naval); u.x = sp.x; u.y = sp.y; u.path = null; }
     return e;
   };
   // A wall foundation just finished: it now occupies its tile, and any unit standing on it moves to the nearest free tile.
@@ -66,14 +66,15 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
     const r = rectOf(b);
     for (const u of game.units.values()) {
       const tx = Math.floor(u.x), ty = Math.floor(u.y);
-      if (tx >= r.x0 && tx < r.x1 && ty >= r.y0 && ty < r.y1) { const t = nearestFree(u.x, u.y, u.naval); u.x = t.x; u.y = t.y; u.path = null; }
+      if (!u.aboard && tx >= r.x0 && tx < r.x1 && ty >= r.y0 && ty < r.y1) { const t = nearestFree(u.x, u.y, u.naval); u.x = t.x; u.y = t.y; u.path = null; }
     }
   };
   game.spawnUnit = (type, owner, x, y) => {
     const d = UNITS[type];
     const u = { id: game.nextId++, kind: 'unit', type, owner, x, y, hp: d.hp, maxHp: d.hp, atk: d.atk, atkType: d.atkType || 'melee', marmor: d.marmor || 0, parmor: d.parmor || 0, bonus: d.bonus || null, range: d.range, speed: d.speed, sight: d.sight,
       cls: d.cls, naval: !!d.naval, splash: d.splash || 0, cooldown: d.cooldown ?? (d.cls === 'archer' ? 40 : d.cls === 'siege' ? 80 : 30), cd: 0, order: { type: 'idle' }, path: null, retry: 0,
-      carry: { type: null, amount: 0 }, relic: null, dead: false };
+      carry: { type: null, amount: 0 }, relic: null, dead: false,
+      aboard: null, cargo: d.carries ? [] : null }; // aboard: the transport carrying this unit; cargo: who a transport carries
     for (const id of game.players[owner].techs) applyUnitEffect(u, TECHS[id].effect); // inherit researched upgrades
     game.entities.set(u.id, u); game.units.set(u.id, u); return u;
   };
@@ -86,9 +87,11 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
   game.spawnRelic = (x, y) => { const r = { id: game.nextId++, kind: 'relic', x, y, holder: null, stored: null, dead: false }; game.entities.set(r.id, r); game.relics.set(r.id, r); return r; };
   game.relicOwner = r => r.holder !== null ? game.entities.get(r.holder)?.owner ?? null : r.stored !== null ? game.entities.get(r.stored)?.owner ?? null : null;
 
+  // The free land tile nearest (x, y), by square rings: within 8 tiles, or anywhere for a relic lost at sea, which washes up
+  // on the nearest shore.
   const freeTileNear = (x, y) => {
     const cx = Math.floor(x), cy = Math.floor(y);
-    for (let r = 0; r <= 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    for (let r = 0; r <= n; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
       const tx = cx + dx, ty = cy + dy;
       if (free(tx, ty)) return { x: tx + 0.5, y: ty + 0.5 }; // never onto a foundation, which would seal a dropped relic inside the wall
@@ -101,6 +104,8 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
   };
   game.remove = e => {
     if (e.dead) return; e.dead = true;
+    for (const id of e.cargo ?? []) { const p = game.entities.get(id); if (p) { game.players[p.owner].losses++; game.remove(p); } } // a sunk transport takes its passengers down
+    if (e.aboard) { const t = game.entities.get(e.aboard); if (t?.cargo) t.cargo = t.cargo.filter(id => id !== e.id); }
     game.entities.delete(e.id); game.units.delete(e.id); game.buildings.delete(e.id); game.resources.delete(e.id);
     if (e.kind === 'building' || e.kind === 'resource') for (const i of cells(e)) { reserved.delete(i); if (occ[i] === e.id) occ[i] = 0; } // a foundation never marked its tile
     const c = centerOf(e); dropRelics(e, e.kind === 'building' ? Math.min(n - 1, Math.floor(c.x) + 0.5) : c.x, e.kind === 'building' ? Math.min(n - 1, e.y + e.size + 0.5) : c.y);
@@ -109,7 +114,7 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
   game.damage = (e, amount, attacker) => {
     if (e.dead) return; e.hp -= amount;
     if (e.hp <= 0) {
-      if (attacker) { const p = game.players[attacker.owner]; if (e.kind === 'building') p.bdestroyed++; else p.kills += e.cls === 'civ' ? 1 : 2; }
+      if (attacker) { const p = game.players[attacker.owner]; if (e.kind === 'building') p.bdestroyed++; else for (const u of [e, ...(e.cargo ?? []).map(id => game.entities.get(id)).filter(Boolean)]) p.kills += u.cls === 'civ' ? 1 : 2; }
       if (e.kind === 'unit') game.players[e.owner].losses++; // for generalship score (any death, attributed or not)
       game.remove(e);
     }
@@ -131,6 +136,7 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
   game.visibleEntities = pid => {
     const p = game.players[pid], out = [];
     for (const list of [game.units, game.buildings]) for (const e of list.values()) {
+      if (e.aboard) continue; // passengers are out of sight in the hold
       if (e.owner === pid) { out.push(e); continue; }
       const c = centerOf(e); if (p.visible[Math.floor(c.y) * n + Math.floor(c.x)]) out.push(e);
     }
@@ -142,7 +148,8 @@ export function createGame({ seed = 1, rules = null, size = 112, workRate = [1, 
   game.tick = () => {
     if (game.result) return;
     game.time++;
-    for (const u of [...game.units.values()]) if (!u.dead) updateUnit(game, u);
+    for (const u of [...game.units.values()]) if (!u.dead && !u.aboard) updateUnit(game, u);
+    for (const t of game.units.values()) for (const id of t.cargo ?? []) { const p = game.entities.get(id); if (p) { p.x = t.x; p.y = t.y; } } // passengers ride along
     for (const b of [...game.buildings.values()]) if (!b.dead) { updateBuilding(game, b); if (b.type === 'tower') updateTower(game, b); }
     if (game.time % RESPAWN_EVERY === 0) updateRespawn(game);
     for (const p of game.players) if (p.ageUp && (p.ageUp.remaining -= p.workRate) <= 0) { p.age = p.ageUp.to; p.ageUp = null; refreshDefences(game, p.id); refreshFarms(game, p.id); }

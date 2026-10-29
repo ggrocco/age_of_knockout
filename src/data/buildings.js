@@ -29,7 +29,7 @@ export const BUILDINGS = {
   airfield:          { name: 'Airfield', hp: 800, cost: c(0, 250, 200, 100), size: 3, buildTime: 65, age: 'modern', trains: ['drone'], sight: 8 },
   // Invented placement: a Dock stands on deep water against the shore (sim/commands.js canPlace). It trains the ships and
   // takes the Fishing Ships' catch; villagers do not drop food there. It does not count towards an age-up.
-  dock:              { name: 'Dock', hp: 600, cost: c(0, 100), size: 3, buildTime: 35, age: 'bronze', trains: ['fishing_ship', 'war_galley', 'frigate', 'destroyer'], drops: ['food'], sight: 6, extra: true, naval: true },
+  dock:              { name: 'Dock', hp: 600, cost: c(0, 100), size: 3, buildTime: 35, age: 'bronze', trains: ['fishing_ship', 'transport_ship', 'war_galley', 'frigate', 'destroyer'], drops: ['food'], sight: 6, extra: true, naval: true },
   // Defences (invented). `hp` here is the Tool-era value; addBuilding takes the real HP and the tower's attack from the owner's era (defences.js).
   tower:             { name: 'Tower', hp: TOWER.tool.hp, cost: c(0, 40, 0, 120), size: 2, buildTime: 40, age: 'tool', sight: 10, extra: true, defence: 'tower' },
   wall:              { name: 'Wall', hp: WALL_HP.tool, cost: c(0, 0, 0, 5), size: 1, buildTime: 6, age: 'tool', sight: 2, extra: true, defence: 'wall', marmor: 4, parmor: 10 },

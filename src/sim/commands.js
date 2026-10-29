@@ -3,7 +3,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { secs, RES_KIND, WATER, passable } from './util.js';
-import { formationSlots, nearestOpen } from './formation.js';
+import { formationSlots, nearestOpen, landingNear } from './formation.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
@@ -14,7 +14,7 @@ export const canAfford = (p, cost) => RES.every(k => p.res[k] >= (cost[k] || 0))
 // Repairs are paid bit by bit, so any of each resource the building costs is enough to go on.
 export const canRepair = (p, type) => RES.every(k => !BUILDINGS[type].cost[k] || p.res[k] > 0);
 const pay = (p, cost) => { for (const k of RES) p.res[k] -= cost[k] || 0; };
-const ownUnits = (game, pid, ids) => (ids || []).map(i => game.entities.get(i)).filter(e => e && e.kind === 'unit' && e.owner === pid && !e.dead);
+const ownUnits = (game, pid, ids) => (ids || []).map(i => game.entities.get(i)).filter(e => e && e.kind === 'unit' && e.owner === pid && !e.dead && !e.aboard); // passengers take no orders
 
 // A build (or repair) given to a villager that is gathering, building or repairing keeps that job as `resume`, and takes it
 // up again once the new building is done, gone or unreachable (orders.js doBuild / doRepair). Builds interrupting builds nest,
@@ -181,6 +181,29 @@ export function execute(game, pid, cmd) {
       const us = ownUnits(game, pid, cmd.ids).filter(u => u.atk > 0), t = game.entities.get(cmd.targetId); // a Fishing Ship has no attack
       if (!us.length) return fail('no units'); if (!t || t.dead || t.owner === pid || (t.kind !== 'unit' && t.kind !== 'building')) return fail('bad target');
       for (const u of us) { u.order = { type: 'attack', target: t.id, fails: 0 }; u.path = null; u.retry = 0; }
+      return OK;
+    }
+    case 'board': { // land units walk to an own transport and go aboard; an idle transport sails to the shore nearest them
+      const t = game.entities.get(cmd.transportId), us = ownUnits(game, pid, cmd.ids).filter(u => !u.naval);
+      if (!t || t.dead || t.owner !== pid || !t.cargo || t.aboard) return fail('bad transport');
+      if (!us.length) return fail('no units');
+      if (t.cargo.length >= UNITS[t.type].carries) return fail('transport full');
+      for (const u of us) { u.order = { type: 'board', target: t.id, fails: 0 }; u.path = null; u.retry = 0; }
+      if (t.order.type === 'idle') {
+        const c = us.reduce((a, u) => ({ x: a.x + u.x / us.length, y: a.y + u.y / us.length }), { x: 0, y: 0 }), l = landingNear(game, c.x, c.y, us[0]);
+        if (l && Math.hypot(l.sea.x - t.x, l.sea.y - t.y) > 0.3) { t.order = { type: 'move', x: l.sea.x, y: l.sea.y, slack: 0 }; t.path = null; t.retry = 0; }
+      }
+      return OK;
+    }
+    case 'unload': { // a transport lands at the shore nearest (x, y) (else nearest itself) and puts everyone ashore there
+      const t = game.entities.get(cmd.transportId);
+      if (!t || t.dead || t.owner !== pid || !t.cargo) return fail('bad transport');
+      if (!t.cargo.length) return fail('empty');
+      const at = Number.isFinite(cmd.x) && Number.isFinite(cmd.y) ? { x: cmd.x, y: cmd.y } : t;
+      const ground = at !== t && passable(game.map.tiles[Math.floor(at.y) * game.map.size + Math.floor(at.x)], false);
+      const l = (ground && landingNear(game, at.x, at.y, at)) || landingNear(game, at.x, at.y); // a shore they can walk on from to (x, y)
+      if (!l) return fail('no shore');
+      t.order = { type: 'unload', x: l.sea.x, y: l.sea.y, sx: l.shore.x, sy: l.shore.y, to: ground ? { x: at.x, y: at.y } : null, slack: 0 }; t.path = null; t.retry = 0;
       return OK;
     }
     case 'relic': {

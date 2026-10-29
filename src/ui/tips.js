@@ -10,7 +10,7 @@ import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
 export const COLORS = { food: '#e0554d', wood: '#a06a35', gold: '#facc15', stone: '#9ca3af' };
-const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored', ship: 'Warship' };
+const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored', ship: 'Warship', transport: 'Transport' };
 
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
@@ -65,6 +65,8 @@ export const DESC = {
   mech: 'Future Age walker with 200 health and heavy armor. Slow, tough and hard-hitting.',
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
   fishing_ship: 'Fishes the shoals in the bays and the river and brings the catch to a Dock. Cannot fight.',
+  transport_ship: 'Carries 8 soldiers or villagers over water: right-click it with units to board, select it and right-click the shore to land. Unarmed; if it sinks, all aboard are lost.',
+  unload: 'Lands everyone aboard on the nearest shore.',
   war_galley: 'Bronze Age oared warship. Shoots arrows at ships and at anything near the shore; soldiers can only hit it from the bank with ranged attacks, or in the shallows.',
   frigate: 'Age of Sail warship whose cannon broadsides splash nearby targets and batter buildings by the water.',
   destroyer: 'Modern warship: fast, heavily armoured and long-ranged, with guns that splash nearby targets.',
@@ -111,7 +113,7 @@ export function roundTipHtml(round, capTicks = round.capTicks) {
     + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
 }
 
-// state: { kind: 'unit'|'building'|'tech'|'age'|'delete', id, next?, age? (the player's era, for era-scaled stats), short?: string[], notes?: string[] }
+// state: { kind: 'unit'|'building'|'tech'|'age'|'delete'|'unload', id, next?, age? (the player's era, for era-scaled stats), short?: string[], notes?: string[] }
 export function tipHtml({ kind, id, next, age = 'stone', short = [], notes = [] }) {
   let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
   if (kind === 'unit') {
@@ -132,6 +134,8 @@ export function tipHtml({ kind, id, next, age = 'stone', short = [], notes = [] 
     if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
   } else if (kind === 'delete') {
     title = 'Delete'; sub = 'Your selected building'; cost = {}; ic = 'delete';
+  } else if (kind === 'unload') {
+    title = 'Unload'; sub = 'Your selected Transport Ship'; cost = {}; ic = 'unload';
   } else {
     const a = AGE_COST[next]; title = `Advance to ${ageTitle(next)}`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
     const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);

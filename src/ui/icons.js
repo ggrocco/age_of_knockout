@@ -59,6 +59,8 @@ export const ICONS = {
   mech: svg(`<rect x="9" y="2.8" width="6" height="4.6" rx="1.2" ${D}/><path d="M10.4 5.2h3.2"/><rect x="7" y="8.6" width="10" height="6.2" rx="1.6" ${D}/><path d="M7 10.2H4.4v5.2M17 10.2h2.6v5.2"/><path d="M9.6 14.8 8.2 20.6H5.4M14.4 14.8l1.4 5.8h2.8"/>`),
   railgun: svg(`<rect x="2.5" y="11.2" width="15" height="3.6" rx="1" ${D}/><path d="M4 13h13"/><path d="M8 14.8 6 20.4M12.6 14.8l2 5.6M4.4 20.4h12"/><path d="M21 8.2l-1.7 3.3h2.7L20.3 15"/>`),
   fishing_ship: svg(`<path d="M3 14.5h18l-2.6 5h-12.8z" ${D}/><path d="M11 14.5V4.5l5.5 8h-5.5"/><path d="M11 6.5 4.5 13"/><circle cx="4.5" cy="14.8" r=".9" ${S}/>`),
+  transport_ship: svg(`<path d="M2.5 14.5h19l-3 5h-13z" ${D}/><path d="M5.5 14.5v-4h13v4"/><path d="M8 10.5V8h3v2.5M13 10.5V8h3v2.5"/><path d="M12 8V3.5l4 2-4 1.5"/>`),
+  unload: svg(`<path d="M2.5 15.5h11l-2 4h-7z" ${D}/><path d="M17 3.5v11M13.5 11l3.5 3.5 3.5-3.5"/><path d="M15 20.5h7"/>`),
   war_galley: svg(`<path d="M2.5 13.5h19l-3 5h-13z" ${D}/><path d="M12 13.5V3.5M7.5 5.5h9l-1 6h-7z"/><path d="M5 18.5 3 21.5M9 18.5l-1.4 3M15 18.5l1.4 3M19 18.5l2 3"/>`),
   frigate: svg(`<path d="M2.5 14.5h19l-2.4 5.5H4.9z" ${D}/><path d="M8 14.5V3.5M16 14.5V5.5M5 5.5h6v3.5H5zM13 7.5h6v3h-6zM5 11h6M13 12.5h6"/><circle cx="7" cy="17" r=".9" ${S}/><circle cx="12" cy="17" r=".9" ${S}/><circle cx="17" cy="17" r=".9" ${S}/>`),
   destroyer: svg(`<path d="M1.5 15.5h21l-3.6 4.5H4.2z" ${D}/><path d="M7.5 15.5v-3.5h7v3.5M10 12V8.5h3V12M11.5 8.5V4.5"/><path d="M14.5 13.5h5M4 14.5l3.5-1"/>`),
@@ -70,7 +72,7 @@ export const ICONS = {
   unknown: svg(`<circle cx="12" cy="12" r="8.2" ${D}/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r=".9" ${S}/>`),
 };
 // Class fallbacks so a future unit never renders a blank tile.
-const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank, ship: ICONS.war_galley };
+const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank, ship: ICONS.war_galley, transport: ICONS.transport_ship };
 // Tech tiles reuse a representative existing icon (weapon/shield/arrow/economy) instead of the "?" glyph.
 const TECH_ICON = {
   hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight,

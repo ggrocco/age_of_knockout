@@ -108,3 +108,32 @@ test('mid-map gold and stone between the bases', () => {
     }
   }
 });
+test('islands: no ground joins the home islands or the central island; ships reach them all; relics and rich ore on the centre', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const m = generateMap(seed, 112, 'islands'), n = m.size, idx = p => Math.floor(p.y) * n + Math.floor(p.x);
+    assert.equal(m.type, 'islands');
+    for (let i = 0; i < n * n; i++) assert.equal(m.tiles[i], m.tiles[n * n - 1 - i], 'mirrored ' + seed);
+    assert.ok(m.tiles.every(t => t !== 4), 'no shallows ' + seed);
+    // On foot (resources ignored, so nothing could ever be cut through): each start's island holds neither the other start
+    // nor the relics.
+    const walk = from => { const seen = new Uint8Array(n * n), st = [from]; seen[from] = 1; while (st.length) { const i = st.pop(), x = i % n, y = (i / n) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, j = ny * n + nx; if (nx >= 0 && ny >= 0 && nx < n && ny < n && !seen[j] && m.tiles[j] !== 1) { seen[j] = 1; st.push(j); } } } return seen; };
+    const home = walk(idx(m.starts[0])), centre = walk(idx(m.relicSpots[0]));
+    assert.ok(!home[idx(m.starts[1])] && !home[idx(m.relicSpots[0])], 'separate islands ' + seed);
+    for (const r of m.relicSpots) assert.ok(centre[idx(r)], 'relics share the central island ' + seed);
+    const rich = m.resources.filter(r => (r.type === 'gold' || r.type === 'stone') && centre[idx(r)]);
+    assert.ok(rich.length >= 6 && rich.every(r => r.amount > 800 || (r.type === 'stone' && r.amount > 600)), 'rich ore on the centre ' + seed);
+    // By sea: from the water nearest each start to the water nearest the centre.
+    const shoals = new Set(m.resources.map(idx)), nearSea = p => { let best = null, bd = Infinity; for (let i = 0; i < n * n; i++) if (m.tiles[i] === 1 && !shoals.has(i)) { const d = Math.hypot(i % n - p.x, ((i / n) | 0) - p.y); if (d < bd) { bd = d; best = { x: i % n, y: (i / n) | 0 }; } } return best; };
+    const seaA = nearSea(m.starts[0]), seaB = nearSea(m.starts[1]), seaC = nearSea(m.relicSpots[0]), blocked = (x, y) => shoals.has(y * n + x);
+    assert.ok(findPath(m, blocked, seaA, seaB, null, true) && findPath(m, blocked, seaA, seaC, null, true), 'one sea ' + seed);
+    for (const s of m.starts) {
+      assert.ok(Math.hypot(nearSea(s).x - s.x, nearSea(s).y - s.y) <= 24, 'coast near home ' + seed);
+      for (const type of ['tree', 'berry', 'gold', 'stone']) assert.ok(m.resources.some(r => r.type === type && Math.hypot(r.x - s.x, r.y - s.y) < 16), `${seed} ${type}`);
+      assert.ok(m.resources.filter(r => r.type === 'fish' && Math.hypot(r.x - s.x, r.y - s.y) < 30).length >= 3, 'fish off the coast ' + seed);
+    }
+  }
+});
+test('river maps are the default and stay as they were', () => {
+  assert.deepEqual(generateMap(7), generateMap(7, 112, 'rivers'));
+  assert.equal(generateMap(7).type, 'rivers');
+});

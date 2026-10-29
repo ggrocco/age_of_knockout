@@ -289,7 +289,27 @@ none checked against the openage data (deviations from AoE1 listed where there i
   Fishing Boat is Stone Age, 50 wood), Frigate (Age of Sail, 200 wood 100 gold, 360 HP, 20 melee splash 0.8, range 7) and
   Destroyer (Modern, 150 wood 200 gold, 520 HP, 30 melee splash 1, range 8, speed 2.4). Warships are class `ship`
   ("Warship"); the Fishing Ship is `civ`. Cannon-armed ships use melee attacks, like the siege guns, so they hurt
-  buildings. Ships keep one look in every era. No transports, trade ships or ship upgrades yet.
+  buildings. Ships keep one look in every era. No trade ships or ship upgrades yet.
+- **Transport Ship** (`units.js`, `carries: 8`): Bronze Age, 150 wood, 150 HP, armour 0/4, speed 2.1, unarmed, class
+  `transport`. AoE1 has a Light Transport (Tool Age, 5 aboard) and a Heavy Transport (Iron Age, 10): here there is one.
+  Boarding (`board` command, `doBoard`): units walk to the transport (an idle one sails to the shore nearest them, or
+  to one a boarder can walk to if they can't reach it) and go aboard, out of sight: they take no orders, can't be
+  targeted and give no sight, but count for population and for staying in the game. Unloading (`unload`, `doUnload`):
+  the transport sails to the water beside the shore nearest the target (ground walkable from the target when it is
+  ground) and puts everyone on the free ground there; relic carriers go on to store their relic, the rest walk on to
+  the target. A sunk transport kills everyone aboard (the attacker gets the kills); a relic aboard washes up on the
+  nearest free land.
+- **Island maps** (`map.js`, `mapType: 'islands'`, chosen in the menu or with `?map=islands`): open sea with a home
+  island round each start (radius 20 +/- 4, wobbly coast) and a central island (radius 11.5 +/- 2.5, its own mirror
+  image) holding the 5 relic spots and mirrored rich piles (4 x 1200 gold, 3 x 900 stone pairs). No shallows: no
+  ground at all joins two islands (generation retries otherwise), lagoons cut off from the open sea are filled in, and
+  each home island gets 4 extra woodlines (the sea takes the rest of the map's forests). Fish: up to 6 shoals off each
+  home island, 2 round the centre. The home gold patch is there; the mid-map ore patches are not.
+- **Bot on islands**: before it has a Transport Ship it keeps only 6 soldiers (nobody can land before then), builds its
+  Dock as soon as it reaches the Bronze Age (ahead of the age-up reserve) and its transports (`transports`: relaxed and
+  easy 1, medium and hard 2) before any warship. Attack waves sail as one convoy to the shore nearest the enemy Town
+  Center. In the relics round it sends a squad of up to 5 to the central island and ferries relic carriers home.
+  On a river map none of this changes anything: everything is one land mass.
 - **Reach** (`orders.js` `canHit`): a ship can target what lies within its range of open water; a soldier can target a
   ship within its range of walkable ground, so on deep water only ranged soldiers hit it, and in the shallows anyone
   can. Towers shoot ships like any unit. Ships never breach walls.

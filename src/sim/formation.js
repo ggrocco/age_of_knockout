@@ -39,6 +39,39 @@ export function nearestOpen(game, x, y, naval) {
   return null;
 }
 
+// Free ground joined on foot (4-neighbour, around buildings and resources) to the tile at (x, y), or for a unit caught on
+// a blocked tile, to the neighbours the pathfinder would step to from it (diagonals only past two free corners): a set of
+// tile indices.
+function groundFrom(game, x, y) {
+  const n = game.map.size, seen = new Set(), queue = [], open = (i, j) => i >= 0 && j >= 0 && i < n && j < n && passable(game.map.tiles[j * n + i], false) && !game.occAt(i, j);
+  const cx = Math.floor(x), cy = Math.floor(y), seed = (i, j) => { if (open(i, j) && !seen.has(j * n + i)) { seen.add(j * n + i); queue.push(j * n + i); } };
+  if (open(cx, cy)) seed(cx, cy);
+  else for (const [dx, dy] of DIRS) if (!(dx && dy) || (open(cx + dx, cy) && open(cx, cy + dy))) seed(cx + dx, cy + dy);
+  for (let k = 0; k < queue.length; k++) {
+    const t = queue[k], i = t % n, j = (t / n) | 0;
+    for (const [ni, nj] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) if (open(ni, nj) && !seen.has(nj * n + ni)) { seen.add(nj * n + ni); queue.push(nj * n + ni); }
+  }
+  return seen;
+}
+// Where a transport lands near (x, y): the open water tile (sea, a tile centre) beside free ground (shore, a tile
+// centre) nearest the point, by square rings, or null. With `from`, the shore must be ground one can walk to from there
+// (not a strip walled in by trees or buildings).
+export function landingNear(game, x, y, from = null) {
+  const n = game.map.size, cx = Math.floor(x), cy = Math.floor(y), tiles = game.map.tiles, ground = from && groundFrom(game, from.x, from.y);
+  const open = (i, j, naval) => i >= 0 && j >= 0 && i < n && j < n && passable(tiles[j * n + i], naval) && !game.occAt(i, j) && (naval || !ground || ground.has(j * n + i));
+  for (let r = 0; r < n; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const i = cx + dx, j = cy + dy;
+    if (!open(i, j, true) || tiles[j * n + i] !== 1) continue; // a deep-water tile, so it is not ground itself
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(i + ox, j + oy, false)) return { sea: { x: i + 0.5, y: j + 0.5 }, shore: { x: i + ox + 0.5, y: j + oy + 0.5 } };
+  }
+  return null;
+}
+// Up to `count` free ground tiles (tile centres) nearest (x, y) that are joined to it on foot, for passengers going ashore.
+export function landingTiles(game, x, y, count) {
+  return reachable(game, Math.floor(x), Math.floor(y), 4, false).slice(0, count).map(t => ({ x: t.x + 0.5, y: t.y + 0.5 }));
+}
+
 // Returns a Map unit id -> { x, y } (a tile centre) for two or more units.
 export function formationSlots(game, units, x, y) {
   const us = [...units].sort((a, b) => a.id - b.id), tx = Math.floor(x), ty = Math.floor(y);

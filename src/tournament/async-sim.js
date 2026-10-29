@@ -30,13 +30,13 @@ export function createAsyncSimulator(WorkerClass = globalThis.Worker, { fallback
     return true;
   };
   return {
-    simulate(roundId, seed, diffs) {
+    simulate(roundId, seed, diffs, opts = {}) {
       if (disposed) return Promise.reject(new Error('Simulator disposed'));
       return new Promise((resolve, reject) => {
-        const request = { args: [roundId, seed, diffs], resolve, reject };
+        const request = { args: [roundId, seed, diffs, opts], resolve, reject };
         if (broken || (!worker && !start())) return local(request);
         const id = ++nextId; pending.set(id, request); if (!timer) watch();
-        try { worker.postMessage({ id, roundId, seed, diffs }); } catch { abandon(); }
+        try { worker.postMessage({ id, roundId, seed, diffs, opts }); } catch { abandon(); }
       });
     },
     dispose() {

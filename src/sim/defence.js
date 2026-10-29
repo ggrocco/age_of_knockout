@@ -19,7 +19,7 @@ export function updateTower(game, b) {
   const c = centerOf(b), n = game.map.size, visible = game.players[b.owner].visible, reach = b.range * b.range;
   let target = null, best = Infinity;
   for (const u of game.units.values()) {
-    if (u.owner === b.owner || u.dead) continue;
+    if (u.owner === b.owner || u.dead || u.aboard) continue;
     const dx = u.x - c.x, dy = u.y - c.y, d2 = dx * dx + dy * dy;
     if (d2 > reach || d2 >= best) continue; // `>=`: a tie keeps the earlier (lower id) unit
     if (!visible[Math.floor(u.y) * n + Math.floor(u.x)]) continue;

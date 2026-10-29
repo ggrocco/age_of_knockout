@@ -6,6 +6,7 @@ import { farmStats } from '../data/farms.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 import { drawFrom } from './ore.js';
 import { canRepair } from './commands.js';
+import { landingTiles, landingNear } from './formation.js';
 
 const REACH = 1.0, CARRY = 10, RATE = { food: 0.7, wood: 0.6, gold: 0.5, stone: 0.5 };
 const IDLE = () => ({ type: 'idle' });
@@ -46,6 +47,8 @@ export function updateUnit(game, u) {
     case 'repair': return doRepair(game, u, o);
     case 'attack': return doAttack(game, u, o);
     case 'relic': return doRelic(game, u, o);
+    case 'board': return doBoard(game, u, o);
+    case 'unload': return doUnload(game, u, o);
   }
 }
 
@@ -157,7 +160,7 @@ export function hit(game, u, t) {
   if (u.splash) {
     const c = centerOf(t);
     for (const list of [game.units, game.buildings]) for (const e of [...list.values()]) {
-      if (e === t || e.dead || e.owner === u.owner) continue;
+      if (e === t || e.dead || e.owner === u.owner || e.aboard) continue;
       if (distPoint(c.x, c.y, e) <= u.splash) game.damage(e, damageTo(u, e) * 0.5, u);
     }
   }
@@ -167,6 +170,7 @@ export function hit(game, u, t) {
 // ground within reach of a ship (so only ranged soldiers hit a ship on deep water; anyone can hit one in the shallows).
 // Same-layer targets are always reachable as far as this goes. game.toWater / game.toLand hold each tile's distance.
 export function canHit(game, u, t) {
+  if (t.aboard) return false; // in a transport's hold: sink the transport instead
   const naval = !!u.naval;
   if (t.kind === 'unit' ? !!t.naval === naval : !naval && !BUILDINGS[t.type]?.naval) return true;
   const d = naval ? game.toWater : game.toLand, n = game.map.size, reach = Math.max(0.9, u.range - 0.5) + 0.05;
@@ -202,10 +206,10 @@ function doAttack(game, u, o) {
 
 // An idle soldier or warship takes on the nearest enemy in sight that it can get in range of (canHit), units before buildings.
 function aggro(game, u) {
-  if (u.cls === 'civ' || (game.time + u.id) % 5 !== 0) return;
+  if (u.cls === 'civ' || !(u.atk > 0) || (game.time + u.id) % 5 !== 0) return; // workers and unarmed transports never pick fights
   let best = null, bd = u.sight + 1;
   for (const e of game.units.values()) {
-    if (e.owner === u.owner) continue;
+    if (e.owner === u.owner || e.aboard) continue;
     const d = Math.hypot(e.x - u.x, e.y - u.y) - (e.cls === 'civ' ? 0.5 : 0); if (d < bd && canHit(game, u, e)) { bd = d; best = e; }
   }
   if (!best) for (const e of game.buildings.values()) {
@@ -251,4 +255,44 @@ function doRepair(game, u, o) {
   if (distPoint(u.x, u.y, b) <= REACH) { b.repairers = (b.repairers || 0) + 1; u.path = null; return; }
   const r = travel(game, u, goalNear(b, 0.95), centerOf(b));
   if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) endBuild(u, o); }
+}
+
+// ---- transports ----
+// Close enough to step aboard: a transport waits on the water next to the shore, so a soldier on the shore tile beside it
+// (up to a diagonal away) can board.
+const BOARD_REACH = 1.6;
+// Board: walk to the transport (following it while it moves) and step aboard, out of sight, while it has room; a full,
+// lost or foreign transport ends the order. Boarding drops the unit's other orders; a relic it carries comes along.
+function doBoard(game, u, o) {
+  const t = game.entities.get(o.target);
+  if (!t || t.dead || t.owner !== u.owner || !t.cargo || t.cargo.length >= UNITS[t.type].carries) return stop(u);
+  if (Math.hypot(t.x - u.x, t.y - u.y) <= BOARD_REACH) {
+    t.cargo.push(u.id); u.aboard = t.id; u.x = t.x; u.y = t.y; stop(u);
+    return;
+  }
+  const tt = tileOf(t), key = tt.x + ',' + tt.y;
+  if (u.path && o.last !== key) u.path = null; // the transport moved: head for where it is now
+  o.last = key;
+  const r = travel(game, u, (x, y) => Math.hypot(x + 0.5 - t.x, y + 0.5 - t.y) <= BOARD_REACH - 0.1, tt);
+  if (r !== 'fail' || t.order.type !== 'idle') return; // while it is still on its way to the shore, keep waiting
+  if (++o.fails > 8) return stop(u);
+  // It waits where this unit can't walk (a coast the base has walled in since): call it to a shore this unit can reach.
+  if (o.fails % 3 === 0) { const l = landingNear(game, u.x, u.y, u); if (l && Math.hypot(l.sea.x - t.x, l.sea.y - t.y) > 0.3) { t.order = { type: 'move', x: l.sea.x, y: l.sea.y, slack: 0 }; t.path = null; t.retry = 0; } }
+}
+// Unload: sail to the landing (o.x, o.y), a water tile beside the shore tile (o.sx, o.sy), and put every passenger ashore on
+// the free ground nearest it. Passengers carrying a relic take it on to a Town Center; the rest walk on to o.to, if given.
+function doUnload(game, u, o) {
+  if (!u.cargo?.length) return stop(u);
+  const to = { x: Math.floor(o.x), y: Math.floor(o.y) };
+  const r = Math.hypot(o.x - u.x, o.y - u.y) <= 1 ? 'arrived' : travel(game, u, (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack, to);
+  if (r === 'fail') { if (o.slack < 1) { o.slack = 1; u.retry = 0; } else stop(u); return; }
+  if (r !== 'arrived') return;
+  const people = u.cargo.map(id => game.entities.get(id)).filter(Boolean), spots = landingTiles(game, o.sx, o.sy, people.length);
+  if (!spots.length) return stop(u); // the shore is full: keep them aboard
+  people.forEach((p, i) => {
+    const s = spots[Math.min(i, spots.length - 1)];
+    p.aboard = null; p.x = s.x; p.y = s.y; p.path = null; p.retry = 0;
+    p.order = p.relic !== null ? { type: 'relic', relic: p.relic, phase: 'store', fails: 0 } : o.to ? { type: 'move', x: o.to.x, y: o.to.y, slack: 0 } : IDLE();
+  });
+  u.cargo = []; stop(u);
 }

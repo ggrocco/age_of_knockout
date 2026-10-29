@@ -144,3 +144,78 @@ test('a bot builds a Dock, keeps a fleet and fishes', () => {
   assert.ok(mine.filter(u => u.naval).every(u => passable(tileAt(g, u), true)));
   assert.equal(b.maxRejects < 20, true, JSON.stringify(b.why));
 });
+
+// ---- transports and island maps ----
+const islandGame = (seed = 4) => { const g = createGame({ seed, mapType: 'islands' }); for (const p of g.players) { p.explored.fill(1); p.age = 'iron'; p.res = { food: 9999, wood: 9999, gold: 9999, stone: 9999 }; } return g; };
+const sameIsland = (g, a, b) => { // on foot from a to b, ignoring resources and buildings
+  const n = g.map.size, seen = new Uint8Array(n * n), s = Math.floor(a.y) * n + Math.floor(a.x), st = [s]; seen[s] = 1;
+  while (st.length) { const i = st.pop(), x = i % n, y = (i / n) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, j = ny * n + nx; if (nx >= 0 && ny >= 0 && nx < n && ny < n && !seen[j] && g.map.tiles[j] !== 1) { seen[j] = 1; st.push(j); } } }
+  return !!seen[Math.floor(b.y) * n + Math.floor(b.x)];
+};
+function loadedTransport(g, people) {
+  const dock = dockFor(g), sp = g.findSpawn(dock, true), t = g.spawnUnit('transport_ship', 0, sp.x, sp.y);
+  assert.equal(g.command(0, { type: 'board', ids: people.map(u => u.id), transportId: t.id }).ok, true);
+  for (let i = 0; i < 20 * 120 && t.cargo.length < people.length; i++) g.tick();
+  return t;
+}
+
+test('a Transport Ship carries soldiers across the sea: they board out of sight, take no orders, and land where sent', () => {
+  const g = islandGame(), s = g.map.starts[0], e = g.map.starts[1];
+  const army = [0, 1, 2, 3, 4].map(k => g.spawnUnit('swordsman', 0, s.x - 1.5 + k, s.y + 3.5)), t = loadedTransport(g, army);
+  assert.equal(t.cargo.length, 5);
+  assert.ok(army.every(u => u.aboard === t.id && !g.visibleEntities(0).includes(u) && !g.visibleEntities(1).includes(u)), 'hidden aboard');
+  assert.equal(g.command(0, { type: 'move', ids: [army[0].id], x: s.x, y: s.y }).reason, 'no units', 'passengers take no orders');
+  const enemyArcher = g.spawnUnit('crossbowman', 1, t.x, t.y); assert.equal(canHit(g, enemyArcher, army[0]), false, 'nor can they be shot');
+  g.remove(enemyArcher);
+  g.recount(); const pop = g.players[0].pop;
+  assert.equal(g.command(0, { type: 'unload', transportId: t.id, x: e.x + 0.5, y: e.y + 0.5 }).ok, true);
+  for (let i = 0; i < 20 * 150 && t.cargo.length; i++) g.tick();
+  assert.equal(t.cargo.length, 0);
+  assert.ok(army.every(u => !u.aboard && passable(tileAt(g, u), false) && sameIsland(g, u, e)), 'ashore on the enemy island');
+  assert.equal(g.players[0].pop, pop, 'passengers counted in population all along');
+  assert.ok(army.every(u => u.order.type === 'move'), 'and walking on to where they were sent');
+});
+
+test('a transport refuses more than 8, and sinking it drowns everyone aboard; a relic aboard washes ashore', () => {
+  const g = islandGame(), s = g.map.starts[0];
+  const nine = Array.from({ length: 9 }, (_, k) => g.spawnUnit('clubman', 0, s.x - 4.5 + k, s.y + 3.5)), t = loadedTransport(g, nine);
+  assert.equal(t.cargo.length, 8, 'room for 8');
+  assert.equal(g.command(0, { type: 'board', ids: [nine.find(u => !u.aboard).id], transportId: t.id }).reason, 'transport full');
+  const aboard = nine.filter(u => u.aboard), relic = g.spawnRelic(t.x, t.y); relic.holder = aboard[0].id; aboard[0].relic = relic.id; // a relic in the hold
+  const enemy = g.spawnUnit('war_galley', 1, t.x, t.y), kills = g.players[1].kills;
+  g.damage(t, 9999, enemy); g.tick();
+  assert.ok(aboard.every(u => u.dead), 'all drowned');
+  assert.equal(g.players[1].kills - kills, 2 + 2 * 8, 'kills for the ship and everyone aboard');
+  assert.equal(relic.holder, null); assert.equal(g.map.tiles[Math.floor(relic.y) * g.map.size + Math.floor(relic.x)], 0, 'the relic lies on land');
+});
+
+test('carried relics: after landing, a relic carrier takes it on to a Town Center', () => {
+  const g = islandGame(), s = g.map.starts[0], c = g.map.relicSpots[0];
+  const carrier = g.spawnUnit('clubman', 0, s.x + 0.5, s.y + 3.5), relic = g.spawnRelic(carrier.x, carrier.y); relic.holder = carrier.id; carrier.relic = relic.id;
+  const t = loadedTransport(g, [carrier]);
+  g.command(0, { type: 'unload', transportId: t.id, x: c.x, y: c.y }); // over to the centre and back again
+  for (let i = 0; i < 20 * 120 && t.cargo.length; i++) g.tick();
+  g.command(0, { type: 'board', ids: [carrier.id], transportId: t.id });
+  for (let i = 0; i < 20 * 120 && !carrier.aboard; i++) g.tick();
+  g.command(0, { type: 'unload', transportId: t.id, x: s.x, y: s.y });
+  for (let i = 0; i < 20 * 200 && relic.stored === null; i++) g.tick();
+  assert.equal(g.relicOwner(relic), 0); assert.notEqual(relic.stored, null, 'stored at home');
+});
+
+test('on an island map the bot ferries an army to the enemy island and relic squads to the centre', () => {
+  // Death Match on islands: rich and in the Iron Age, so a hard bot crosses within minutes.
+  const g = createGame({ seed: 2, rules: roundById('deathmatch'), mapType: 'islands' }), b = createBot(g, 0, 'hard'), e = g.map.starts[1];
+  let landed = 0;
+  for (let i = 0; i < 20 * 900 && landed < 4; i++) {
+    g.tick(); if (g.time % 10 === 0) b.think();
+    if (g.time % 100 === 0) landed = [...g.units.values()].filter(u => u.owner === 0 && !u.naval && !u.aboard && sameIsland(g, u, e)).length;
+  }
+  assert.ok(landed >= 4, 'soldiers landed on the enemy island: ' + landed);
+  assert.ok([...g.units.values()].some(u => u.owner === 0 && u.type === 'transport_ship'));
+  assert.ok(b.maxRejects < 20, JSON.stringify(b.why));
+  // Capture the Relics on islands: the relics are on the central island; the bot fetches them home by sea.
+  const r = createGame({ seed: 3, rules: roundById('relics'), mapType: 'islands' }), rb = createBot(r, 0, 'hard');
+  for (let i = 0; i < 20 * 1500 && ![...r.relics.values()].some(x => r.relicOwner(x) === 0 && x.stored !== null); i++) { r.tick(); if (r.time % 10 === 0) rb.think(); }
+  assert.ok([...r.relics.values()].some(x => r.relicOwner(x) === 0 && x.stored !== null), 'a relic stored at home');
+  assert.ok(rb.maxRejects < 20, JSON.stringify(rb.why));
+});
