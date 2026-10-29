@@ -53,4 +53,9 @@ createServer(async (req, res) => {
   } catch {
     send(res, 404, 'Not Found');
   }
-}).listen(port, () => console.log(`Serving ${root} at http://localhost:${port}/`));
+}).listen(port, async () => {
+  console.log(`Serving ${root} at http://localhost:${port}/`);
+  // The pages import three.js straight from node_modules: without it they load as a blank page.
+  await stat(join(root, 'node_modules/three/build/three.module.js'))
+    .catch(() => console.error('three.js is missing from node_modules: run `npm install`, or the game page stays blank.'));
+});
