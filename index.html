@@ -42,6 +42,7 @@
     </form>
   </dialog>
 </div>
-<script type="module" src="src/main.js"></script>
+<!-- A module that fails to load (e.g. three.js not installed) would otherwise leave a blank page. -->
+<script type="module" src="src/main.js" onerror="const s = document.getElementById('screen'); s.classList.remove('hidden'); s.innerHTML = '<p style=&quot;max-width:32em;padding:1em;text-align:center&quot;>The game could not load its files (the browser console names the missing one). Running it from a checkout? Run <code>npm install</code>, then <code>npm start</code>.</p>';"></script>
 </body>
 </html>
