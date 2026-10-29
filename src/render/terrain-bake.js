@@ -1,25 +1,12 @@
 import * as THREE from 'three';
 
-// The small simulation grid stays on the CPU. The millions of decorative pixels
-// are generated into a mipmapped GPU texture, never read back during play.
-export function bakeTerrain(renderer, { size: n, tiles, starts }, seed, shore, scale = 24) {
-  const grid = new Float32Array(n * n * 4);
-  const updateGrid = () => {
-    for (let i = 0; i < n * n; i++) { grid[i * 4] = tiles[i]; grid[i * 4 + 1] = shore[i]; }
-    input.needsUpdate = true;
-  };
-  const input = new THREE.DataTexture(grid, n, n, THREE.RGBAFormat, THREE.FloatType);
-  const side = Math.min(n * scale, renderer.capabilities.maxTextureSize);
-  const target = new THREE.WebGLRenderTarget(side, side, {
-    type: THREE.UnsignedByteType, colorSpace: THREE.SRGBColorSpace,
-    minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true, depthBuffer: false,
-  });
-  target.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const material = new THREE.RawShaderMaterial({
+// The baking pass: a full-screen quad whose fragment shader paints the terrain from the tile grid.
+function createBakeMaterial(input, { size, starts }, seed, side) {
+  return new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
     uniforms: {
       terrainGrid: { value: input }, terrainSeed: { value: seed >>> 0 },
-      terrainSize: { value: n }, textureSide: { value: side },
+      terrainSize: { value: size }, textureSide: { value: side },
       startA: { value: new THREE.Vector2(starts[0].x + 0.5, starts[0].y + 0.5) },
       startB: { value: new THREE.Vector2(starts[1].x + 0.5, starts[1].y + 0.5) },
     },
@@ -27,25 +14,50 @@ export function bakeTerrain(renderer, { size: n, tiles, starts }, seed, shore, s
     fragmentShader: FRAGMENT,
     depthTest: false, depthWrite: false,
   });
+}
+
+// Renders `scene` into `target`, then restores the renderer's own target, viewport and scissor.
+function renderInto(renderer, target, side, scene, beforeRender) {
+  const previous = renderer.getRenderTarget(), viewport = renderer.getViewport(new THREE.Vector4());
+  const scissor = renderer.getScissor(new THREE.Vector4()), scissorTest = renderer.getScissorTest();
+  try {
+    beforeRender();
+    renderer.setRenderTarget(target); renderer.setViewport(0, 0, side, side); renderer.setScissorTest(false);
+    renderer.render(scene, new THREE.Camera());
+  } finally {
+    renderer.setRenderTarget(previous); renderer.setViewport(viewport);
+    renderer.setScissor(scissor); renderer.setScissorTest(scissorTest);
+  }
+}
+
+// The small simulation grid stays on the CPU. The millions of decorative pixels
+// are generated into a mipmapped GPU texture, never read back during play.
+export function bakeTerrain(renderer, map, seed, shore, scale = 24) {
+  const { size, tiles } = map;
+  // Per tile: red = tile type, green = shore distance.
+  const grid = new Float32Array(size * size * 4);
+  const updateGrid = () => {
+    for (let i = 0; i < size * size; i++) { grid[i * 4] = tiles[i]; grid[i * 4 + 1] = shore[i]; }
+    input.needsUpdate = true;
+  };
+  const input = new THREE.DataTexture(grid, size, size, THREE.RGBAFormat, THREE.FloatType);
+  const side = Math.min(size * scale, renderer.capabilities.maxTextureSize);
+  const target = new THREE.WebGLRenderTarget(side, side, {
+    type: THREE.UnsignedByteType, colorSpace: THREE.SRGBColorSpace,
+    minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true, depthBuffer: false,
+  });
+  target.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const material = createBakeMaterial(input, map, seed, side);
   const geometry = new THREE.PlaneGeometry(2, 2), scene = new THREE.Scene();
   scene.add(new THREE.Mesh(geometry, material));
-  const render = () => {
-    const previous = renderer.getRenderTarget(), viewport = renderer.getViewport(new THREE.Vector4());
-    const scissor = renderer.getScissor(new THREE.Vector4()), scissorTest = renderer.getScissorTest();
-    try {
-      updateGrid();
-      renderer.setRenderTarget(target); renderer.setViewport(0, 0, side, side); renderer.setScissorTest(false);
-      renderer.render(scene, new THREE.Camera());
-    } finally {
-      renderer.setRenderTarget(previous); renderer.setViewport(viewport); renderer.setScissor(scissor); renderer.setScissorTest(scissorTest);
-    }
-  };
+  const render = () => renderInto(renderer, target, side, scene, updateGrid);
   const disposeTarget = target.dispose.bind(target);
   target.dispose = () => { input.dispose(); geometry.dispose(); material.dispose(); disposeTarget(); };
   let stamp;
   target.refresh = version => {
     if (version === stamp) return;
-    render(); stamp = version;
+    render();
+    stamp = version;
   };
   try { render(); } catch (error) { target.dispose(); throw error; }
   return target;

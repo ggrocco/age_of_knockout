@@ -1,21 +1,32 @@
 import * as THREE from 'three';
 
-export function createGrass(game, mask, count = 14000) {
+const BLADE_WIDTH = 0.025, SEGMENT_HEIGHT = 0.12;
+
+// One clump: three bent blades, each two tapering segments, with dark roots and sunlit tips.
+function clumpGeometry() {
   const positions = [], colors = [];
-  // Three bent blades per clump, with dark roots and sunlit tips.
   for (let blade = 0; blade < 3; blade++) {
     const angle = blade * Math.PI / 3, c = Math.cos(angle), s = Math.sin(angle);
-    const vertex = (x, y, bend) => { positions.push(x * c + bend * s, y, -x * s + bend * c); colors.push(0.4 + y * 1.5, 0.5 + y * 1.25, 0.23 + y * 0.7); };
+    const vertex = (x, y, bend) => {
+      positions.push(x * c + bend * s, y, -x * s + bend * c);
+      colors.push(0.4 + y * 1.5, 0.5 + y * 1.25, 0.23 + y * 0.7);
+    };
     for (let segment = 0; segment < 2; segment++) {
-      const y0 = segment * 0.12, y1 = (segment + 1) * 0.12;
-      const w0 = 0.025 * (1 - segment / 2), w1 = 0.025 * (1 - (segment + 1) / 2);
+      const y0 = segment * SEGMENT_HEIGHT, y1 = (segment + 1) * SEGMENT_HEIGHT;
+      const w0 = BLADE_WIDTH * (1 - segment / 2), w1 = BLADE_WIDTH * (1 - (segment + 1) / 2);
       for (const [x, y] of [[-w0, y0], [w0, y0], [-w1, y1], [w0, y0], [w1, y1], [-w1, y1]]) vertex(x, y, y * y * 0.8);
     }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals();
-  const time = { value: 0 }, fog = { value: 1 };
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// Blades sway in the wind; the ground mask hides them on occupied tiles and in unexplored fog, and dims them in
+// explored fog.
+function grassMaterial(game, mask, time, fog) {
   const material = new THREE.MeshStandardMaterial({ color: 0x9aa769, vertexColors: true, roughness: 1, side: THREE.DoubleSide });
   material.onBeforeCompile = shader => {
     shader.uniforms.grassTime = time; shader.uniforms.groundMask = { value: mask }; shader.uniforms.showFog = fog;
@@ -34,21 +45,40 @@ export function createGrass(game, mask, count = 14000) {
       `);
   };
   material.customProgramCacheKey = () => `grass-${game.map.size}`;
-  const mesh = new THREE.InstancedMesh(geometry, material, count), matrix = new THREE.Matrix4(), transform = new THREE.Object3D();
-  mesh.receiveShadow = true; mesh.userData.skipAO = true; mesh.raycast = () => {};
+  return material;
+}
+
+// Scatters up to `count` clumps over plain land from the map's seed; returns how many were placed.
+function scatterClumps(mesh, game, count) {
+  const { size, tiles, starts } = game.map, matrix = new THREE.Matrix4(), transform = new THREE.Object3D();
   let seed = game.seed >>> 0, added = 0;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   for (let attempt = 0; added < count && attempt < count * 4; attempt++) {
-    const x = random() * game.map.size, z = random() * game.map.size;
-    if (game.map.tiles[Math.floor(z) * game.map.size + Math.floor(x)] !== 0) continue; // no grass in water or on ore (later patches: the mask)
+    const x = random() * size, z = random() * size;
+    if (tiles[Math.floor(z) * size + Math.floor(x)] !== 0) continue; // no grass in water or on ore (later patches: the mask)
     // Cluster growth into meadows instead of a uniform scatter of identical blades.
-    const patch = 0.5 + 0.5 * Math.sin(x * 0.68 + Math.sin(z * 0.23) * 2) * Math.sin(z * 0.57);
-    if (random() > 0.18 + patch * 0.8) continue;
-    if (game.map.starts.some(start => Math.hypot(x - start.x - 0.5, z - start.y - 0.5) < 2.6)) continue;
-    transform.position.set(x, 0.012, z); transform.rotation.y = random() * Math.PI * 2;
-    transform.scale.setScalar(0.6 + random() * 0.9); transform.updateMatrix(); matrix.copy(transform.matrix);
+    const meadow = 0.5 + 0.5 * Math.sin(x * 0.68 + Math.sin(z * 0.23) * 2) * Math.sin(z * 0.57);
+    if (random() > 0.18 + meadow * 0.8) continue;
+    if (starts.some(start => Math.hypot(x - start.x - 0.5, z - start.y - 0.5) < 2.6)) continue; // keep the start clear
+    transform.position.set(x, 0.012, z);
+    transform.rotation.y = random() * Math.PI * 2;
+    transform.scale.setScalar(0.6 + random() * 0.9);
+    transform.updateMatrix();
+    matrix.copy(transform.matrix);
     mesh.setMatrixAt(added++, matrix);
   }
+  return added;
+}
+
+export function createGrass(game, mask, count = 14000) {
+  const time = { value: 0 }, fog = { value: 1 };
+  const mesh = new THREE.InstancedMesh(clumpGeometry(), grassMaterial(game, mask, time, fog), count);
+  mesh.receiveShadow = true; mesh.userData.skipAO = true; mesh.raycast = () => {};
+  const added = scatterClumps(mesh, game, count);
   mesh.count = added; mesh.instanceMatrix.needsUpdate = true; mesh.computeBoundingSphere();
-  return { mesh, setCount(value) { mesh.count = Math.min(added, value); }, update(t, fogEnabled) { time.value = t; fog.value = fogEnabled ? 1 : 0; } };
+  return {
+    mesh,
+    setCount(value) { mesh.count = Math.min(added, value); },
+    update(t, fogEnabled) { time.value = t; fog.value = fogEnabled ? 1 : 0; },
+  };
 }

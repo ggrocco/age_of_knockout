@@ -1,26 +1,38 @@
 import * as THREE from 'three';
 
+// Shader motion modes (cosmeticMatrix in GLSL below): 1 spin, 2 sway, 3 float, 4 rising smoke; any part can also bob.
+const SPIN = 1, SWAY = 2, FLOAT = 3, SMOKE = 4, AXIS_INDEX = { x: 0, y: 1, z: 2 };
+
+// Tags every mesh under `root` with its motion; the batch uploads it once per instance.
+function markMotion(root, motion) {
+  root?.traverse(part => { if (part.isMesh) part.userData.cosmetic = { ...part.userData.cosmetic, ...motion }; });
+}
+
 // Per-part parameters, not per-frame poses. The gallery keeps its CPU animation path.
 export function prepareCosmetics(group, entity) {
-  const a = group.userData.anim;
+  const anim = group.userData.anim;
   group.userData.gpuCosmetics = true;
-  const mark = (root, motion) => root?.traverse(o => { if (o.isMesh) o.userData.cosmetic = { ...o.userData.cosmetic, ...motion }; });
-  if (a.type === 'building') {
-    mark(a.flag, { mode: 2, axis: 1, speed: 3, amplitude: 0.35 });
-    for (const s of a.spinners ?? []) mark(s.p, { mode: 1, axis: { x: 0, y: 1, z: 2 }[s.axis], speed: s.speed });
-    for (const f of a.floaters ?? []) mark(f.p, { mode: 3, speed: f.speed, amplitude: f.amp, phase: f.phase });
-    for (const s of a.smoke ?? []) mark(s.p, { mode: 4, speed: 0.35, phase: s.phase });
-  } else if (a.type === 'ship') {
-    mark(a.body, { bob: 0.025, bobPhase: entity.id });
-  } else if (a.type === 'drone') {
-    mark(a.body, { bob: 0.055, bobPhase: entity.id });
-    a.rotors.forEach((p, i) => mark(p, { mode: 1, axis: 1, speed: i % 2 ? 35 : -35 }));
+  if (anim.type === 'building') {
+    markMotion(anim.flag, { mode: SWAY, axis: 1, speed: 3, amplitude: 0.35 });
+    for (const spinner of anim.spinners ?? []) {
+      markMotion(spinner.p, { mode: SPIN, axis: AXIS_INDEX[spinner.axis], speed: spinner.speed });
+    }
+    for (const floater of anim.floaters ?? []) {
+      markMotion(floater.p, { mode: FLOAT, speed: floater.speed, amplitude: floater.amp, phase: floater.phase });
+    }
+    for (const puff of anim.smoke ?? []) markMotion(puff.p, { mode: SMOKE, speed: 0.35, phase: puff.phase });
+  } else if (anim.type === 'ship') {
+    markMotion(anim.body, { bob: 0.025, bobPhase: entity.id });
+  } else if (anim.type === 'drone') {
+    markMotion(anim.body, { bob: 0.055, bobPhase: entity.id });
+    anim.rotors.forEach((rotor, i) => markMotion(rotor, { mode: SPIN, axis: 1, speed: i % 2 ? 35 : -35 }));
   }
 }
 
 export function createCosmetics(capacity) {
   const uniforms = { cosmeticTime: { value: 0 }, cosmeticData: { value: null } };
   let data, texture;
+  // Two RGBA texels per instance in a 64-texel-wide float texture.
   function resize(count) {
     const next = new Float32Array(Math.ceil(count * 2 / 64) * 64 * 4);
     if (data) next.set(data.subarray(0, next.length));
@@ -31,9 +43,9 @@ export function createCosmetics(capacity) {
   resize(capacity);
   return {
     uniforms, resize,
-    set(id, p = {}) {
-      data.set([p.mode ?? 0, p.axis ?? 1, p.speed ?? 0, p.amplitude ?? 0,
-        p.phase ?? 0, p.bob ?? 0, p.bobPhase ?? 0, 0], id * 8);
+    set(id, motion = {}) {
+      data.set([motion.mode ?? 0, motion.axis ?? 1, motion.speed ?? 0, motion.amplitude ?? 0,
+        motion.phase ?? 0, motion.bob ?? 0, motion.bobPhase ?? 0, 0], id * 8);
       texture.needsUpdate = true;
     },
     patch(material) {
