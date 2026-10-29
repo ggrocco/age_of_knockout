@@ -15,6 +15,7 @@ import * as industrial from './industrial.js';
 import * as modern from './modern.js';
 import * as future from './future.js';
 import { mine } from './mine.js';
+import { dock } from './dock.js';
 import { GATES } from './gates.js';
 
 // Today's looks that stay, byte-identical (pinned by test/fixtures/kept-buildings.json).
@@ -39,8 +40,8 @@ export const designAge = (type, age) => {
 // The key also names the model cache entry, so it must determine the geometry: legacy eras that share a style share it.
 export function designOf(type, age) {
   const a = designAge(type, age);
-  // The Mine is one design (mine.js) that changes with the era.
-  if (type === 'mine') return { key: `mine:${a}`, kind: 'design', age: a };
+  // The Mine and the Dock are one design each (mine.js, dock.js) that changes with the era.
+  if (type === 'mine' || type === 'dock') return { key: `${type}:${a}`, kind: 'design', age: a };
   if (KEPT[a]?.includes(type)) return { key: `kept:${a}`, kind: 'kept', age: a };
   if (DESIGNS[a]?.[type]) return { key: a, kind: 'design', age: a };
   return { key: `legacy:${styleOf(a).key}`, kind: 'legacy', age: a };
@@ -50,5 +51,5 @@ export function archGeos(type, team, size, age) {
   const d = designOf(type, age);
   if (d.kind !== 'design') return legacyGeos(type, team, size, d.age);
   const ctx = designCtx(type, team, size, d.age);
-  return finish(ctx, (type === 'mine' ? mine : DESIGNS[d.age][type])(ctx));
+  return finish(ctx, (type === 'mine' ? mine : type === 'dock' ? dock : DESIGNS[d.age][type])(ctx));
 }

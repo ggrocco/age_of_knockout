@@ -53,15 +53,21 @@ desktop and touch. The match pauses while it is open and restores its previous p
 ## Architecture
 
 A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI: five rounds (Standard Game, Death Match,
-Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a 96-tile map.
+Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a 112-tile map.
 
 - `src/sim`: the game itself, **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (`game.js`) owns all
   state (entities/units/buildings/resources/relics Maps, occupancy grid). The player and the bot both act only through
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
-  rivers), `path.js` (A*), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
+  the river with its shallows, estuaries and home bays, fish), `path.js` (A*, on land or, for ships, on water), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
   `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
   gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
   runner and tests work.
+  - Tiles: 0 land, 1 deep water, 2 gold vein, 3 quarry, 4 shallows. Soldiers walk everything but deep water; ships
+    (units with `naval`) sail deep water and shallows only (`passable` in `util.js`). Only plain land takes buildings,
+    except the Mine (ore) and the Dock (deep water against the shore). `orders.js` `canHit` says whether a unit can ever
+    get a target of the other layer in range (from `game.toWater` / `game.toLand`, fixed per map); `aggro`, `doAttack`
+    and the bot use it, so no soldier path-searches the whole map for a ship it can never reach. Ships don't count
+    towards staying in the game (`isEliminated`), a Dock does.
   - `map.tiles` is no longer fixed after generation: ore patches (tiles 2 gold vein, 3 quarry) appear and revert to
     land (0) during play. Whatever changes `map.tiles` must bump `game.terrainVersion`; the terrain (`render/terrain.js`)
     and the minimap (`render/minimap.js`) compare it with the version they last drew and repaint when it moves on.

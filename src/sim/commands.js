@@ -2,8 +2,8 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
-import { secs, RES_KIND } from './util.js';
-import { formationSlots } from './formation.js';
+import { secs, RES_KIND, WATER, passable } from './util.js';
+import { formationSlots, nearestOpen } from './formation.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
@@ -31,14 +31,28 @@ export function canPlace(game, pid, type, x, y) {
   const def = BUILDINGS[type], n = game.map.size, p = game.players[pid];
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
   if (x < 1 || y < 1 || x + def.size > n - 1 || y + def.size > n - 1) return false;
-  // A Mine goes wholly on one patch that still holds ore; everything else only on plain land (not water, not ore).
+  // A Mine goes wholly on one patch that still holds ore, a Dock wholly on deep water; everything else only on plain land
+  // (not water, shallows or ore).
   const pat = def.ore ? game.patchAt[y * n + x] : 0;
   if (def.ore && !(game.patches.get(pat)?.reserve > 0)) return false;
   for (let j = y; j < y + def.size; j++) for (let i = x; i < x + def.size; i++) {
-    if ((def.ore ? game.patchAt[j * n + i] !== pat : game.map.tiles[j * n + i] !== 0) || game.occAt(i, j) || game.reserved.has(j * n + i) || !p.explored[j * n + i]) return false;
+    const tile = game.map.tiles[j * n + i];
+    if ((def.ore ? game.patchAt[j * n + i] !== pat : tile !== (def.naval ? WATER : 0)) || game.occAt(i, j) || game.reserved.has(j * n + i) || !p.explored[j * n + i]) return false;
   }
+  if (def.naval && !atShore(game, x, y, def.size)) return false;
   for (const r of game.relics.values()) if (r.holder === null && r.stored === null && r.x >= x && r.x < x + def.size && r.y >= y && r.y < y + def.size) return false;
   return true;
+}
+
+// A Dock's footprint at (x, y) touches the shore: a villager can stand beside it to build it, and a ship to be launched or
+// land its catch. Of the tiles along its four sides (corners left out), one is free ground and one is free water.
+function atShore(game, x, y, size) {
+  const n = game.map.size, open = (i, j, naval) => passable(game.map.tiles[j * n + i], naval) && !game.occAt(i, j) && !game.reserved.has(j * n + i);
+  let land = false, sea = false;
+  for (let k = 0; k < size; k++) for (const [i, j] of [[x + k, y - 1], [x + k, y + size], [x - 1, y + k], [x + size, y + k]]) {
+    land ||= open(i, j, false); sea ||= open(i, j, true);
+  }
+  return land && sea;
 }
 
 // Advancing out of `age` needs this many distinct finished buildings of that age (extras like the Farm and Wonder don't count).
@@ -65,15 +79,22 @@ export function execute(game, pid, cmd) {
     case 'move': {
       const us = ownUnits(game, pid, cmd.ids); if (!us.length) return fail('no units');
       if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('bad target');
-      const slots = us.length > 1 ? formationSlots(game, us, cmd.x, cmd.y) : null; // a group spreads out instead of piling onto one tile
-      for (const u of us) { const s = slots ? slots.get(u.id) : cmd; u.order = { type: 'move', x: s.x, y: s.y, slack: 0 }; u.path = null; u.retry = 0; }
+      // A group spreads out instead of piling onto one tile; soldiers and ships each form up on their own ground, and
+      // ships sent onto land head for the nearest water.
+      for (const group of [us.filter(u => !u.naval), us.filter(u => u.naval)]) {
+        if (!group.length) continue;
+        const at = group[0].naval ? nearestOpen(game, cmd.x, cmd.y, true) || cmd : cmd, slots = group.length > 1 ? formationSlots(game, group, at.x, at.y) : null;
+        for (const u of group) { const s = slots ? slots.get(u.id) : at; u.order = { type: 'move', x: s.x, y: s.y, slack: 0 }; u.path = null; u.retry = 0; }
+      }
       return OK;
     }
-    case 'gather': {
-      const us = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager'), r = game.entities.get(cmd.resourceId);
-      if (!us.length) return fail('no villagers');
+    case 'gather': { // villagers gather on land, Fishing Ships fish; each takes the orders for its own kind of resource
+      const all = ownUnits(game, pid, cmd.ids).filter(u => u.type === 'villager' || UNITS[u.type].capacity), r = game.entities.get(cmd.resourceId);
+      if (!all.length) return fail('no villagers');
       const ok = r && !r.dead && r.amount > 0 && (r.kind === 'resource' || (r.kind === 'building' && r.owner === pid && r.constructed && r.gatherType));
       if (!ok) return fail('bad resource');
+      const us = all.filter(u => u.naval === (r.type === 'fish'));
+      if (!us.length) return fail(r.type === 'fish' ? 'needs a fishing ship' : 'no villagers');
       const kind = r.gatherType || RES_KIND[r.type];
       for (const u of us) { u.order = { type: 'gather', res: r.id, kind, phase: 'go', fails: 0 }; u.path = null; u.retry = 0; if (u.carry.type !== kind) u.carry = { type: null, amount: 0 }; }
       return OK;
@@ -157,13 +178,13 @@ export function execute(game, pid, cmd) {
       return OK;
     }
     case 'attack': {
-      const us = ownUnits(game, pid, cmd.ids), t = game.entities.get(cmd.targetId);
+      const us = ownUnits(game, pid, cmd.ids).filter(u => u.atk > 0), t = game.entities.get(cmd.targetId); // a Fishing Ship has no attack
       if (!us.length) return fail('no units'); if (!t || t.dead || t.owner === pid || (t.kind !== 'unit' && t.kind !== 'building')) return fail('bad target');
       for (const u of us) { u.order = { type: 'attack', target: t.id, fails: 0 }; u.path = null; u.retry = 0; }
       return OK;
     }
     case 'relic': {
-      const us = ownUnits(game, pid, cmd.ids).filter(u => u.cls !== 'siege' && u.relic === null), r = game.relics.get(cmd.relicId);
+      const us = ownUnits(game, pid, cmd.ids).filter(u => u.cls !== 'siege' && !u.naval && u.relic === null), r = game.relics.get(cmd.relicId);
       if (!us.length) return fail('no carriers'); if (!r || r.holder !== null || r.stored !== null) return fail('relic unavailable');
       const u = us[0]; u.order = { type: 'relic', relic: r.id, phase: 'go', fails: 0 }; u.path = null; u.retry = 0;
       return OK;

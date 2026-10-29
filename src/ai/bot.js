@@ -4,19 +4,22 @@ import { BUILDINGS } from '../data/buildings.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, canRepair, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
-import { RES_KIND, centerOf, distPoint } from '../sim/util.js';
+import { RES_KIND, WATER, centerOf, distPoint } from '../sim/util.js';
+import { canHit } from '../sim/orders.js';
+import { nearestOpen } from '../sim/formation.js';
 import { parseTimeLimit } from '../time-limit.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
 // towers: how many Towers it keeps near its Town Center from the Tool Age on.
+// fleet: warships it keeps from the Bronze Age on (two more once it has seen enemy ships); fishers: Fishing Ships from the Medieval Age.
 // ageFirst: research and the second half of the army only spend what leaves the next age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
-  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1 },
-  easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true },
-  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2 },
-  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3 },
+  relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000, dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1, fleet: 1, fishers: 2 },
+  easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0, dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true, fleet: 2, fishers: 2 },
+  medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0, dmWave: 32, dmArmy: 44, towers: 2, fleet: 3, fishers: 3 },
+  hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0, dmWave: 38, dmArmy: 44, towers: 3, fleet: 4, fishers: 4 },
 };
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([k, d]) => [k, d.every]));
@@ -202,7 +205,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (game.result) return;
     const tc = mine('buildings').find(b => b.type === 'town_center' && b.constructed), anyBase = tc || mine('buildings').find(b => b.constructed);
     const units = mine('units'), vills = units.filter(u => u.type === 'villager');
-    const army = units.filter(u => u.cls !== 'civ' && u.type !== 'king');
+    const army = units.filter(u => u.cls !== 'civ' && u.type !== 'king' && !u.naval), ships = units.filter(u => u.naval);
     const roundId = game.rules ? game.rules.id : 'conquest';
     if (!anyBase && !vills.length && !army.length) return;
     const home = anyBase ? centerOf(anyBase) : (units[0] || game.map.starts[pid]);
@@ -292,13 +295,13 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- military production
     const armyCap = roundId === 'deathmatch' ? D.dmArmy : D.army;
-    const armyCount = army.length + done.reduce((n, b) => n + b.queue.filter(q => UNITS[q.unit].cls !== 'civ').length, 0);
+    const armyCount = army.length + done.reduce((n, b) => n + b.queue.filter(q => UNITS[q.unit].cls !== 'civ' && !UNITS[q.unit].naval).length, 0);
     const enemyClass = dominantEnemyClass(enemies); // counter-pick against what we can see
     if (!bot.saving && armyCount < armyCap && (vills.length >= D.villagers * 0.6 || roundId === 'deathmatch' || roundId === 'wonder')) {
       // Buildings whose pick ranks higher go first, so the best siege takes the two siege places (a Castle's Trebuchet before
       // a Government Center's Catapult) and the best unit gets the resources when they run short.
       const pref = PREF[enemyClass] || PREF.default;
-      const picks = done.filter(b => b.type !== 'town_center' && b.queue.length < (roundId === 'deathmatch' ? 4 : 2))
+      const picks = done.filter(b => b.type !== 'town_center' && b.type !== 'dock' && b.queue.length < (roundId === 'deathmatch' ? 4 : 2))
         .map(b => ({ b, u: bestUnit(BUILDINGS[b.type].trains || [], enemyClass) })).filter(p => p.u).sort((a, c) => pref.indexOf(a.u) - pref.indexOf(c.u));
       for (const { b, u } of picks) {
         if (!canPay(UNITS[u].cost) || me.pop >= me.popCap) continue;
@@ -311,7 +314,70 @@ export function createBot(game, pid, difficulty = 'medium') {
 
     // --- military orders
     orderArmy(army, enemies, home, roundId, vis);
+    navy(ships, done, buildings, free, enemies, home, roundId);
   }
+
+  // ---- the navy: a Dock in the home bay, Fishing Ships, and a small fleet that patrols to the enemy's bay ----
+  const SHIPS = ['destroyer', 'frigate', 'war_galley']; // newest first
+  // Dock spots, nearest home first: every 3x3 block of deep water against the shore, beside ground we can walk to from our
+  // start, on our side of the map and within 30 tiles of it. Fixed terrain, so worked out once; canPlace is checked when used.
+  let dockSpots = null;
+  function findDockSpots() {
+    const n = game.map.size, own = game.map.starts[pid], out = [], wet = (x, y) => game.map.tiles[y * n + x] === WATER;
+    for (let y = 1; y < n - 4; y++) for (let x = 1; x < n - 4; x++) {
+      const c = { x: x + 1.5, y: y + 1.5 }, d = dist(c, own);
+      if (d > 30 || d >= dist(c, enemyStart)) continue;
+      let ok = true; for (let j = y; j < y + 3 && ok; j++) for (let i = x; i < x + 3; i++) if (!wet(i, j)) { ok = false; break; }
+      if (!ok) continue;
+      let land = false, sea = false;
+      for (let k = 0; k < 3; k++) for (const [i, j] of [[x + k, y - 1], [x + k, y + 3], [x - 1, y + k], [x + 3, y + k]]) { land ||= !!reach[j * n + i]; sea ||= wet(i, j); }
+      if (land && sea) out.push({ x, y, d });
+    }
+    return out.sort((a, b) => a.d - b.d);
+  }
+  function navy(ships, done, buildings, free, enemies, home, roundId) {
+    if (ageIndex(me.age) < ageIndex(BUILDINGS.dock.age) || roundId === 'wonder') return; // the Wonder round saves for its Wonder
+    const docks = done.filter(b => b.type === 'dock');
+    if (!buildings.some(b => b.type === 'dock') && !bot.saving && free.length >= 6 && leavesAgeUp(BUILDINGS.dock.cost) && canPay(BUILDINGS.dock.cost)) {
+      dockSpots ??= findDockSpots();
+      const sp = dockSpots.find(p => canPlace(game, pid, 'dock', p.x, p.y));
+      const v = sp && free.filter(u => u.order.type !== 'repair').sort((a, b) => dist(a, sp) - dist(b, sp))[0];
+      if (v) cmd({ type: 'build', ids: [v.id], building: 'dock', x: sp.x, y: sp.y });
+      else if (!sp && dockSpots.length && game.time - (bot.dockScout ?? -Infinity) > 1200) { // the bay is still unexplored: walk a villager over
+        const p = dockSpots[0], n = game.map.size, v2 = free.sort((a, b) => dist(a, p) - dist(b, p))[0];
+        if (v2 && !game.players[pid].explored[(p.y + 1) * n + p.x + 1]) { bot.dockScout = game.time; cmd({ type: 'move', ids: [v2.id], x: p.x + 1.5, y: p.y + 1.5 }); }
+      }
+    }
+    if (!docks.length) return;
+    const dock = docks[0], queued = type => done.reduce((k, b) => k + b.queue.filter(q => q.unit === type).length, 0);
+    const fishers = ships.filter(u => u.type === 'fishing_ship'), fleet = ships.filter(u => u.cls === 'ship');
+    // Fishing Ships: train up to `fishers`, and send idle ones to the nearest fish we know of.
+    const fish = game.knownResources(pid).filter(r => r.type === 'fish' && r.amount > 0);
+    if (ageIndex(me.age) >= ageIndex(UNITS.fishing_ship.age) && fish.length && fishers.length + queued('fishing_ship') < D.fishers && dock.queue.length < 2
+      && canPay(UNITS.fishing_ship.cost) && me.pop < me.popCap) cmd({ type: 'train', buildingId: dock.id, unit: 'fishing_ship' });
+    for (const u of fishers) if (u.order.type === 'idle') { const f = fish.sort((a, b) => dist(a, u) - dist(b, u))[0]; if (f) cmd({ type: 'gather', ids: [u.id], resourceId: f.id }); }
+    // Warships: the newest we can build, up to `fleet` (two more once enemy ships show up), never out of the next age-up.
+    const enemyShips = enemies.filter(e => e.kind === 'unit' && e.naval), want = D.fleet + (enemyShips.length ? 2 : 0);
+    const best = SHIPS.find(t => ageIndex(UNITS[t].age) <= ageIndex(me.age));
+    if (!bot.saving && fleet.length + SHIPS.reduce((k, t) => k + queued(t), 0) < want && dock.queue.length < 2 && canPay(UNITS[best].cost)
+      && (!D.ageFirst || leavesAgeUp(UNITS[best].cost)) && me.pop < me.popCap) cmd({ type: 'train', buildingId: dock.id, unit: best });
+    // Idle warships take the nearest target they can reach (enemy ships first), else, while a land wave is on, sail to the
+    // enemy's bay (the mirror of our Dock) and back to our Dock in turn.
+    const targets = enemies.filter(e => (e.kind === 'unit' || e.constructed) && fleet.length && canHit(game, fleet[0], e));
+    for (const u of fleet) {
+      if (u.order.type !== 'idle') continue;
+      const t = targets.filter(e => e.naval).sort((a, b) => dist(a, u) - dist(b, u))[0] || targets.sort((a, b) => dist(a, u) - dist(b, u))[0];
+      if (t && dist(t, u) < 30) { cmd({ type: 'attack', ids: [u.id], targetId: t.id }); continue; }
+      if (!bot.waveActive) continue;
+      const n = game.map.size, c = centerOf(dock), legs = [nearestOpen(game, n - c.x, n - c.y, true), nearestOpen(game, c.x, c.y, true)];
+      const leg = fleetLeg.get(u.id) ?? 0, to = legs[leg];
+      if (!to) continue;
+      fleetLeg.set(u.id, dist(u, to) < 5 || sentLeg.get(u.id) === leg ? 1 - leg : leg); // there (or stuck short of it): turn round
+      const next = legs[fleetLeg.get(u.id)];
+      if (cmd({ type: 'move', ids: [u.id], x: next.x, y: next.y })) sentLeg.set(u.id, fleetLeg.get(u.id));
+    }
+  }
+  const fleetLeg = new Map(), sentLeg = new Map(); // ship id -> the leg (0 to the enemy's bay, 1 home) it is on, and was last sent on
 
   const SIEGE = ['railgun', 'field_artillery', 'cannon', 'trebuchet', 'catapult'];
   const RESEARCH_PREF = ['woodworking', 'gold_mining', 'sacred_harvest', 'colonial_trade', 'electrification', 'masonry', 'bronze_weapons', 'bronze_shields',
@@ -331,7 +397,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   };
   function dominantEnemyClass(enemies) {
     const n = {};
-    for (const e of enemies) if (e.kind === 'unit' && e.cls && e.cls !== 'civ') n[e.cls] = (n[e.cls] || 0) + 1;
+    for (const e of enemies) if (e.kind === 'unit' && e.cls && e.cls !== 'civ' && !e.naval) n[e.cls] = (n[e.cls] || 0) + 1;
     let best = null, bn = 0;
     for (const k in n) if (n[k] > bn) { bn = n[k]; best = k; }
     return best;
@@ -379,7 +445,7 @@ export function createBot(game, pid, difficulty = 'medium') {
       }
       // find the closest resource of this kind near a dropsite
       let res = null, bs = Infinity;
-      for (const r of known) if (RES_KIND[r.type] === kind && r.amount > 0) { const s = dist(r, v) + 1.5 * Math.min(dropDist(kind, r, done), 25); if (s < bs) { bs = s; res = r; } }
+      for (const r of known) if (RES_KIND[r.type] === kind && r.type !== 'fish' && r.amount > 0) { const s = dist(r, v) + 1.5 * Math.min(dropDist(kind, r, done), 25); if (s < bs) { bs = s; res = r; } }
       if (kind === 'food') { // prefer farms once berries are far away
         const farms = done.filter(b => b.gatherType === 'food' && b.amount > 0);
         const nearestFarm = farms.sort((a, b) => dist(a, v) - dist(b, v))[0];
@@ -416,7 +482,7 @@ export function createBot(game, pid, difficulty = 'medium') {
 
   function orderArmy(army, enemies, home, roundId, vis) {
     if (!army.length) return;
-    const threats = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && dist(e, home) < 14);
+    const threats = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval && dist(e, home) < 14); // ships are the towers' and the fleet's
     const idle = army.filter(u => u.order.type === 'idle');
     // relics: send the nearest free soldier to each loose relic (idle or mid-wave), one per relic
     if (roundId === 'relics') {
@@ -447,9 +513,9 @@ export function createBot(game, pid, difficulty = 'medium') {
     let vault = null;
     if (roundId === 'relics') { const ids = new Set([...game.relics.values()].filter(r => r.stored !== null && game.relicOwner(r) === enemy).map(r => r.stored)); vault = enemies.find(e => ids.has(e.id)); }
     if (king) target = king; else if (wonder) target = wonder; else if (vault) target = vault;
-    if (!target) target = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ').sort((a, b) => dist(a, c) - dist(b, c))[0]
+    if (!target) target = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0]
       || enemies.filter(e => e.kind === 'building').sort((a, b) => dist(a, c) - dist(b, c))[0]
-      || enemies.filter(e => e.kind === 'unit').sort((a, b) => dist(a, c) - dist(b, c))[0];
+      || enemies.filter(e => e.kind === 'unit' && !e.naval).sort((a, b) => dist(a, c) - dist(b, c))[0];
     // Siege goes for the defences first: a siege unit with no attack order of its own (idle, on a sweep move, or only
     // auto-aggro on something else) takes the finished enemy tower nearest it that we can see. A commanded attack, a
     // breach (an attack with `resume`) and an attack already on a tower are kept.

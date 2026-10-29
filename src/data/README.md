@@ -260,10 +260,44 @@ untuned placeholder. Nothing here comes from the openage data.
   so gold can't crowd out the quarries).
 - **Pile respawn** (`ore.js`): every 30 s, if a kind's loose piles hold under 25% of its starting total and 120 s have
   passed since the last respawn, a mirrored 2x2 block of piles appears on each side (800 gold / 600 stone each), more than
-  13 tiles from either start and more than 8 from the map centre (the relic land bridge), never on a loose relic, and
+  13 tiles from either start and more than 8 from the map centre (the relic shallows), never on a loose relic, and
   only where a tile beside each block is reachable on foot from a Town Center (a 4-neighbour flood through land and ore
   ground, blocked by water, resources and buildings). Respawned patches also avoid loose relics.
 - **Bot** (`ai/bot.js`): digs Mines only on patches in its own half that its villagers can reach (computed once on the
   bare map), when its loose piles of that kind run out.
 - **Look** (`render/arch/mine.js`): the Mine varies by era to satisfy the architecture invariants (distinct per era, team
   colour, footprint, height cap); the wheel and the cart animate while it is finished.
+
+## Invented content (water, the Dock and ships)
+
+AoE1 has Docks and ships, but this game's water, rules and numbers are its own: invented, game-tuned approximations,
+none checked against the openage data (deviations from AoE1 listed where there is a counterpart).
+
+- **Map** (`map.js`, 112 tiles since 2026-10-29, was 96): a navigable river (5-7 tiles wide) runs edge to edge between
+  the starts, through **shallows** (tile 4) over the centre (the relic spots, kept dry) and at a ford on each half;
+  past each ford it opens into an estuary lake, and each player has a home bay, a channel from the river to a lake
+  whose edge is 17-20 tiles from the start. 1-3 small ponds remain. About 9% of the map is water or shallows. Shallows
+  are walked by soldiers and sailed by ships; nothing is built or placed on them. AoE1's shallows let land units cross
+  but not ships.
+- **Fish**: mirrored shoals of 300 food on open deep water (all eight neighbours wet, 3 tiles apart): 4 in each home
+  bay, 3 in each estuary, up to 3 along each half of the river. AoE1 fish hold 250 (shore) to 400 (deep).
+- **Dock** (`buildings.js`): Bronze Age (AoE1: Stone), 100 wood, 3x3, 35 s, 600 HP, sight 6, `extra: true` (never counts
+  toward an age-up), `naval: true`. It stands wholly on deep water with free ground and free water along its sides
+  (`atShore` in `commands.js`). It trains every ship and takes only the Fishing Ships' food; villagers never drop there.
+- **Ships** (`units.js`, `naval: true`): War Galley (Bronze, 135 wood 30 gold, 200 HP, 8 pierce, range 6, armour 0/3,
+  speed 2.0; modelled on AoE1's War Galley), Fishing Ship (Medieval, 75 wood, 75 HP, no attack, carries 15 a trip; AoE1's
+  Fishing Boat is Stone Age, 50 wood), Frigate (Age of Sail, 200 wood 100 gold, 360 HP, 20 melee splash 0.8, range 7) and
+  Destroyer (Modern, 150 wood 200 gold, 520 HP, 30 melee splash 1, range 8, speed 2.4). Warships are class `ship`
+  ("Warship"); the Fishing Ship is `civ`. Cannon-armed ships use melee attacks, like the siege guns, so they hurt
+  buildings. Ships keep one look in every era. No transports, trade ships or ship upgrades yet.
+- **Reach** (`orders.js` `canHit`): a ship can target what lies within its range of open water; a soldier can target a
+  ship within its range of walkable ground, so on deep water only ranged soldiers hit it, and in the shallows anyone
+  can. Towers shoot ships like any unit. Ships never breach walls.
+- **Elimination** (`rounds/index.js`): ships don't keep a side in the game (AoE1's last-boat hunts); a Dock does, as a
+  building that trains units.
+- **Bot**: from the Bronze Age, once it has six free villagers and the next age-up stays affordable, it builds one Dock in
+  its home bay (on its side, within 30 tiles, beside ground it can walk to), sending a villager to look if the bay is
+  still unexplored. It trains the newest warship up to `fleet` (relaxed 1, easy 2, medium 3, hard 4; two more once it
+  sees enemy ships) and, from the Medieval Age, `fishers` Fishing Ships (2, 2, 3, 4). Warships attack the nearest target
+  they can reach, enemy ships first; while a land wave is on, idle ones sail between the enemy's bay and their own Dock.
+  It never sends soldiers after ships. The Wonder round skips the navy.

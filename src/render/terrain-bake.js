@@ -124,7 +124,8 @@ void main() {
     float sand = max(0.0,1.0-shore/2.0)*0.7;
     color = mix(vec3(83.0,94.0,47.0)+broad*vec3(30.0,30.0,16.0),vec3(141.0,119.0,80.0),earth);
     color = mix(color,vec3(166.0,150.0,106.0),sand);
-    if (kind >= 2.0) color = mix(color,oreColor(p,ivec2(pixel),kind),oreWeight(p,kind));
+    if (kind == 4.0) color = vec3(76.0,104.0,88.0) + broad*vec3(18.0,16.0,10.0); // shallows: a wet sand bed seen through clear water
+    if (kind == 2.0 || kind == 3.0) color = mix(color,oreColor(p,ivec2(pixel),kind),oreWeight(p,kind));
   }
   color = clamp(color+(detail-0.5)*17.0+grain*13.0,0.0,255.0);
   // The sRGB render attachment encodes linear output. Subsequent terrain sampling

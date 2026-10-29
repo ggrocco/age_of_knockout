@@ -10,7 +10,7 @@ import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
 export const COLORS = { food: '#e0554d', wood: '#a06a35', gold: '#facc15', stone: '#9ca3af' };
-const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored' };
+const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored', ship: 'Warship' };
 
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
@@ -37,6 +37,7 @@ export const DESC = {
   power_plant: 'Modern Age generating station that researches Electrification (all gathering 10% faster). Needed, with an Airfield, to reach AI Future.',
   airfield: 'Modern Age airstrip that researches Air Support (+30 HP for Tanks and siege) and trains Combat Drones in the AI Future Age. Needed, with a Power Plant, to reach AI Future.',
   mine: 'A shaft on rocky ground. Build it on a gold vein for gold or a quarry for stone; every Mine on a patch shares its reserve, and the patch is gone when it runs dry.',
+  dock: 'Harbour built on deep water against the shore. Trains ships and takes the Fishing Ships\' catch. Does not count toward advancing an Age.',
   tower: 'Shoots the nearest enemy in range, on its own. Towers built in a later Age are tougher and hit harder. Does not count toward advancing an Age.',
   wall: 'One-tile barrier that blocks every unit, yours too. It has no gates: leave a gap or delete it. Walls built in a later Age are tougher.',
   villager: 'Gathers food, wood, gold and stone and builds every structure. Weak in a fight.',
@@ -63,6 +64,10 @@ export const DESC = {
   drone: 'Fast Future Age skirmisher that fires from long range.',
   mech: 'Future Age walker with 200 health and heavy armor. Slow, tough and hard-hitting.',
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
+  fishing_ship: 'Fishes the shoals in the bays and the river and brings the catch to a Dock. Cannot fight.',
+  war_galley: 'Bronze Age oared warship. Shoots arrows at ships and at anything near the shore; soldiers can only hit it from the bank with ranged attacks, or in the shallows.',
+  frigate: 'Age of Sail warship whose cannon broadsides splash nearby targets and batter buildings by the water.',
+  destroyer: 'Modern warship: fast, heavily armoured and long-ranged, with guns that splash nearby targets.',
   king: 'Regicide only: if your King falls, the match is lost. Keep him safe.',
   age: 'Research the next Age to unlock stronger units and buildings.',
   delete: 'Asks you to confirm before removing this building. Nothing is refunded, and queued training or research is lost.',
@@ -76,7 +81,7 @@ const cap = s => s[0].toUpperCase() + s.slice(1);
 const row = (label, value, wide) => `<div${wide ? ' class="wide"' : ''}><dt>${label}</dt><dd>${value}</dd></div>`;
 const names = ids => ids.map(i => (UNITS[i] || BUILDINGS[i]).name).join(', ');
 
-const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train units, and completed Wonders. Other buildings alone cannot keep an empire alive.';
+const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train units, and completed Wonders. Other buildings alone cannot keep an empire alive, and neither can ships without a Dock.';
 const ROUND_INFO = {
   conquest: { icon: 'town_center', goal: CONQUEST_GOAL },
   deathmatch: { icon: 'barracks', goal: CONQUEST_GOAL, start: 'Iron Age with 20,000 of each resource.' },

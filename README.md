@@ -78,7 +78,7 @@ their finite mode/difficulty limits so the bracket always resolves.
 
 ![Stone Age village with the Town Center selected: the HUD offers Villager, Advance: Tool and Delete](docs/screenshots/village.jpg)
 
-You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few villagers on a 96-tile map, at a random point on a ring
+You start in the Stone Age (Death Match: Iron Age) with a Town Center and a few villagers on a 112-tile map, at a random point on a ring
 around the centre (the opponent mirrors you). Gather food, wood, gold and stone, build houses for population, and
 **advance through nine eras**: Stone, Tool, Bronze, Iron, Medieval, Age of Sail, Industrial, Modern and AI Future.
 Each era unlocks units and buildings and changes how your buildings look. To advance you need a Town Center and
@@ -99,9 +99,9 @@ The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +
 +20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
 foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster; the station also trains the Armored Train),
 Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks, Armored Trains and siege +30 HP). The Airfield also trains the Combat Drone once you reach AI Future. Farms, Mines,
-Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
+Docks, Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
-catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers and the King keep one look.
+catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers, the King and ships keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
 180 and 200 in AI Future (each house adds 4, the Town Center 10).
 Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 600, 750, 900, 1050, 1250, 1500 and
@@ -126,6 +126,25 @@ on the map, one for each side, each holding a third of what the emptied patch st
 once that third would be under 400 no new pair appears, and at most 8 gold and 4 stone patches exist at once. Loose gold and stone piles run out too: when a kind drops below a quarter of its starting
 total, new mirrored piles appear (a block for each side, away from both bases and the centre). The opponent digs Mines on
 its own half of the map when its piles run low.
+
+**Water and ships.** A river runs across every map between the two bases, from edge to edge, opening into a lake
+past each ford, and each player has a home bay off it, a short walk from the Town Center. There is always a way to
+attack on foot: soldiers wade the light-blue **shallows** over the centre (where the relics are) and at a ford on each
+side, and only deep water stops them. From the Bronze Age a villager can build a **Dock** (100 wood) on deep water
+against the shore; it trains the ships, which sail the deep water and the shallows of the whole river, so the two home
+fleets can meet:
+
+| Ship | Age | Cost | Role |
+| --- | --- | --- | --- |
+| War Galley | Bronze | 135 wood, 30 gold | Oared warship, shoots arrows |
+| Fishing Ship | Medieval | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock |
+| Frigate | Age of Sail | 200 wood, 100 gold | Cannon broadsides that splash and batter buildings by the water |
+| Destroyer | Modern | 150 wood, 200 gold | Fast, armoured, long-ranged guns that splash |
+
+A ship can hit anything within its range of the water, ships first; soldiers on the bank can only hit a ship with ranged
+attacks, but a ship in the shallows can be attacked by anyone, and Towers shoot ships too. Ships alone don't keep a
+beaten side in the game (a Dock does). The opponent builds a Dock in its bay, fishes from the Medieval Age, and keeps a
+small fleet that answers yours and patrols to your bay during its attacks.
 
 ### Controls (desktop)
 
@@ -159,7 +178,7 @@ siege, and villagers at the back.
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
-tree/mine/farm = gather, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
+tree/mine/farm = gather, fish = fish with Fishing Ships, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
 Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap

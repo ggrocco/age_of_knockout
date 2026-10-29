@@ -40,17 +40,20 @@ export function createTerrain(game, renderer, preset) {
   ground.rotation.x = -Math.PI / 2; ground.position.set(n / 2, 0, n / 2); ground.receiveShadow = true;
 
   // Water remains clipped to the simulation grid; its normal map animates without
-  // altering the ground used for picking or pathfinding.
-  const positions = [], uvs = [], shores = [];
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (waterAt(x, y)) {
+  // altering the ground used for picking or pathfinding. Shallows (tile 4, where soldiers wade) are water too, drawn
+  // lighter and clearer over their sandy bed: `ford` is 1 on their vertices.
+  const positions = [], uvs = [], shores = [], fords = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (waterAt(x, y) || tiles[y * n + x] === 4) {
+    const ford = tiles[y * n + x] === 4 ? 1 : 0;
     for (const [px, py] of [[x,y], [x,y+1], [x+1,y], [x+1,y], [x,y+1], [x+1,y+1]]) {
-      positions.push(px, 0.025, py); uvs.push(px / 4, py / 4); shores.push(shoreAt(px, py));
+      positions.push(px, 0.025, py); uvs.push(px / 4, py / 4); shores.push(shoreAt(px, py)); fords.push(ford);
     }
   }
   const waterGeometry = new THREE.BufferGeometry();
   waterGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   waterGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  waterGeometry.setAttribute('shore', new THREE.Float32BufferAttribute(shores, 1)); waterGeometry.computeVertexNormals();
+  waterGeometry.setAttribute('shore', new THREE.Float32BufferAttribute(shores, 1));
+  waterGeometry.setAttribute('ford', new THREE.Float32BufferAttribute(fords, 1)); waterGeometry.computeVertexNormals();
   const normalData = new Uint8Array(128 * 128 * 4), tau = Math.PI * 2;
   for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
     const u = x / 128 * tau, v = y / 128 * tau;
@@ -71,17 +74,19 @@ export function createTerrain(game, renderer, preset) {
   });
   waterMaterial.onBeforeCompile = shader => {
     shader.uniforms.waterTime = waterTime;
-    shader.vertexShader = `attribute float shore; varying float waterShore; varying vec2 waterWorld;\n${shader.vertexShader}`
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nwaterShore = shore; waterWorld = position.xz;');
-    shader.fragmentShader = `uniform float waterTime; varying float waterShore; varying vec2 waterWorld;\n${shader.fragmentShader}`
+    shader.vertexShader = `attribute float shore; attribute float ford; varying float waterShore; varying float waterFord; varying vec2 waterWorld;\n${shader.vertexShader}`
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nwaterShore = shore; waterFord = ford; waterWorld = position.xz;');
+    shader.fragmentShader = `uniform float waterTime; varying float waterShore; varying float waterFord; varying vec2 waterWorld;\n${shader.fragmentShader}`
       .replace('#include <color_fragment>', `#include <color_fragment>
-        float shallows = 1.0 - smoothstep(0.8, 2.7, waterShore);
+        float shallows = max(1.0 - smoothstep(0.8, 2.7, waterShore), waterFord);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.31, 0.25), shallows * 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.5, 0.47), waterFord * 0.5);
+        diffuseColor.a *= 1.0 - waterFord * 0.15;
         float foam = pow(0.5 + 0.5 * sin(waterWorld.x * 3.0 + waterWorld.y * 4.0 - waterTime * 0.8), 8.0);
-        diffuseColor.rgb += (1.0 - smoothstep(0.85, 1.25, waterShore)) * foam * 0.16;
+        diffuseColor.rgb += max(1.0 - smoothstep(0.85, 1.25, waterShore), waterFord * 0.3) * foam * 0.16;
       `);
   };
-  waterMaterial.customProgramCacheKey = () => 'water-shore-v1';
+  waterMaterial.customProgramCacheKey = () => 'water-shore-v2';
   const water = new THREE.Mesh(waterGeometry, waterMaterial); water.raycast = () => {};
 
   // Red = knowledge/visibility, green = occupancy. Decorative grass never reveals
@@ -99,7 +104,7 @@ export function createTerrain(game, renderer, preset) {
         maskStamp = game.time;
         for (let i = 0; i < n * n; i++) {
           maskData[i * 4] = game.players[0].visible[i] ? 255 : game.players[0].explored[i] ? 100 : 0;
-          maskData[i * 4 + 1] = game.occAt(i % n, i / n | 0) || tiles[i] >= 2 ? 255 : 0; maskData[i * 4 + 3] = 255; // no grass on ore either
+          maskData[i * 4 + 1] = game.occAt(i % n, i / n | 0) || tiles[i] >= 2 ? 255 : 0; maskData[i * 4 + 3] = 255; // no grass on ore or shallows either
         }
         mask.needsUpdate = true;
       }

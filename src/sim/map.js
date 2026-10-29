@@ -1,6 +1,6 @@
 import { makeRng } from './rng.js';
 // 180-degree rotationally symmetric map so both players get identical terrain and resources.
-export function generateMap(seed, size = 96) {
+export function generateMap(seed, size = 112) {
   for (let attempt = 0; attempt < 20; attempt++) {
     const m = build(seed + attempt * 1000, size);
     if (connected(m)) return m;
@@ -30,34 +30,45 @@ function build(seed, size) {
   const a = rng.next() * Math.PI * 2, R = size / 2 - 14;
   const s0 = { x: Math.round(mid + Math.cos(a) * R), y: Math.round(mid + Math.sin(a) * R) }, s1 = rot(s0.x, s0.y);
   const far = (x, y) => dist(x, y, s0) > 13 && dist(x, y, s1) > 13 && Math.hypot(x - mid, y - mid) > 9;
-  const wet = (x, y) => { // water on (x, y) and its mirror tile
+  // Tile 1 is deep water (ships only), tile 4 shallows (ships and soldiers both cross; nothing is built or placed there).
+  const wet = (x, y, v = 1) => { // water on (x, y) and its mirror tile; shallows never fill in deep water
     if (x < 0 || y < 0 || x >= size || y >= size || dist(x, y, s0) <= 15 || dist(x, y, s1) <= 15) return;
-    const q = rot(x, y); tiles[y * size + x] = 1; tiles[q.y * size + q.x] = 1;
+    const q = rot(x, y), i = y * size + x, j = q.y * size + q.x;
+    if (tiles[i] !== 1) tiles[i] = v;
+    if (tiles[j] !== 1) tiles[j] = v;
   };
-  for (let b = 0; b < 2 + rng.int(3); b++) { // small lakes
-    const cx = rng.int(size), cy = rng.int(size), r = 2 + rng.int(3);
-    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (Math.hypot(x - cx, y - cy) <= r && far(x, y)) wet(x, y);
-  }
-  // A meandering river runs edge to edge between the players. Its sideways offset is an odd function of t,
-  // so the mirrored half joins it smoothly at the centre. Crossings: a wide land bridge over the centre
-  // (where the relics are) and a ford on each half.
+  const disc = (cx, cy, r, v = 1, keep = () => true) => { // water on a disc and its mirror
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) if (Math.hypot(x - cx, y - cy) <= r && keep(x, y)) wet(x, y, v);
+  };
+  for (let b = 0; b < 1 + rng.int(3); b++) { const cx = rng.int(size), cy = rng.int(size); disc(cx, cy, 2 + rng.int(3), 1, far); } // small ponds
+  // A meandering, navigable river runs edge to edge between the players. Its sideways offset is an odd function of t,
+  // so the mirrored half joins it smoothly at the centre. Soldiers cross it (there is always a way to attack on foot) at
+  // the shallows over the centre, where the relics are, and at a shallow ford on each half; ships sail the whole river.
   const d = a + Math.PI / 2 + (rng.next() - 0.5) * 0.6, dir = { x: Math.cos(d), y: Math.sin(d) }, perp = { x: -dir.y, y: dir.x };
-  const amp = 3 + rng.next() * 4, freq = 0.07 + rng.next() * 0.05, ford = size * (0.22 + rng.next() * 0.1), bank = [];
-  for (let t = 7; t < size; t += 0.5) {
-    const off = amp * Math.sin(t * freq), px = mid + dir.x * t + perp.x * off, py = mid + dir.y * t + perp.y * off;
+  const amp = 3 + rng.next() * 4, freq = 0.07 + rng.next() * 0.05, ford = size * (0.24 + rng.next() * 0.08), bank = [];
+  const along = t => { const off = amp * Math.sin(t * freq); return { x: mid + dir.x * t + perp.x * off, y: mid + dir.y * t + perp.y * off }; };
+  const halfWidth = t => 3 + 0.8 * Math.sin(t * 0.21), CENTRE = 12;
+  for (let t = 0; t < size; t += 0.5) {
+    const { x: px, y: py } = along(t), w = halfWidth(t), shallow = t < CENTRE || Math.abs(t - ford) < w + 2.5; // fords at least 5 tiles across
     if (px < -2 || py < -2 || px > size + 1 || py > size + 1) break;
-    if (Math.abs(t - ford) < 2.5) continue;
-    const w = 1.3 + 0.4 * Math.sin(t * 0.21);
-    for (let y = Math.floor(py - w); y <= Math.ceil(py + w); y++) for (let x = Math.floor(px - w); x <= Math.ceil(px + w); x++) if (Math.hypot(x - px, y - py) <= w) wet(x, y);
-    if (t % 2 === 0) for (const side of [-1, 1]) bank.push({ x: px + perp.x * side * (w + 1.5), y: py + perp.y * side * (w + 1.5) });
+    disc(px, py, w, shallow ? 4 : 1);
+    if (!shallow && t % 2 === 0) for (const side of [-1, 1]) bank.push({ x: px + perp.x * side * (w + 1.5), y: py + perp.y * side * (w + 1.5) });
   }
+  // Past each ford the river opens into an estuary lake, and each player has a home bay: a channel from the river to a
+  // lake 17 tiles or more from their start, so a Dock is a short walk from home. The bays are mirror images, both on the
+  // one river, so the two home fleets can meet.
+  const te = ford + 9 + rng.next() * 6, e = along(te); disc(e.x, e.y, 6 + rng.next() * 2);
+  const side = rng.next() < 0.5 ? 1 : -1, tb = side * (CENTRE + 2 + rng.next() * Math.max(1, ford - CENTRE - 10)), p0 = along(tb);
+  const toward = Math.hypot(p0.x - s0.x, p0.y - s0.y), lake = { x: s0.x + (p0.x - s0.x) * 24 / toward, y: s0.y + (p0.y - s0.y) * 24 / toward };
+  for (let k = 0; k <= 1; k += 0.5 / toward) disc(lake.x + (p0.x - lake.x) * k, lake.y + (p0.y - lake.y) * k, 2.4);
+  disc(lake.x, lake.y, 6.5);
   const resources = [], taken = new Set(), key = (x, y) => y * size + x; let nid = 0;
   const ok = (x, y) => x >= 1 && y >= 1 && x < size - 1 && y < size - 1 && !tiles[key(x, y)] && !taken.has(key(x, y));
   const place = (type, x, y, amount, mirror = true) => {
     const pts = mirror ? [[x, y], [size - 1 - x, size - 1 - y]] : [[x, y]];
     for (const [px, py] of pts) if (ok(px, py)) { taken.add(key(px, py)); resources.push({ id: 'r' + nid++, type, x: px + 0.5, y: py + 0.5, amount }); }
   };
-  const AMOUNT = { tree: 100, berry: 200, gold: 800, stone: 600 };
+  const AMOUNT = { tree: 100, berry: 200, gold: 800, stone: 600, fish: 300 };
   const ring = (type, count, rMin, rMax) => {
     for (let k = 0, placed = 0; placed < count && k < 200; k++) {
       const a = rng.next() * Math.PI * 2, r = rMin + rng.next() * (rMax - rMin);
@@ -70,14 +81,14 @@ function build(seed, size) {
   // Rocky ore patches (tile 2 gold vein, 3 quarry) for Mines. Each is placed with its 180-degree mirror or not at all.
   const orePatches = [], MINE_TILE = { gold: 2, stone: 3 }, pair = (type, x, y, amount) => { // a mirrored pair of piles, both or neither
     const q = rot(x, y);
-    if (!ok(x, y) || !ok(q.x, q.y) || (x === q.x && y === q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // also off the relic land bridge
+    if (!ok(x, y) || !ok(q.x, q.y) || (x === q.x && y === q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // also off the relic shallows at the centre
     place(type, x, y, amount); return true;
   };
   const patch = (kind, cx, cy, w, h, reserve) => {
     const x0 = Math.round(cx - w / 2), y0 = Math.round(cy - h / 2), own = new Set(), mir = new Set();
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
       const q = rot(x, y);
-      if (!ok(x, y) || !ok(q.x, q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // dry, free, clear of the relic land bridge
+      if (!ok(x, y) || !ok(q.x, q.y) || Math.hypot(x - mid, y - mid) <= 8) return false; // dry, free, clear of the relic shallows at the centre
       own.add(key(x, y)); mir.add(key(q.x, q.y));
     }
     for (const i of own) if (mir.has(i)) return false;
@@ -111,6 +122,19 @@ function build(seed, size) {
   for (let c = 0; c < 3; c++) { const a = rng.next() * Math.PI * 2, r = 11 + rng.next() * 3; forest(s0.x + Math.cos(a) * r, s0.y + Math.sin(a) * r, 2.5, 0.75, home); }
   for (let f = 0, count = Math.round(size * size / 480); f < count; f++) forest(rng.int(size), rng.int(size), 2 + rng.next() * 2.5, 0.7, far);
   for (const p of bank) if (rng.next() < 0.3) forest(p.x, p.y, 0.5, 1, far);
+  // Fish (food for Fishing Ships), mirrored, in each home bay, estuary and along the river. Only on open water (all eight
+  // neighbours wet) and 3 tiles apart, so a shoal never closes a channel or sits against the shore.
+  const fishAt = [], open = (x, y) => { for (let j = y - 1; j <= y + 1; j++) for (let i = x - 1; i <= x + 1; i++) if (i < 0 || j < 0 || i >= size || j >= size || tiles[key(i, j)] !== 1) return false; return true; };
+  const shoal = (cx, cy, r, count) => {
+    for (let k = 0, got = 0; got < count && k < 60; k++) {
+      const x = Math.round(cx + (rng.next() * 2 - 1) * r), y = Math.round(cy + (rng.next() * 2 - 1) * r), q = rot(x, y);
+      if (!open(x, y) || (x === q.x && y === q.y) || fishAt.some(f => Math.max(Math.abs(f.x - x), Math.abs(f.y - y)) < 3 || Math.max(Math.abs(f.x - q.x), Math.abs(f.y - q.y)) < 3)) continue;
+      for (const [px, py] of [[x, y], [q.x, q.y]]) { taken.add(key(px, py)); fishAt.push({ x: px, y: py }); resources.push({ id: 'r' + nid++, type: 'fish', x: px + 0.5, y: py + 0.5, amount: AMOUNT.fish }); }
+      got++;
+    }
+  };
+  shoal(lake.x, lake.y, 4.5, 4); shoal(e.x, e.y, 5, 3);
+  for (let k = 0; k < 3; k++) { const p = along(CENTRE + 2 + rng.next() * (size / 2 - CENTRE - 2)); shoal(p.x, p.y, 1.5, 1); }
   const c = size / 2 | 0;
   const relicSpots = [[c, c], [c - 4, c - 6], [c + 4, c + 6], [c - 6, c + 4], [c + 6, c - 4]].map(([x, y]) => ({ x: x + 0.5, y: y + 0.5 }));
   for (const r of relicSpots) { const x = Math.floor(r.x), y = Math.floor(r.y), q = rot(x, y); tiles[y * size + x] = 0; tiles[q.y * size + q.x] = 0; }

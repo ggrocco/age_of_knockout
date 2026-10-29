@@ -1,14 +1,16 @@
 // Where each unit of a group move stands: a block of rows centred on the clicked point, facing the way the group travels
 // (from its centroid to the point, snapped to one of 8 directions). Melee fighters take the front rows, then ranged units,
 // then siege, then villagers; each kind starts a new row. Every unit gets its own tile, one the target can be reached from.
+// A group is all soldiers or all ships (commands.js splits a mixed one): ships take their slots on open water.
+import { passable } from './util.js';
 
 const RANK = u => u.cls === 'civ' ? 3 : u.cls === 'siege' ? 2 : u.cls !== 'armor' && u.range >= 2 ? 1 : 0;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 // Tiles reachable from (tx, ty) by the pathfinder's rules (8-neighbour, no corner cutting) within `r` tiles, nearest first.
-function reachable(game, tx, ty, r) {
-  const n = game.map.size, free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && game.map.tiles[y * n + x] !== 1 && !game.occAt(x, y);
-  if (!free(tx, ty)) { // clicked on water or a building: start from the nearest open tile
+function reachable(game, tx, ty, r, naval = false) {
+  const n = game.map.size, free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && passable(game.map.tiles[y * n + x], naval) && !game.occAt(x, y);
+  if (!free(tx, ty)) { // clicked on water (land for a ship) or a building: start from the nearest open tile
     let best = null, bd = Infinity;
     for (let y = ty - r; y <= ty + r; y++) for (let x = tx - r; x <= tx + r; x++) {
       const d = Math.hypot(x - tx, y - ty); if (free(x, y) && d < bd) { bd = d; best = [x, y]; }
@@ -26,6 +28,17 @@ function reachable(game, tx, ty, r) {
   return out;
 }
 
+// The open tile (a tile centre) nearest (x, y) for this layer, by square rings, or null: ships sent onto land sail to the shore.
+export function nearestOpen(game, x, y, naval) {
+  const n = game.map.size, cx = Math.floor(x), cy = Math.floor(y);
+  for (let r = 0; r < n; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    const tx = cx + dx, ty = cy + dy;
+    if (tx >= 0 && ty >= 0 && tx < n && ty < n && passable(game.map.tiles[ty * n + tx], naval) && !game.occAt(tx, ty)) return { x: tx + 0.5, y: ty + 0.5 };
+  }
+  return null;
+}
+
 // Returns a Map unit id -> { x, y } (a tile centre) for two or more units.
 export function formationSlots(game, units, x, y) {
   const us = [...units].sort((a, b) => a.id - b.id), tx = Math.floor(x), ty = Math.floor(y);
@@ -39,7 +52,7 @@ export function formationSlots(game, units, x, y) {
     for (let i = 0; i < group.length; i += cols) rows.push(group.slice(i, i + cols).sort((a, b) => side(a) - side(b) || a.id - b.id));
   }
   // Offsets are whole steps along forward/right, so on a diagonal every slot still lands on its own tile.
-  const front = Math.floor((rows.length - 1) / 2), tiles = reachable(game, tx, ty, cols + rows.length + 6), used = new Set(), out = new Map();
+  const front = Math.floor((rows.length - 1) / 2), tiles = reachable(game, tx, ty, cols + rows.length + 6, us[0].naval), used = new Set(), out = new Map();
   rows.forEach((row, i) => row.forEach((u, j) => {
     const k = front - i, c = j - Math.floor((row.length - 1) / 2), sx = tx + k * fx + c * rx, sy = ty + k * fy + c * ry;
     let best = null, bd = Infinity;

@@ -10,6 +10,8 @@ export function prepareCosmetics(group, entity) {
     for (const s of a.spinners ?? []) mark(s.p, { mode: 1, axis: { x: 0, y: 1, z: 2 }[s.axis], speed: s.speed });
     for (const f of a.floaters ?? []) mark(f.p, { mode: 3, speed: f.speed, amplitude: f.amp, phase: f.phase });
     for (const s of a.smoke ?? []) mark(s.p, { mode: 4, speed: 0.35, phase: s.phase });
+  } else if (a.type === 'ship') {
+    mark(a.body, { bob: 0.025, bobPhase: entity.id });
   } else if (a.type === 'drone') {
     mark(a.body, { bob: 0.055, bobPhase: entity.id });
     a.rotors.forEach((p, i) => mark(p, { mode: 1, axis: 1, speed: i % 2 ? 35 : -35 }));

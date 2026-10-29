@@ -27,5 +27,11 @@ export const UNITS = {
   drone:        { name: 'Combat Drone', hp: 45, atk: 6, atkType: 'pierce', marmor: 0, parmor: 1, range: 7, speed: 3.0, cost: c(60, 0, 80), trainTime: 28, age: 'future', sight: 9, cls: 'archer' },
   mech:         { name: 'Mech Walker', hp: 200, atk: 20, atkType: 'melee', marmor: 5, parmor: 3, range: 0.9, speed: 1.5, cost: c(120, 0, 90), trainTime: 36, age: 'future', sight: 6, cls: 'inf' },
   railgun:      { name: 'Railgun', hp: 90, atk: 80, atkType: 'pierce', marmor: 0, parmor: 0, range: 11, speed: 1.0, cost: c(0, 120, 150), trainTime: 55, age: 'future', sight: 9, cls: 'siege', splash: 1.2 },
+  // Ships, trained at the Dock (invented; unverified approximations, see README.md). naval: they move on water and
+  // shallows only. The War Galley is modelled on AoE1's; the Fishing Ship carries `capacity` fish a trip.
+  fishing_ship: { name: 'Fishing Ship', hp: 75, atk: 0, atkType: 'melee', marmor: 0, parmor: 2, range: 0.9, speed: 1.9, cost: c(0, 75), trainTime: 30, age: 'medieval', sight: 6, cls: 'civ', naval: true, capacity: 15 },
+  war_galley:   { name: 'War Galley', hp: 200, atk: 8, atkType: 'pierce', marmor: 0, parmor: 3, range: 6, speed: 2.0, cost: c(0, 135, 30), trainTime: 40, age: 'bronze', sight: 8, cls: 'ship', naval: true, cooldown: 40 },
+  frigate:      { name: 'Frigate', hp: 360, atk: 20, atkType: 'melee', marmor: 2, parmor: 5, range: 7, speed: 1.8, cost: c(0, 200, 100), trainTime: 50, age: 'sail', sight: 9, cls: 'ship', naval: true, cooldown: 50, splash: 0.8 },
+  destroyer:    { name: 'Destroyer', hp: 520, atk: 30, atkType: 'melee', marmor: 4, parmor: 7, range: 8, speed: 2.4, cost: c(0, 150, 200), trainTime: 55, age: 'modern', sight: 10, cls: 'ship', naval: true, cooldown: 40, splash: 1 },
   king:         { name: 'King', hp: 120, atk: 5, atkType: 'melee', marmor: 2, parmor: 0, range: 0.9, speed: 1.4, cost: c(), trainTime: 1, age: 'stone', sight: 6, cls: 'civ', trainable: false },
 };

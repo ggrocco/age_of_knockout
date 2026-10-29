@@ -1,7 +1,7 @@
 // Era looks for units trained in an earlier era than their owner's current one. A unit keeps what tells it apart (its
 // weapon family, shield, scale, mount or chassis role) but takes the owner's era uniform, weapon finish, mount and
-// siege chassis: a Scout in the AI Future rides a hoverbike, a Catapult in the Age of Sail is a mortar. Villagers and
-// the King keep one look. unitEra and eraSpec are pure data; the geometry builders share models.js's toolkit.
+// siege chassis: a Scout in the AI Future rides a hoverbike, a Catapult in the Age of Sail is a mortar. Villagers,
+// the King and ships keep one look. unitEra and eraSpec are pure data; the geometry builders share models.js's toolkit.
 import { UNITS } from '../data/units.js';
 import { AGES, ageIndex } from '../data/ages.js';
 import { B, C, TEAM, unit } from './builder.js';
@@ -13,7 +13,7 @@ const remap = pairs => new Map(pairs);
 // The era a unit is drawn in: its owner's era once that is past the unit's own, else the unit's own era.
 export function unitEra(type, age) {
   const spec = UNITS[type], native = spec?.age ?? 'stone';
-  if (!spec || spec.cls === 'civ' || !AGES.includes(age)) return native;
+  if (!spec || spec.cls === 'civ' || spec.naval || !AGES.includes(age)) return native;
   return ageIndex(age) > ageIndex(native) ? age : native;
 }
 

@@ -1,4 +1,5 @@
 import { BUILDINGS } from '../data/buildings.js';
+import { UNITS } from '../data/units.js';
 import { canPlace, canAfford } from '../sim/commands.js';
 import { lineTiles } from '../sim/util.js';
 
@@ -55,7 +56,8 @@ export function createInput(ui) {
   function orderAt(t, gp, ids) {
     const vids = ids.filter(id => g().entities.get(id).type === 'villager');
     if (t && (t.kind === 'unit' || t.kind === 'building') && t.owner === 1) return ui.cmd({ type: 'attack', ids, targetId: t.id });
-    if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
+    // Villagers and Fishing Ships both gather; the command sends each only to its own kind of resource (fish are the ships').
+    if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: ids.filter(id => { const e = g().entities.get(id); return e.type === 'villager' || UNITS[e.type].capacity; }), resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && t.gatherType && t.constructed) return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && !t.constructed) return ui.cmd({ type: 'construct', ids: vids, targetId: t.id });
     if (vids.length && repairable(t)) return ui.cmd({ type: 'repair', ids: vids, targetId: t.id });

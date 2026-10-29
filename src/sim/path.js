@@ -1,5 +1,7 @@
 // A* on a tile grid. 8-neighbour, no corner cutting. Returns tiles after `from` up to the goal,
-// [] if already there, null if unreachable. isGoal lets callers stop next to a blocked target.
+// [] if already there, null if unreachable. isGoal lets callers stop next to a blocked target. naval: search the water
+// (deep water and shallows) instead of the land.
+import { passable } from './util.js';
 class Heap {
   constructor() { this.a = []; }
   get size() { return this.a.length; }
@@ -14,11 +16,11 @@ function buffers(n) {
   if (++buf.gen === 0xffffffff) { buf.seen.fill(0); buf.closed.fill(0); buf.gen = 1; }
   return buf;
 }
-export function findPath(map, blocked, from, to, isGoal) {
+export function findPath(map, blocked, from, to, isGoal, naval = false) {
   const n = map.size;
   const goal = isGoal || ((x, y) => x === to.x && y === to.y);
   if (goal(from.x, from.y)) return [];
-  const free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && map.tiles[y * n + x] !== 1 && !blocked(x, y);
+  const free = (x, y) => x >= 0 && y >= 0 && x < n && y < n && passable(map.tiles[y * n + x], naval) && !blocked(x, y);
   if (!isGoal && !free(to.x, to.y)) return null;
   const { gen, seen, closed, g, prev } = buffers(n);
   const h = (x, y) => { const dx = Math.abs(x - to.x), dy = Math.abs(y - to.y); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };

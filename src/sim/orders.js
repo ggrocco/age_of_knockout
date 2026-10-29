@@ -1,6 +1,7 @@
 import { findPath } from './path.js';
 import { breachTarget } from './defence.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { UNITS } from '../data/units.js';
 import { farmStats } from '../data/farms.js';
 import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 import { drawFrom } from './ore.js';
@@ -14,7 +15,7 @@ const goalNear = (t, r) => (x, y) => distPoint(x + 0.5, y + 0.5, t) <= r;
 function travel(game, u, goal, to) {
   if (!u.path) {
     if (u.retry > game.time) return 'wait';
-    u.path = findPath(game.map, game.blocked, { x: Math.floor(u.x), y: Math.floor(u.y) }, to, goal);
+    u.path = findPath(game.map, game.blocked, { x: Math.floor(u.x), y: Math.floor(u.y) }, to, goal, u.naval);
     if (!u.path) { u.retry = game.time + 40; return 'fail'; }
     if (u.path.length === 0) { u.path = null; u.x = Math.floor(u.x) + 0.5; u.y = Math.floor(u.y) + 0.5; return 'arrived'; }
   }
@@ -49,29 +50,31 @@ export function updateUnit(game, u) {
 }
 
 // A move that cannot reach its tile first settles for within 2 tiles of it. If even that fails and enemy buildings are in the
-// way, the unit breaks through them, then tries for the exact tile again (slack back to 0); otherwise it stops.
+// way, the unit breaks through them, then tries for the exact tile again (slack back to 0); otherwise it stops. Ships never
+// breach: walls stand on land.
 function doMove(game, u, o) {
   const to = { x: Math.floor(o.x), y: Math.floor(o.y) }, goal = (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack;
   const r = travel(game, u, goal, to);
   if (r === 'arrived') return stop(u);
   if (r !== 'fail') return;
   if (o.slack < 2) { o.slack = 2; u.retry = 0; return; }
-  const id = breachTarget(game, u, to, goal);
+  const id = u.naval ? null : breachTarget(game, u, to, goal);
   if (id === null) return stop(u);
   o.slack = 0; breach(u, id, o);
 }
 
+// Ships fish and land at a Dock; villagers gather everything else and never drop at a Dock.
 function nearestResource(game, u, kind, maxDist) {
   let best = null, bd = maxDist;
   const consider = e => { const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < bd) { bd = d; best = e; } };
-  for (const r of game.resources.values()) if (RES_KIND[r.type] === kind && r.amount > 0) consider(r);
-  for (const b of game.buildings.values()) if (b.owner === u.owner && b.constructed && b.gatherType === kind && b.amount > 0) consider(b); // own Farms and Mines
+  for (const r of game.resources.values()) if (RES_KIND[r.type] === kind && r.amount > 0 && (r.type === 'fish') === u.naval) consider(r);
+  if (!u.naval) for (const b of game.buildings.values()) if (b.owner === u.owner && b.constructed && b.gatherType === kind && b.amount > 0) consider(b); // own Farms and Mines
   return best;
 }
 function nearestDrop(game, u, kind) {
   let best = null, bd = Infinity;
   for (const b of game.buildings.values()) {
-    if (b.owner !== u.owner || !b.constructed || !(BUILDINGS[b.type].drops || []).includes(kind)) continue;
+    if (b.owner !== u.owner || !b.constructed || !(BUILDINGS[b.type].drops || []).includes(kind) || !BUILDINGS[b.type].naval !== !u.naval) continue;
     const d = distPoint(u.x, u.y, b); if (d < bd) { bd = d; best = b; }
   }
   return best;
@@ -96,7 +99,7 @@ function doGather(game, u, o) {
     if (u.carry.type !== kind) u.carry = { type: kind, amount: 0 };
     if (res.kind === 'building') res.gatherers = (res.gatherers || 0) + 1;
     const take = drawFrom(game, res, rate); u.carry.amount += take; game.players[u.owner].gathered += take; // removes an empty pile/Farm, exhausts a Mine's patch
-    if (u.carry.amount >= CARRY || res.amount <= 0 || res.dead) { o.phase = 'drop'; u.path = null; }
+    if (u.carry.amount >= (UNITS[u.type].capacity ?? CARRY) || res.amount <= 0 || res.dead) { o.phase = 'drop'; u.path = null; }
   } else { // drop
     if (u.carry.amount <= 0) { o.phase = 'go'; return; }
     const d = nearestDrop(game, u, u.carry.type);
@@ -160,12 +163,25 @@ export function hit(game, u, t) {
   }
 }
 
+// Whether `u` could ever get `t` in range: a ship needs open water within reach of a target on land, and a soldier needs
+// ground within reach of a ship (so only ranged soldiers hit a ship on deep water; anyone can hit one in the shallows).
+// Same-layer targets are always reachable as far as this goes. game.toWater / game.toLand hold each tile's distance.
+export function canHit(game, u, t) {
+  const naval = !!u.naval;
+  if (t.kind === 'unit' ? !!t.naval === naval : !naval && !BUILDINGS[t.type]?.naval) return true;
+  const d = naval ? game.toWater : game.toLand, n = game.map.size, reach = Math.max(0.9, u.range - 0.5) + 0.05;
+  if (t.kind === 'unit') return d[Math.floor(t.y) * n + Math.floor(t.x)] <= reach;
+  let m = Infinity;
+  for (let y = t.y; y < t.y + t.size; y++) for (let x = t.x; x < t.x + t.size; x++) m = Math.min(m, d[y * n + x]);
+  return m - 0.5 <= reach;
+}
+
 // A breach order (one with `resume`) that loses its target hands back the order it interrupted, on the next tick and with no
-// retry wait. A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap
+// retry wait. A target this unit can never get in range of (canHit) ends the order the same way, before any path search. A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap
 // the order round itself); a breach can wrap again, each layer restoring the one before. Only an attack with no breach counts fails.
 function doAttack(game, u, o) {
   const t = game.entities.get(o.target);
-  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building')) {
+  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building') || !canHit(game, u, t)) {
     if (!o.resume) return stop(u);
     return resume(u, o);
   }
@@ -179,21 +195,22 @@ function doAttack(game, u, o) {
   o.last = key;
   const goal = goalNear(t, Math.max(0.9, u.range - 0.5)), r = travel(game, u, goal, tt);
   if (r !== 'fail') return;
-  const id = breachTarget(game, u, tt, goal);
+  const id = u.naval ? null : breachTarget(game, u, tt, goal);
   if (id !== null && id !== o.target) return breach(u, id, o);
   if (++o.fails > 3) stop(u);
 }
 
+// An idle soldier or warship takes on the nearest enemy in sight that it can get in range of (canHit), units before buildings.
 function aggro(game, u) {
   if (u.cls === 'civ' || (game.time + u.id) % 5 !== 0) return;
   let best = null, bd = u.sight + 1;
   for (const e of game.units.values()) {
     if (e.owner === u.owner) continue;
-    const d = Math.hypot(e.x - u.x, e.y - u.y) - (e.cls === 'civ' ? 0.5 : 0); if (d < bd) { bd = d; best = e; }
+    const d = Math.hypot(e.x - u.x, e.y - u.y) - (e.cls === 'civ' ? 0.5 : 0); if (d < bd && canHit(game, u, e)) { bd = d; best = e; }
   }
   if (!best) for (const e of game.buildings.values()) {
     if (e.owner === u.owner) continue;
-    const d = distPoint(u.x, u.y, e) + 2; if (d < bd) { bd = d; best = e; }
+    const d = distPoint(u.x, u.y, e) + 2; if (d < bd && canHit(game, u, e)) { bd = d; best = e; }
   }
   if (best) { u.order = { type: 'attack', target: best.id, fails: 0, auto: true }; u.path = null; }
 }

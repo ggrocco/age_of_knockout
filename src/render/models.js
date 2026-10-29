@@ -5,6 +5,7 @@ import { styleOf } from './styles.js';
 import { B, C, unit, TEAM, TEAM_DARK, MODEL_MATERIAL, cached, mesh, pivot } from './builder.js';
 import { designOf, archGeos } from './arch/index.js';
 import { unitEra, eraSpec, mountOf, siegeLook, SIEGE_REMAP, pads, motorbike, hoverbike, mortar, rockets, armoredTrain } from './era-units.js';
+import { shipModel, animateShip, SHIP_TYPES } from './ships.js';
 export { TEAM, TEAM_DARK, MODEL_MATERIAL, unitEra };
 const rng = seed => { let a = (seed * 2654435761) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
@@ -166,6 +167,7 @@ function eraSiegeModel(e, era) {
 function unitModel(e, age) {
   const root = new THREE.Group(), team = e.owner, era = unitEra(e.type, age);
   if (['drone', 'mech', 'railgun'].includes(e.type)) return futureModel(e);
+  if (SHIP_TYPES.includes(e.type)) return shipModel(e);
   if (e.cls === 'siege' || e.cls === 'armor') return eraSiegeModel(e, era);
   const spec = eraSpec(e.type, { ...(HUMAN[e.type] || {}) }, era); if (spec.cape === 'team') spec.cape = TEAM_DARK[team];
   const h = cached(`h:${e.type}:${team}:${era}`, () => limbs(spec, team));
@@ -320,12 +322,23 @@ function berry(variant) {
   for (let i = 0; i < 12; i++) b.sph(0.035, i % 3 ? 0x8f2630 : 0xb94036, (r() - 0.5) * 0.6, 0.25 + r() * 0.2, (r() - 0.5) * 0.6);
   return b.geometry();
 }
+// A shoal: silver fish with dark backs just under the surface, a few bubbles, and one leaping.
+function fishShoal(variant) {
+  const r = rng(variant + 91), b = new B();
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9 + r() * 0.6, d = 0.1 + r() * 0.24, x = Math.cos(a) * d, z = Math.sin(a) * d, c = i % 2 ? 0xc4d2da : 0xa9bcc7;
+    b.add(unit.sph, c, x, 0.05, z, 0.06, 0.035, 0.15, 0, a, 0).add(unit.sph, 0x41545e, x, 0.075, z, 0.03, 0.015, 0.11, 0, a, 0)
+      .add(unit.box, c, x - Math.sin(a) * 0.16, 0.05, z - Math.cos(a) * 0.16, 0.08, 0.05, 0.02, 0, a, 0);
+  }
+  for (let i = 0; i < 4; i++) b.sph(0.025, 0xe8f4f6, (r() - 0.5) * 0.5, 0.05, (r() - 0.5) * 0.5);
+  return b.add(unit.sph, 0xd4e0e6, 0.05, 0.3, -0.05, 0.06, 0.04, 0.15, -0.6, 0.4, 0).add(unit.sph, 0xe8f4f6, 0.12, 0.05, 0.05, 0.08, 0.02, 0.08);
+}
 function resourceModel(e) {
   const v = e.id % 6, root = new THREE.Group(), rr = rng(e.id);
-  const geo = cached(`r:${e.type}:${v}`, () => e.type === 'tree' ? tree(v) : e.type === 'berry' ? berry(v) : rockPile(e.type, v));
+  const geo = cached(`r:${e.type}:${v}`, () => e.type === 'tree' ? tree(v) : e.type === 'berry' ? berry(v) : e.type === 'fish' ? fishShoal(v).geometry() : rockPile(e.type, v));
   const m = mesh(geo); m.rotation.y = rr() * 6.28; m.userData.baseScale = 0.9 + rr() * 0.25; root.add(m);
   if (e.type === 'tree') m.rotation.z = (rr() - 0.5) * 0.08;
-  return { root, anim: { type: 'res', mesh: m }, shadow: e.type === 'tree' ? 0.5 : 0.4 };
+  return { root, anim: { type: 'res', mesh: m }, shadow: e.type === 'tree' ? 0.5 : e.type === 'fish' ? 0.1 : 0.4 };
 }
 function relicModel() {
   const root = new THREE.Group(), g = cached('relic', () => { const b = new B(); b.cylT(0.2, 0.26, 0.2, C.stone, 0, 0, 0, 8).cylT(0.05, 0.08, 0.2, C.gold, 0, 0.2, 0, 8).cylT(0.16, 0.06, 0.2, C.gold, 0, 0.4, 0, 10).add(unit.tor, C.gold, 0.16, 0.5, 0, 0.09, 0.09, 0.09, 0, 0, 0).sph(0.06, 0xd6336c, 0, 0.64, 0); return b.geometry(); });
@@ -371,6 +384,8 @@ export function animate(g, e, t, moving) {
   } else if (a.type === 'tank') {
     a.turret.position.z = e.order.type === 'attack' ? -Math.max(0, (e.cd - e.cooldown + 8) / 8) * 0.1 : 0;
     a.hull.position.y = moving ? Math.abs(Math.sin(t * 12 + e.id)) * 0.02 : 0;
+  } else if (a.type === 'ship') {
+    animateShip(g, a, e, t, moving);
   } else if (a.type === 'drone') {
     a.body.position.y = 1.1 + (g.userData.gpuCosmetics ? 0 : Math.sin(t * 3 + e.id) * 0.055);
     a.body.rotation.x = moving ? 0.12 : 0;
@@ -405,7 +420,7 @@ export function animate(g, e, t, moving) {
     }
     if (a.ore) a.ore.visible = !!e.constructed;
   } else if (a.type === 'res') {
-    const full = e.type === 'tree' ? 100 : e.type === 'berry' ? 200 : e.type === 'gold' ? 800 : 600, f = 0.55 + 0.45 * Math.min(1, e.amount / full), s = a.mesh.userData.baseScale;
+    const full = { tree: 100, berry: 200, gold: 800, stone: 600, fish: 300 }[e.type] ?? 600, f = 0.55 + 0.45 * Math.min(1, e.amount / full), s = a.mesh.userData.baseScale;
     a.mesh.scale.set(s * f, s * (e.type === 'tree' ? f : 0.6 + 0.4 * f), s * f);
   } else if (a.type === 'relic') {
     a.body.rotation.y = t * 1.5; a.glow.scale.setScalar(1 + Math.sin(t * 3) * 0.15);

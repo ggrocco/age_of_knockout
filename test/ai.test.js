@@ -152,6 +152,7 @@ test('an army whose sweep move fails goes on to the next waypoint instead of ret
   assert.ok(deep.length, 'seed 1 has deep water');
   b.sweep[0] = deep[0];
   const s = g.map.starts[0], army = [0, 1, 2, 3].map(k => g.spawnUnit('clubman', 0, s.x - 3 + k, s.y + 3));
+  b.sweep[1] = b.sweep.slice(2).find(w => Math.hypot(w.x - s.x, w.y - s.y) > 10); // the next waypoint is not one the army already stands at
   b.waveActive = true; b.think();
   assert.ok(army.every(u => u.order.type === 'move' && u.order.x === deep[0].x + 0.5), 'sent to the lake first');
   for (let i = 0; i < 20 && army.some(u => u.order.type !== 'idle'); i++) g.tick();
