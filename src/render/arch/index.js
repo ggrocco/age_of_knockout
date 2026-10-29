@@ -27,9 +27,12 @@ export const KEPT = {
 };
 // Per era, type → design(ctx), which draws into ctx and returns its scaffold height (the body's top). Each era module
 // exports one design function per building type.
+const ERA_MODULES = { stone, tool, bronze, iron, medieval, sail, industrial, modern, future };
 // The gate buildings (gates.js) have one design for every era from their unlock on, added to each era here.
-export const DESIGNS = Object.fromEntries(Object.entries({ stone, tool, bronze, iron, medieval, sail, industrial, modern, future }).map(([age, mod]) =>
-  [age, { ...mod, ...Object.fromEntries(Object.entries(GATES).filter(([type]) => ageIndex(age) >= ageIndex(BUILDINGS[type].age))) }]));
+const gatesStandingIn = age => Object.fromEntries(
+  Object.entries(GATES).filter(([type]) => ageIndex(age) >= ageIndex(BUILDINGS[type].age)));
+export const DESIGNS = Object.fromEntries(
+  Object.entries(ERA_MODULES).map(([age, designs]) => [age, { ...designs, ...gatesStandingIn(age) }]));
 
 // Before a building unlocks (gallery, debug) it shows its unlock-era design.
 export const designAge = (type, age) => {
@@ -39,17 +42,23 @@ export const designAge = (type, age) => {
 
 // The key also names the model cache entry, so it must determine the geometry: legacy eras that share a style share it.
 export function designOf(type, age) {
-  const a = designAge(type, age);
+  const shownAge = designAge(type, age);
   // The Mine and the Dock are one design each (mine.js, dock.js) that changes with the era.
-  if (type === 'mine' || type === 'dock') return { key: `${type}:${a}`, kind: 'design', age: a };
-  if (KEPT[a]?.includes(type)) return { key: `kept:${a}`, kind: 'kept', age: a };
-  if (DESIGNS[a]?.[type]) return { key: a, kind: 'design', age: a };
-  return { key: `legacy:${styleOf(a).key}`, kind: 'legacy', age: a };
+  if (type === 'mine' || type === 'dock') return { key: `${type}:${shownAge}`, kind: 'design', age: shownAge };
+  if (KEPT[shownAge]?.includes(type)) return { key: `kept:${shownAge}`, kind: 'kept', age: shownAge };
+  if (DESIGNS[shownAge]?.[type]) return { key: shownAge, kind: 'design', age: shownAge };
+  return { key: `legacy:${styleOf(shownAge).key}`, kind: 'legacy', age: shownAge };
 }
 
+const designFunction = (type, age) => {
+  if (type === 'mine') return mine;
+  if (type === 'dock') return dock;
+  return DESIGNS[age][type];
+};
+
 export function archGeos(type, team, size, age) {
-  const d = designOf(type, age);
-  if (d.kind !== 'design') return legacyGeos(type, team, size, d.age);
-  const ctx = designCtx(type, team, size, d.age);
-  return finish(ctx, (type === 'mine' ? mine : type === 'dock' ? dock : DESIGNS[d.age][type])(ctx));
+  const design = designOf(type, age);
+  if (design.kind !== 'design') return legacyGeos(type, team, size, design.age);
+  const ctx = designCtx(type, team, size, design.age);
+  return finish(ctx, designFunction(type, design.age)(ctx));
 }
