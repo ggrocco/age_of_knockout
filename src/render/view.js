@@ -97,6 +97,8 @@ export function createView(container, game, backend = null) {
   const view = { renderer, backend: backend ? 'webgpu' : 'webgl', scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
   const batch = backend?.createBatch ? backend.createBatch(MODEL_MATERIAL) : createModelBatch(MODEL_MATERIAL, backend);
   scene.add(batch.mesh); view.batch = batch;
+  // Shown in Settings, so the player can tell which renderer and GPU actually run the match.
+  view.rendererLabel = `${backend ? `WebGPU${batch.mesh.isGpuBatch ? ', GPU culling' : ''}` : 'WebGL'} on ${gpu.replace(/^WebGPU: /, '')}`;
   let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
   view.revision = 0; view.invalidate = () => { view.revision++; };
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();

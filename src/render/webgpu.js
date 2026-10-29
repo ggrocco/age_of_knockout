@@ -19,13 +19,25 @@ export async function createWebGPUBackend({ trackTimestamp = false } = {}) {
   if (!renderer.backend.isWebGPUBackend) { renderer.dispose(); throw new Error('no WebGPU adapter (would fall back to WebGL 2)'); }
   const device = renderer.backend.device, info = device.adapterInfo ?? {};
   const gpu = `WebGPU: ${[info.vendor, info.architecture, info.description].filter(Boolean).join(' ') || 'unknown adapter'}`;
-  return {
-    webgpu: true, renderer, gpu,
+  // A lost device (driver reset, GPU process crash) leaves the canvas blank for good; callers fall back to WebGL.
+  // three.js ignores a loss with reason "destroyed" (it assumes the app destroyed the device), but this page never
+  // destroys its device, and a dropped GPU instance reports exactly that reason, so the device is watched directly.
+  const lostListeners = [];
+  const lose = loss => { if (backend.lost) return; backend.lost = loss; lostListeners.forEach(listener => listener(loss)); };
+  renderer.onDeviceLost = loss => { renderer._onDeviceLost(loss); lose(loss); };
+  device.lost.then(info => { if (!disposed) lose({ api: 'WebGPU', message: info.message || `device ${info.reason ?? 'lost'}`, reason: info.reason }); });
+  let disposed = false;
+  const dispose = renderer.dispose.bind(renderer);
+  renderer.dispose = () => { disposed = true; dispose(); };
+  const backend = {
+    webgpu: true, renderer, gpu, lost: null,
+    onLost(listener) { lostListeners.push(listener); if (backend.lost) listener(backend.lost); },
     softwareGpu: !!info.isFallbackAdapter || SOFTWARE.test(gpu),
     maxTextureSize: device.limits.maxTextureDimension2D,
     maxAnisotropy: renderer.getMaxAnisotropy(),
     modelMaterial, animateBatch, grassMaterial, waterMaterial,
   };
+  return backend;
 }
 
 // materials.js: procedural wood grain, stone courses and metal patina anchored in model space.

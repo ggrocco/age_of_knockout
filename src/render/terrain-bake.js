@@ -50,7 +50,7 @@ function bakeToCanvas(map, seed, shore, scale, backend) {
   return {
     texture,
     refresh(version) { if (version === stamp) return; render(); stamp = version; },
-    dispose() { texture.dispose(); input.dispose(); geometry.dispose(); material.dispose(); gl.dispose(); gl.forceContextLoss(); },
+    dispose() { texture.dispose(); input.dispose(); geometry.dispose(); material.dispose(); gl.dispose(); if (!gl.getContext().isContextLost()) gl.forceContextLoss(); },
   };
 }
 

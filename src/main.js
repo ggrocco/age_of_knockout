@@ -15,8 +15,8 @@ import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // `?renderer=webgpu`: the WebGPU spike, started once before any match (null = WebGL).
-const renderBackend = await loadRenderBackend(location.search);
-let webgpuWarned = false;
+let renderBackend = await loadRenderBackend(location.search), webgpuWarned = false;
+renderBackend?.onLost(loss => fallBackToWebGL(loss));
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
 const pickSeed = () => +params.get('seed') || 1 + Math.floor(Math.random() * 100000);
 const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
@@ -53,6 +53,19 @@ window.addEventListener('orientationchange', () => setTimeout(() => app.onResize
 const hud = createHud(ui), input = createInput(ui); ui.toast = hud.toast; ui.confirmDelete = hud.confirmDelete; ui.quit = () => { endMatch(); menu(); };
 
 // Stop the render loop and free the WebGL context; a finished match otherwise keeps drawing behind menus.
+// The WebGPU device was lost: later matches use WebGL, and a running one gets a WebGL view of the same game.
+function fallBackToWebGL(loss) {
+  renderBackend = null;
+  hud.toast(`WebGPU stopped working (${loss.message}): switched to WebGL.`);
+  const m = app.match; if (!m || m.ended) return;
+  const old = m.view, vp = document.getElementById('viewport');
+  try { old.dispose(); } catch (error) { console.warn('Disposing the lost WebGPU view:', error); }
+  vp.innerHTML = '';
+  const view = createView(vp, m.game, null); view.selection = ui.sel;
+  view.focus.copy(old.focus); view.setZoom(old.zoom); view.fogEnabled = old.fogEnabled;
+  m.view = ui.view = view; ui.minimap = createMinimap(document.getElementById('minimap'), m.game, view); view.sync(true);
+}
+
 function endMatch() {
   hud.cancelDelete(); ui.paused = false; document.getElementById('pausemodal').classList.add('hidden');
   const m = app.match; if (!m) return;
@@ -86,7 +99,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   const diffs = { 0: botDiff, 1: oppDiff };
   const tc = [...game.buildings.values()].find(b => b.owner === 0); view.centerOn(tc.x + 1.5, tc.y + 1.5); view.setZoom(ui.touch ? (innerHeight > innerWidth ? 7.5 : 9) : 13);
   const m = app.match = { game, view, bots, diffs, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd };
-  app.onResize = () => { view.resize(); }; window.addEventListener('resize', app.onResize);
+  app.onResize = () => { m.view.resize(); }; window.addEventListener('resize', app.onResize);
   const loop = now => {
     m.raf = requestAnimationFrame(loop);
     const budget = FRAME_MS;
@@ -98,6 +111,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
       for (let i = 0; i < steps && !game.result; i++) { game.tick(); for (const b of m.bots) { const pid = b === m.bots[m.bots.length - 1] ? 1 : 0, ev = THINK_EVERY[m.diffs[pid]]; if (game.time % ev === (pid * 3) % ev) b.think(); } }
     }
     if (!ui.paused) m.animT += dt; // the animation clock stops with the match, so working villagers freeze mid-swing
+    const view = m.view; // replaced if WebGPU falls back to WebGL mid-match
     input.update(dt); view.sync(); hud.update();
     const selectionKey = `${[...ui.sel]}|${ui.placing}`;
     const idle = ui.paused || game.result;

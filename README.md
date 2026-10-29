@@ -292,6 +292,8 @@ times on your own GPU, run `npm start` and open `/test/tools/render-audit.html` 
 Under WebGPU a compute pass culls every model part against the camera and the sun's shadow view each frame and
 draws the survivors with one indirect draw per kind of part, so the number of draws follows how many kinds of
 models are on the map, not how many units; add `&indirect=0` to compare with drawing each part separately.
+**Settings** shows which renderer and GPU are actually in use. If WebGPU stops working mid-game (the browser
+reports a lost device), the match switches to WebGL by itself and shows a notice.
 
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Grass clumps |
 | --- | --- | --- | --- | --- |
