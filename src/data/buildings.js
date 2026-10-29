@@ -1,5 +1,6 @@
 // UNVERIFIED approximations of AoE1 values. buildTime in sec (single builder).
 import { TOWER, WALL_HP } from './defences.js';
+// c(food, wood, gold, stone): a cost, any amount left out is 0.
 const c = (food = 0, wood = 0, gold = 0, stone = 0) => ({ food, wood, gold, stone });
 export const BUILDINGS = {
   town_center:       { name: 'Town Center', hp: 600, cost: c(0, 200, 0, 100), size: 3, buildTime: 60, age: 'stone', trains: ['villager'], drops: ['food', 'wood', 'gold', 'stone'], pop: 10, sight: 8 },
@@ -39,8 +40,9 @@ export const BUILDINGS = {
 // and full repair costs this share of its build cost, paid as the HP goes back on.
 export const REPAIR_COST = 0.5;
 // What putting `hp` HP back on a building of `type` with `maxHp` costs.
-export const repairCost = (type, hp, maxHp) => Object.fromEntries(Object.entries(BUILDINGS[type].cost).map(([k, v]) => [k, v * REPAIR_COST * hp / maxHp]));
+export const repairCost = (type, hp, maxHp) => Object.fromEntries(Object.entries(BUILDINGS[type].cost)
+  .map(([kind, amount]) => [kind, amount * REPAIR_COST * hp / maxHp]));
 // Damage slows a building's production (invented): it trains and researches at its share of full HP, never below
 // DAMAGED_MIN_SPEED, and is back to full speed once repaired.
 export const DAMAGED_MIN_SPEED = 0.25;
-export const workSpeed = b => Math.max(DAMAGED_MIN_SPEED, Math.min(1, b.hp / b.maxHp));
+export const workSpeed = building => Math.max(DAMAGED_MIN_SPEED, Math.min(1, building.hp / building.maxHp));

@@ -3,9 +3,11 @@ import { ROUNDS } from '../rounds/index.js';
 import { simulateMatch } from './sim.js';
 import { DEFAULT_TIME_LIMIT } from '../time-limit.js';
 
-export const NAMES = ['You', 'Ramses', 'Hammurabi', 'Sargon', 'Nebuchadnezzar', 'Darius', 'Xerxes', 'Cyrus', 'Leonidas', 'Pericles', 'Alexander', 'Ptolemy',
-  'Hannibal', 'Scipio', 'Caesar', 'Augustus', 'Attila', 'Boudica', 'Shalmaneser', 'Tiglath', 'Ashurbanipal', 'Thutmose', 'Akhenaten', 'Minos',
+export const NAMES = ['You', 'Ramses', 'Hammurabi', 'Sargon', 'Nebuchadnezzar', 'Darius', 'Xerxes', 'Cyrus',
+  'Leonidas', 'Pericles', 'Alexander', 'Ptolemy', 'Hannibal', 'Scipio', 'Caesar', 'Augustus',
+  'Attila', 'Boudica', 'Shalmaneser', 'Tiglath', 'Ashurbanipal', 'Thutmose', 'Akhenaten', 'Minos',
   'Agamemnon', 'Themistocles', 'Philip', 'Seleucus', 'Antiochus', 'Mithridates', 'Vercingetorix', 'Arminius'];
+const BOT_DIFFICULTIES = ['easy', 'medium', 'hard'];
 // Difficulty of the opponent the human faces in each round, per chosen level. 'normal' is the original ramp.
 export const LEVELS = {
   relaxed: ['relaxed', 'relaxed', 'relaxed', 'relaxed', 'relaxed'],
@@ -14,17 +16,24 @@ export const LEVELS = {
 };
 export const LEVEL_NAME = { relaxed: 'Relaxed', normal: 'Normal', hard: 'Hard' };
 
+// The seed of the bracket match between alive[i] and alive[i + 1] in a round: the same in either runner.
+const matchSeed = (tournamentSeed, roundIndex, i) => tournamentSeed * 1000 + roundIndex * 50 + i;
+
 // mapType: every match of the tournament, the player's and the simulated ones, is played on this kind of map.
-export function createTournament(seed = 1, level = 'normal', { noTimeLimit = false, timeLimit = noTimeLimit ? 0 : DEFAULT_TIME_LIMIT, mapType = 'rivers' } = {}) {
+export function createTournament(seed = 1, level = 'normal', {
+  noTimeLimit = false, timeLimit = noTimeLimit ? 0 : DEFAULT_TIME_LIMIT, mapType = 'rivers',
+} = {}) {
   const ramp = LEVELS[level] || LEVELS.normal;
   const rng = makeRng(seed);
-  const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : ['easy', 'medium', 'hard'][rng.int(3)] }));
+  // Every bot entrant gets a random difficulty of its own; the opponent the human meets takes the level's ramp instead.
+  const players = NAMES.map((name, id) => ({ id, name, difficulty: id === 0 ? 'human' : BOT_DIFFICULTIES[rng.int(3)] }));
   let resolving = false;
-  const t = {
-    seed, level, timeLimit, noTimeLimit: timeLimit === 0, mapType, roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
+  const tournament = {
+    seed, level, timeLimit, noTimeLimit: timeLimit === 0, mapType,
+    roundIndex: 0, alive: [...players], history: [], over: false, champion: null,
     get round() { return ROUNDS[this.roundIndex]; },
     get human() { return this.alive[0]; },
-    get opponent() { const o = this.alive[1]; return { ...o, difficulty: ramp[this.roundIndex] }; },
+    get opponent() { return { ...this.alive[1], difficulty: ramp[this.roundIndex] }; },
     // Supports either a synchronous headless runner or an asynchronous Worker runner. Nothing changes until every
     // match has an outcome, so after a failure the same round can simply be resolved again.
     async resolveAsync(humanWon, { onProgress, simulate = simulateMatch } = {}) {
@@ -33,33 +42,65 @@ export function createTournament(seed = 1, level = 'normal', { noTimeLimit = fal
       if (this.over) throw new Error('tournament is over');
       resolving = true;
       try {
-        const ri = this.roundIndex, round = ROUNDS[ri], cache = new Map(), total = (this.alive.length - 2) / 2; let done = 0;
-        for (let i = 2; i < this.alive.length; i += 2) {
-          await new Promise(r => setTimeout(r, 0));
-          const s = this.seed * 1000 + ri * 50 + i; cache.set(s, await simulate(round.id, s, [this.alive[i].difficulty, this.alive[i + 1].difficulty], { mapType }));
-          try { onProgress?.(++done, total); } catch { /* a progress display must not lose the round */ }
-        }
-        return this.resolve(humanWon, (id, s) => cache.get(s));
+        const outcomes = await simulateRoundAsync(this, simulate, onProgress, mapType);
+        return this.resolve(humanWon, (roundId, seedOfMatch) => outcomes.get(seedOfMatch));
       } finally { resolving = false; }
     },
     // Record the outcome of the human's match, simulate every other match of the round, advance.
     resolve(humanWon, simulate = simulateMatch) {
       if (this.over) throw new Error('tournament is over');
-      const ri = this.roundIndex, round = ROUNDS[ri], next = [], results = [];
-      results.push({ a: this.alive[0].name, b: this.alive[1].name, winner: humanWon ? this.alive[0].name : this.alive[1].name, human: true });
-      if (!humanWon) { this.history.push({ round: round.id, results }); this.over = true; this.lostIn = ri; return this; }
-      next.push(this.alive[0]);
-      for (let i = 2; i < this.alive.length; i += 2) {
-        const a = this.alive[i], b = this.alive[i + 1];
-        const m = simulate(round.id, seed * 1000 + ri * 50 + i, [a.difficulty, b.difficulty], { mapType });
-        if (!m) throw new Error(`no result for ${a.name} vs ${b.name} in ${round.id}`); // checked before anything changes
-        const w = m.winner === 1 ? b : a; next.push(w); results.push({ a: a.name, b: b.name, winner: w.name, reason: m.reason });
-      }
+      const roundIndex = this.roundIndex, round = ROUNDS[roundIndex], [human, opponent] = this.alive;
+      const results = [{ a: human.name, b: opponent.name, winner: humanWon ? human.name : opponent.name, human: true }];
+      if (!humanWon) return eliminate(this, round, roundIndex, results);
+      // Checked before anything changes: a missing result throws with the tournament as it was.
+      const winners = playOtherMatches(this.alive, round.id, i => matchSeed(seed, roundIndex, i), simulate, mapType, results);
       this.history.push({ round: round.id, results });
-      this.alive = next; this.roundIndex++;
-      if (this.alive.length === 1) { this.over = true; this.champion = this.alive[0]; }
+      this.alive = [human, ...winners];
+      this.roundIndex++;
+      if (this.alive.length === 1) {
+        this.over = true;
+        this.champion = this.alive[0];
+      }
       return this;
     },
   };
-  return t;
+  return tournament;
+}
+
+// The human lost their match in this round: the tournament ends there.
+function eliminate(tournament, round, roundIndex, results) {
+  tournament.history.push({ round: round.id, results });
+  tournament.over = true;
+  tournament.lostIn = roundIndex;
+  return tournament;
+}
+
+// Every match of the round but the human's (alive[2] v alive[3], alive[4] v alive[5], ...), off-screen; their results
+// are appended to `results`. Returns the winners, in bracket order.
+function playOtherMatches(alive, roundId, seedOf, simulate, mapType, results) {
+  const winners = [];
+  for (let i = 2; i < alive.length; i += 2) {
+    const a = alive[i], b = alive[i + 1];
+    const match = simulate(roundId, seedOf(i), [a.difficulty, b.difficulty], { mapType });
+    if (!match) throw new Error(`no result for ${a.name} vs ${b.name} in ${roundId}`);
+    const winner = match.winner === 1 ? b : a;
+    winners.push(winner);
+    results.push({ a: a.name, b: b.name, winner: winner.name, reason: match.reason });
+  }
+  return winners;
+}
+
+// Simulates the round's off-screen matches one after another, yielding between them; returns the outcomes by match seed.
+async function simulateRoundAsync(tournament, simulate, onProgress, mapType) {
+  const roundIndex = tournament.roundIndex, round = ROUNDS[roundIndex], outcomes = new Map();
+  const total = (tournament.alive.length - 2) / 2;
+  let done = 0;
+  for (let i = 2; i < tournament.alive.length; i += 2) {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const seedOfMatch = matchSeed(tournament.seed, roundIndex, i);
+    const difficulties = [tournament.alive[i].difficulty, tournament.alive[i + 1].difficulty];
+    outcomes.set(seedOfMatch, await simulate(round.id, seedOfMatch, difficulties, { mapType }));
+    try { onProgress?.(++done, total); } catch { /* a progress display must not lose the round */ }
+  }
+  return outcomes;
 }

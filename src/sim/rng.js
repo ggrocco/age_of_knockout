@@ -1,12 +1,14 @@
 // Seeded mulberry32. All sim randomness must come from here.
 export function makeRng(seed) {
-  let a = seed >>> 0;
+  let state = seed >>> 0;
+  // A float in [0, 1).
   const next = () => {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    state = (state + 0x6D2B79F5) >>> 0;
+    let mixed = state;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
-  return { next, int: n => Math.floor(next() * n) };
+  // An integer in [0, count).
+  return { next, int: count => Math.floor(next() * count) };
 }

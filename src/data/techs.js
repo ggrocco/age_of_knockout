@@ -11,6 +11,7 @@
 //   { cls: ['inf'], hp: 20 }                  -> +max HP (and the same HP now)
 //   { speedMul: 1.1 }                         -> multiplies move speed (no cls: every unit)
 //   { gather: { wood: 1.25 } }                -> multiplies a player's gather rate (not per-unit)
+// c(food, wood, gold, stone): a cost, any amount left out is 0.
 const c = (food = 0, wood = 0, gold = 0, stone = 0) => ({ food, wood, gold, stone });
 
 export const TECHS = {
@@ -71,13 +72,16 @@ export const TECHS = {
 
 // Apply a unit effect to one unit. Idempotent per tech: called once when the unit spawns and once
 // when a tech completes for existing units, so each unit receives each tech exactly once.
-export function applyUnitEffect(u, eff) {
-  if (!eff || eff.gather) return;
-  if (eff.cls && !eff.cls.includes(u.cls)) return;
-  if (eff.atk) u.atk += eff.atk;
-  if (eff.marmor) u.marmor += eff.marmor;
-  if (eff.parmor) u.parmor += eff.parmor;
-  if (eff.range) u.range += eff.range;
-  if (eff.hp) { u.maxHp += eff.hp; u.hp += eff.hp; }
-  if (eff.speedMul) u.speed *= eff.speedMul;
+export function applyUnitEffect(unit, effect) {
+  if (!effect || effect.gather) return;
+  if (effect.cls && !effect.cls.includes(unit.cls)) return;
+  if (effect.atk) unit.atk += effect.atk;
+  if (effect.marmor) unit.marmor += effect.marmor;
+  if (effect.parmor) unit.parmor += effect.parmor;
+  if (effect.range) unit.range += effect.range;
+  if (effect.hp) {
+    unit.maxHp += effect.hp;
+    unit.hp += effect.hp;
+  }
+  if (effect.speedMul) unit.speed *= effect.speedMul;
 }

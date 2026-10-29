@@ -1,5 +1,6 @@
 // Combat/cost stats verified against openage AoE1 manual data (unit_stats_aoe.csv);
 // deviations recorded in README.md. speed = tiles/sec, range = tiles, trainTime = sec.
+// c(food, wood, gold, stone): a cost, any amount left out is 0.
 const c = (food = 0, wood = 0, gold = 0, stone = 0) => ({ food, wood, gold, stone });
 export const UNITS = {
   villager:     { name: 'Villager', hp: 25, atk: 3, atkType: 'melee', marmor: 0, parmor: 0, range: 0.9, speed: 1.6, cost: c(50), trainTime: 20, age: 'stone', sight: 5, cls: 'civ' },
