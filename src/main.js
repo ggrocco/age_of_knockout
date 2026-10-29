@@ -11,6 +11,7 @@ import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
 import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
+import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
@@ -27,6 +28,8 @@ let level = [params.get('level'), storedLevel()].find(l => Object.hasOwn(LEVELS,
 function setLevel(l) { level = l; try { localStorage.setItem('level', l); } catch {} }
 let timeLimit = (() => { try { return readTimeLimit(location.search, localStorage); } catch { return readTimeLimit(location.search); } })();
 function setTimeLimit(value) { timeLimit = Number(value); try { localStorage.setItem('timeLimit', String(timeLimit)); } catch {} }
+let mapType = (() => { try { return readMapType(location.search, localStorage); } catch { return readMapType(location.search); } })();
+function setMapType(value) { mapType = value; try { localStorage.setItem('mapType', value); } catch {} }
 const timeLimitLabel = () => timeLimit === 0 ? 'No time limit' : timeLimit === 120 ? '2 hours' : `${timeLimit} minute${timeLimit === 1 ? '' : 's'}`;
 // Frame cap: high-refresh displays would otherwise redraw the whole scene ~120 times a second; idle screens need less.
 const FRAME_MS = 1000 / (+params.get('fps') || 60), IDLE_FRAME_MS = 1000 / 10;
@@ -64,11 +67,11 @@ function updateRoundCaps(diffs, minutes = timeLimit) {
 function show(html) { hud.hideTip(); screenEl.innerHTML = html; screenEl.classList.remove('hidden'); if (AUTO) setTimeout(() => screenEl.querySelector('[data-auto]')?.click(), 500); }
 function hide() { hud.hideTip(); screenEl.classList.add('hidden'); screenEl.innerHTML = ''; }
 
-function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit }) {
+function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit, map = mapType }) {
   endMatch();
   document.body.classList.add('ingame');
   const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO; // botDiff: the bot that drives player 0 in autoplay/test modes
-  const game = createGame({ seed, rules: roundById(roundId), ...matchOptions([autoplay ? botDiff : null, oppDiff], { timeLimit: minutes }) });
+  const game = createGame({ seed, rules: roundById(roundId), mapType: map, ...matchOptions([autoplay ? botDiff : null, oppDiff], { timeLimit: minutes }) });
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
   const view = createView(vp, game); view.selection = ui.sel;
@@ -133,14 +136,14 @@ function bracketScreen() {
   // Before the first round nothing is lost by going back; after it, leaving throws the tournament away, so it asks twice.
   const started = t.roundIndex > 0, backLabel = started ? 'Leave tournament' : 'Back to menu';
   const buttons = `<button class="btn" id="back">${backLabel}</button><button class="btn" data-auto id="go">Begin Round</button>`;
-  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? buttons : ''}${bracketHtml(t)}${TOUCH ? '' : buttons}</div>`);
+  show(`<div class="card"><h2>Round ${t.roundIndex + 1} of 5 &mdash; ${r.name}</h2><p>${r.desc}</p><p>${t.noTimeLimit ? '' : 'Time limit: '}<b>${roundLimitText(r, ui.roundCaps[r.id])}.</b> ${t.noTimeLimit ? NO_TIME_LIMIT_RULE : TIME_LIMIT_RULE}</p><p>Map: <b>${MAP_NAME[t.mapType] ?? MAP_NAME.rivers}</b></p><p>Opponent: <b>${o.name}</b> (${o.difficulty}) &middot; Level: ${LEVEL_NAME[t.level]}</p>${TOUCH ? buttons : ''}${bracketHtml(t)}${TOUCH ? '' : buttons}</div>`);
   const back = document.getElementById('back');
   back.onclick = () => {
     if (!started || back.dataset.armed) { app.tournament = null; return menu(); }
     back.dataset.armed = '1'; back.textContent = 'Confirm leave? Progress is lost';
     setTimeout(() => { if (back.isConnected) { delete back.dataset.armed; back.textContent = backLabel; } }, 3000);
   };
-  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, minutes: t.timeLimit, onEnd: won => afterMatch(won) });
+  document.getElementById('go').onclick = () => startMatch({ roundId: r.id, seed: t.seed * 10 + t.roundIndex + 1, oppDiff: o.difficulty, minutes: t.timeLimit, map: t.mapType, onEnd: won => afterMatch(won) });
 }
 async function afterMatch(won) {
   const t = app.tournament;
@@ -160,7 +163,7 @@ async function afterMatch(won) {
   show(`<div class="card"><h1 class="${champ ? 'win' : 'lose'}">${champ ? 'Champion!' : 'Eliminated'}</h1><p>${champ ? 'You won all five rounds and the knockout crown.' : `You fell in round ${t.lostIn + 1} (${ROUNDS[t.lostIn].name}).`}</p>${TOUCH ? '<button class="btn" data-auto id="again">Back to menu</button>' : ''}${bracketHtml(t)}${TOUCH ? '' : '<button class="btn" data-auto id="again">Back to menu</button>'}</div>`);
   document.getElementById('again').onclick = menu;
 }
-function startTournament() { app.tournament = createTournament(pickSeed(), level, { timeLimit }); bracketScreen(); }
+function startTournament() { app.tournament = createTournament(pickSeed(), level, { timeLimit, mapType }); bracketScreen(); }
 
 const REPO_URL = 'https://github.com/ggrocco/age_of_knockout';
 const GITHUB_ICON = '<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>';
@@ -169,9 +172,10 @@ function menu() {
   document.body.classList.remove('ingame');
   show(`<div class="card"><h1>Age of Knockout</h1><h2>A five-round elimination tournament in the spirit of Age of Empires (1997)</h2>
   <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
-  ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, or pick up relics</span>
+  ${TOUCH ? `<div class="keys"><b>Tap</b><span>select your unit or building; with a selection, tap a target to order it (move, gather, attack, build)</span><b>Drag / pinch</b><span>pan the map / zoom</span><b>Round buttons</b><span>next idle villager, Town Center, box-select, deselect</span></div>` : `<div class="keys"><b>Left click / drag</b><span>select units and buildings (double-click: all of a type)</span><b>Right click</b><span>move, gather, build, attack, pick up relics, or board and land a Transport Ship</span>
   <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager (or the round button above the minimap), jump to Town Center</span><b>Space + drag</b><span>pan the map with the mouse</span><b>Esc</b><span>pause / resume (cancels a placement first)</span></div>`}
   <div class="level">Difficulty: ${Object.keys(LEVELS).map(l => `<button class="btn${l === level ? ' on' : ''}" data-level="${l}">${LEVEL_NAME[l]}</button>`).join('')}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
+  <div class="level map-option">Map: ${MAP_TYPES.map(m => `<button class="btn${m === mapType ? ' on' : ''}" data-map="${m}">${MAP_NAME[m]}</button>`).join('')}<p id="mapdesc">${MAP_DESC[mapType]}</p></div>
   <div class="time-option">
     <label for="time-limit">Time limit <output id="time-limit-value" for="time-limit">${timeLimitLabel()}</output></label>
     <input type="range" id="time-limit" min="0" max="${MAX_TIME_LIMIT}" step="1" value="${timeLimit}" aria-valuetext="${timeLimitLabel()}" aria-describedby="time-limit-help">
@@ -194,10 +198,14 @@ function menu() {
     e.target.setAttribute('aria-valuetext', timeLimitLabel());
     refreshOptions();
   };
-  for (const b of document.querySelectorAll('.level .btn')) b.onclick = () => {
+  for (const b of document.querySelectorAll('.map-option .btn')) b.onclick = () => {
+    setMapType(b.dataset.map); document.getElementById('mapdesc').textContent = MAP_DESC[mapType];
+    for (const x of document.querySelectorAll('.map-option .btn')) x.classList.toggle('on', x === b);
+  };
+  for (const b of document.querySelectorAll('.level:not(.map-option) .btn')) b.onclick = () => {
     setLevel(b.dataset.level); document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
     refreshOptions();
-    for (const x of document.querySelectorAll('.level .btn')) x.classList.toggle('on', x === b);
+    for (const x of document.querySelectorAll('.level:not(.map-option) .btn')) x.classList.toggle('on', x === b);
   };
   // A quick match faces the opponent that round would have in a tournament at the chosen level.
   for (const b of document.querySelectorAll('.quick')) b.onclick = () => startMatch({ roundId: ROUNDS[+b.dataset.i].id, seed: pickSeed(), oppDiff: LEVELS[level][+b.dataset.i] });

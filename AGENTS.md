@@ -16,6 +16,7 @@ npm run lint                                # eslint . (CI fails on any error)
 node --test test/econ.test.js               # single test file
 node --test --test-name-pattern="<name>" test/*.test.js   # single test
 node test/bot-sim.js 12                     # bot-vs-bot termination check (12 seeds x 5 rounds)
+node test/bot-sim.js 12 medium,medium islands   # the same on island maps (transports and ferries)
 node test/era-reach.js 12 deathmatch        # measurement, not a test: how far bots climb the eras
 docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
@@ -32,6 +33,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `?round=1..5` | Skip the menus, start that round as a quick match |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent bot for `?round=` (default `medium`) |
 | `&seed=N` | Replay a map; omitted = random map and start position |
+| `?map=rivers\|islands` | Map type for quick matches and tournaments (else the saved menu pick, else Rivers) |
 | `&speed=N` | Game speed multiplier |
 | `&autoplay=1` | A bot plays your side; `&bot=easy\|medium\|hard` sets it (default `hard`) |
 | `?autotour=1` | Whole tournament on autopilot, clicking through every screen |
@@ -53,15 +55,21 @@ desktop and touch. The match pauses while it is open and restores its previous p
 ## Architecture
 
 A 32-player knockout bracket of 1v1 AoE1-style RTS matches vs AI: five rounds (Standard Game, Death Match,
-Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a 96-tile map.
+Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a 112-tile map.
 
 - `src/sim`: the game itself, **deterministic, no DOM, seeded RNG, 20 ticks/s**. `createGame` (`game.js`) owns all
   state (entities/units/buildings/resources/relics Maps, occupancy grid). The player and the bot both act only through
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
-  rivers), `path.js` (A*), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
+  the river with its shallows, estuaries and home bays, fish), `path.js` (A*, on land or, for ships, on water), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
   `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
   gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
   runner and tests work.
+  - Tiles: 0 land, 1 deep water, 2 gold vein, 3 quarry, 4 shallows. Soldiers walk everything but deep water; ships
+    (units with `naval`) sail deep water and shallows only (`passable` in `util.js`). Only plain land takes buildings,
+    except the Mine (ore) and the Dock (deep water against the shore). `orders.js` `canHit` says whether a unit can ever
+    get a target of the other layer in range (from `game.toWater` / `game.toLand`, fixed per map); `aggro`, `doAttack`
+    and the bot use it, so no soldier path-searches the whole map for a ship it can never reach. Ships don't count
+    towards staying in the game (`isEliminated`), a Dock does.
   - `map.tiles` is no longer fixed after generation: ore patches (tiles 2 gold vein, 3 quarry) appear and revert to
     land (0) during play. Whatever changes `map.tiles` must bump `game.terrainVersion`; the terrain (`render/terrain.js`)
     and the minimap (`render/minimap.js`) compare it with the version they last drew and repaint when it moves on.
@@ -73,7 +81,10 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
   sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
-  Center. `test/ai.test.js` checks a lone bot climbs to AI Future within an hour.
+  Center, a Dock with Fishing Ships and a fleet of the newest warship, and Transport Ship ferries (`ferryWork`: attack
+  waves to an enemy across the sea, relic squads to the central island, relic carriers home). Soldiers only get orders
+  for targets on their own land mass (`landMasses`). `test/ai.test.js` checks a lone bot climbs to AI Future within an
+  hour; `test/naval.test.js` checks its navy and ferries.
 - `src/tournament`: `bracket.js` (bracket, `LEVELS` = each difficulty's five-round opponent ramp) and a headless
   match runner (`sim.js`) used by tests and `test/bot-sim.js`. Browser bracket resolution uses the same runner in a
   module Worker (`worker.js`, managed by `async-sim.js`); no live match state crosses threads.
@@ -125,6 +136,9 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 - A deliberate change to a `KEPT` building look: regenerate `test/fixtures/kept-buildings.json` (command above).
 - A deviation from AoE1 (stat, rule, tech-tree placement): `src/data/README.md` and `progress.md`.
 - A ruling, known gap or deferred minor issue: append it to `progress.md`.
+- Any new unit, building, upgrade, command or game mechanic: teach the bot (`src/ai/bot.js`) to use it in the same
+  change, and prove it with a test or a `test/bot-sim.js` run that shows the bot actually does (the bot is the
+  opponent in every match and plays every bracket match, so content it ignores is content the game never uses).
 
 ## Testing in the browser (required)
 

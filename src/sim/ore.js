@@ -9,7 +9,7 @@ export const PATCH_CAP = { gold: 8, stone: 4 }, RESPAWN_MIN = 400;
 const ORE_TILE = { gold: 2, stone: 3 };
 // Loose gold and stone piles: when a kind's piles fall below LOW_PILES of its starting total a mirrored cluster appears.
 export const RESPAWN_EVERY = secs(30), PILE_COOLDOWN = secs(120), LOW_PILES = 0.25, PILE_AMOUNT = { gold: 800, stone: 600 };
-const KINDS = ['gold', 'stone'], CENTRE_CLEAR = 8; // CENTRE_CLEAR: keep off the relic land bridge, like map generation
+const KINDS = ['gold', 'stone'], CENTRE_CLEAR = 8; // CENTRE_CLEAR: keep off the relic shallows at the centre, like map generation
 
 export function initOre(game) {
   const n = game.map.size;

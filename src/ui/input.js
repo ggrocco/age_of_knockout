@@ -1,4 +1,5 @@
 import { BUILDINGS } from '../data/buildings.js';
+import { UNITS } from '../data/units.js';
 import { canPlace, canAfford } from '../sim/commands.js';
 import { lineTiles } from '../sim/util.js';
 
@@ -54,12 +55,24 @@ export function createInput(ui) {
   // Right-click / tap-with-selection: the context order for whatever is under the pointer.
   function orderAt(t, gp, ids) {
     const vids = ids.filter(id => g().entities.get(id).type === 'villager');
+    // Own Transport Ship under the pointer: everyone selected who walks goes aboard.
+    const walkers = ids.filter(id => !g().entities.get(id).naval);
+    if (t && t.kind === 'unit' && t.owner === 0 && t.cargo && walkers.length) return ui.cmd({ type: 'board', ids: walkers, transportId: t.id });
     if (t && (t.kind === 'unit' || t.kind === 'building') && t.owner === 1) return ui.cmd({ type: 'attack', ids, targetId: t.id });
-    if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
+    // Villagers and Fishing Ships both gather; the command sends each only to its own kind of resource (fish are the ships').
+    if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: ids.filter(id => { const e = g().entities.get(id); return e.type === 'villager' || UNITS[e.type].capacity; }), resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && t.gatherType && t.constructed) return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
     if (t && t.kind === 'building' && t.owner === 0 && !t.constructed) return ui.cmd({ type: 'construct', ids: vids, targetId: t.id });
     if (vids.length && repairable(t)) return ui.cmd({ type: 'repair', ids: vids, targetId: t.id });
     if (t && t.kind === 'relic') return ui.cmd({ type: 'relic', ids, relicId: t.id });
+    // Loaded transports sent onto ground land everyone there (the rest of the selection moves as usual).
+    const loaded = ids.filter(id => g().entities.get(id).cargo?.length), n = g().map.size;
+    if (gp && loaded.length && g().map.tiles[Math.floor(gp.y) * n + Math.floor(gp.x)] !== 1) {
+      let r = null;
+      for (const id of loaded) r = ui.cmd({ type: 'unload', transportId: id, x: gp.x, y: gp.y });
+      const rest = ids.filter(id => !loaded.includes(id));
+      return rest.length ? ui.cmd({ type: 'move', ids: rest, x: gp.x, y: gp.y }) : r;
+    }
     if (gp) return ui.cmd({ type: 'move', ids, x: gp.x, y: gp.y });
     return null;
   }
@@ -185,7 +198,8 @@ export function createInput(ui) {
     const ent = ui.view.pickEntity(x, y), gp = ui.view.pickGround(x, y), ids = selectedUnitIds();
     const own = ent && ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building');
     const helps = own && ent.kind === 'building' && ids.some(id => g().entities.get(id).type === 'villager') && (!ent.constructed || (ent.gatherType && ent.constructed) || repairable(ent));
-    if (own && !helps) return selectOwn(ent, false);
+    const boards = own && ent.cargo && ids.some(id => !g().entities.get(id).naval); // a tap on own transport with walkers selected: board it
+    if (own && !helps && !boards) return selectOwn(ent, false);
     if (ids.length) { const r = orderAt(ent, gp, ids); if (r && r.ok && gp) ui.marker(gp.x, gp.y); return; }
     setSel([]); if (ent) ui.inspect = ent;
   }

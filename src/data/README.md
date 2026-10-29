@@ -260,10 +260,69 @@ untuned placeholder. Nothing here comes from the openage data.
   so gold can't crowd out the quarries).
 - **Pile respawn** (`ore.js`): every 30 s, if a kind's loose piles hold under 25% of its starting total and 120 s have
   passed since the last respawn, a mirrored 2x2 block of piles appears on each side (800 gold / 600 stone each), more than
-  13 tiles from either start and more than 8 from the map centre (the relic land bridge), never on a loose relic, and
+  13 tiles from either start and more than 8 from the map centre (the relic shallows), never on a loose relic, and
   only where a tile beside each block is reachable on foot from a Town Center (a 4-neighbour flood through land and ore
   ground, blocked by water, resources and buildings). Respawned patches also avoid loose relics.
 - **Bot** (`ai/bot.js`): digs Mines only on patches in its own half that its villagers can reach (computed once on the
   bare map), when its loose piles of that kind run out.
 - **Look** (`render/arch/mine.js`): the Mine varies by era to satisfy the architecture invariants (distinct per era, team
   colour, footprint, height cap); the wheel and the cart animate while it is finished.
+
+## Invented content (water, the Dock and ships)
+
+AoE1 has Docks and ships, but this game's water, rules and numbers are its own: invented, game-tuned approximations,
+none checked against the openage data (deviations from AoE1 listed where there is a counterpart).
+
+- **Map** (`map.js`, 112 tiles since 2026-10-29, was 96): a navigable river (5-7 tiles wide) runs edge to edge between
+  the starts, through **shallows** (tile 4) over the centre (the relic spots, kept dry) and at a ford on each half;
+  past each ford it opens into an estuary lake, and each player has a home bay, a channel from the river to a lake
+  whose edge is 17-20 tiles from the start. 1-3 small ponds remain. About 9% of the map is water or shallows. Shallows
+  are walked by soldiers and sailed by ships; nothing is built or placed on them. AoE1's shallows let land units cross
+  but not ships.
+- **Fish**: mirrored shoals of 300 food on open deep water (all eight neighbours wet, 3 tiles apart): 4 in each home
+  bay, 3 in each estuary, up to 3 along each half of the river. AoE1 fish hold 250 (shore) to 400 (deep).
+- **Dock** (`buildings.js`): Bronze Age (AoE1: Stone), 100 wood, 3x3, 35 s, 600 HP, sight 6, `extra: true` (never counts
+  toward an age-up), `naval: true`. It stands wholly on deep water with free ground and free water along its sides
+  (`atShore` in `commands.js`). It trains every ship and takes only the Fishing Ships' food; villagers never drop there.
+- **Ships** (`units.js`, `naval: true`): War Galley (Bronze, 135 wood 30 gold, 200 HP, 8 pierce, range 6, armour 0/3,
+  speed 2.0; modelled on AoE1's War Galley), Fishing Ship (Medieval, 75 wood, 75 HP, no attack, carries 15 a trip; AoE1's
+  Fishing Boat is Stone Age, 50 wood), Frigate (Age of Sail, 200 wood 100 gold, 360 HP, 20 melee splash 0.8, range 7) and
+  Destroyer (Modern, 150 wood 200 gold, 520 HP, 30 melee splash 1, range 8, speed 2.4). Warships are class `ship`
+  ("Warship"); the Fishing Ship is `civ`. Cannon-armed ships use melee attacks, like the siege guns, so they hurt
+  buildings. Ships keep one look in every era. No trade ships or ship upgrades yet.
+- **Transport Ship** (`units.js`, `carries: 8`): Bronze Age, 150 wood, 150 HP, armour 0/4, speed 2.1, unarmed, class
+  `transport`. AoE1 has a Light Transport (Tool Age, 5 aboard) and a Heavy Transport (Iron Age, 10): here there is one.
+  Boarding (`board` command, `doBoard`): units walk to the transport (an idle one sails to the shore nearest them, or
+  to one a boarder can walk to if they can't reach it) and go aboard, out of sight: they take no orders, can't be
+  targeted and give no sight, but count for population and for staying in the game. Unloading (`unload`, `doUnload`):
+  the transport sails to the water beside the shore nearest the target (ground walkable from the target when it is
+  ground) and puts everyone on the free ground there; relic carriers go on to store their relic, the rest walk on to
+  the target. A sunk transport kills everyone aboard (the attacker gets the kills); a relic aboard washes up on the
+  nearest free land.
+- **Island maps** (`map.js`, `mapType: 'islands'`, chosen in the menu or with `?map=islands`): open sea with a home
+  island round each start (radius 20 +/- 4, wobbly coast) and a central island (radius 11.5 +/- 2.5, its own mirror
+  image) holding the 5 relic spots and mirrored rich piles (4 x 1200 gold, 3 x 900 stone pairs). No shallows: no
+  ground at all joins two islands (generation retries otherwise), lagoons cut off from the open sea are filled in, and
+  each home island gets 4 extra woodlines (the sea takes the rest of the map's forests). Fish: up to 6 shoals off each
+  home island, 2 round the centre. The home gold patch is there; the mid-map ore patches are not.
+  Each home island must hold enough to climb four Ages (Stone to Medieval) without leaving it, with half again to
+  spare, or generation tries another layout (`homeBudget` / `climbCost` in `map.js`, from the data tables): the four
+  age-ups, the two cheapest gate buildings of each Age left, 20 villagers and their Houses, a Dock and a Transport Ship,
+  and Farms (wood, at Stone Age capacity) for the food the berries don't cover. Today that is 4400 food, 1690 wood,
+  2150 gold, 200 stone; a home island holds at least 1200 food (berries), 7100 wood, 4700 gold and 1800 stone.
+- **Bot on islands**: before it has a Transport Ship it keeps only 6 soldiers (nobody can land before then), builds its
+  Dock as soon as it reaches the Bronze Age (ahead of the age-up reserve) and its transports (`transports`: relaxed and
+  easy 1, medium and hard 2) before any warship. Attack waves sail as one convoy to the shore nearest the enemy Town
+  Center. In the relics round it sends a squad of up to 5 to the central island and ferries relic carriers home.
+  On a river map none of this changes anything: everything is one land mass.
+- **Reach** (`orders.js` `canHit`): a ship can target what lies within its range of open water; a soldier can target a
+  ship within its range of walkable ground, so on deep water only ranged soldiers hit it, and in the shallows anyone
+  can. Towers shoot ships like any unit. Ships never breach walls.
+- **Elimination** (`rounds/index.js`): ships don't keep a side in the game (AoE1's last-boat hunts); a Dock does, as a
+  building that trains units.
+- **Bot**: from the Bronze Age, once it has six free villagers and the next age-up stays affordable, it builds one Dock in
+  its home bay (on its side, within 30 tiles, beside ground it can walk to), sending a villager to look if the bay is
+  still unexplored. It trains the newest warship up to `fleet` (relaxed 1, easy 2, medium 3, hard 4; two more once it
+  sees enemy ships) and, from the Medieval Age, `fishers` Fishing Ships (2, 2, 3, 4). Warships attack the nearest target
+  they can reach, enemy ships first; while a land wave is on, idle ones sail between the enemy's bay and their own Dock.
+  It never sends soldiers after ships. The Wonder round skips the navy.

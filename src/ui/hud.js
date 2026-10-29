@@ -8,7 +8,8 @@ import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { QUALITY } from '../render/quality.js';
 
-const REASONS = { resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', 'pop limit': 'Population limit of this Age reached - advance to raise it', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
+const REASONS = { 'needs a fishing ship': 'Only Fishing Ships can fish', 'transport full': 'The Transport Ship is full (8 aboard)', 'bad transport': 'Not one of your Transport Ships',
+  empty: 'Nobody is aboard', 'no shore': 'No shore to land on there', resources: 'Not enough resources', 'pop cap': 'Population cap reached - build Houses', 'pop limit': 'Population limit of this Age reached - advance to raise it', age: 'Requires a later Age', placement: 'Cannot build there', 'needs buildings': 'Advancing needs more finished buildings of your current Age',
   'queue full': 'Production queue is full', 'no villagers': 'Select villagers first', 'no units': 'Select units first', 'bad target': 'Invalid target', 'already researching': 'Already advancing', 'needs town center': 'Requires a Town Center',
   'nothing to repair': 'Nothing to repair' };
 const TECHS_AT = new Set(Object.values(TECHS).map(t => t.building)); // buildings that research something
@@ -105,7 +106,7 @@ export function createHud(ui) {
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${obj}</span></span>${clockHtml}`
       + [1, 2, 4].map(s => `<button data-speed="${s}" class="${ui.speed === s ? 'on' : ''}">${s}x</button>`).join('') + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button><button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
     if (!ui.touch) html += '<button data-menu="open" aria-label="Game settings">Settings</button>';
-    let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle') idleN++;
+    let idleN = 0; for (const u of g.units.values()) if (u.owner === 0 && u.type === 'villager' && u.order.type === 'idle' && !u.aboard) idleN++;
     const badge = document.querySelector(ui.touch ? '#touchbar [data-act=idle] .badge' : '#idlebtn .badge'), bt = idleN ? String(idleN) : ''; if (badge.textContent !== bt) badge.textContent = bt;
     if (!ui.touch) $('idlebtn').classList.toggle('has', idleN > 0);
     if (ui.touch) {
@@ -130,7 +131,7 @@ export function createHud(ui) {
     const nameOf = e => e.kind === 'unit' ? UNITS[e.type].name : e.kind === 'building' ? BUILDINGS[e.type].name : e.type;
     const describe = e => {
       let s = `<h3>${nameOf(e)}${e.owner === 1 ? ' <small class="lose">(enemy)</small>' : ''}</h3>` + bar(e) + `HP ${Math.ceil(e.hp)}/${e.maxHp}`;
-      if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
+      if (e.kind === 'unit') s += ` &nbsp; Attack ${e.atk} ${e.atkType === 'pierce' ? 'pierce' : 'melee'} &nbsp; Armor ${e.marmor}/${e.parmor}` + (e.carry?.amount > 0 ? `<br>Carrying ${Math.floor(e.carry.amount)} ${e.carry.type}` : '') + (e.cargo ? `<br>Aboard ${e.cargo.length}/${UNITS[e.type].carries}` : '') + `<br>${e.order.type === 'idle' ? 'Idle' : e.order.type[0].toUpperCase() + e.order.type.slice(1)}`;
       if (e.kind === 'building') s += e.constructed ? (e.queue.length ? `<br>Training: ${queueText(e.queue)} (${Math.ceil(e.queue[0].remaining / 20 / workSpeed(e))}s)` : (e.gatherType ? `<br>${e.gatherType[0].toUpperCase() + e.gatherType.slice(1)} left ${Math.floor(e.amount)}${e.maxAmount ? ' / ' + e.maxAmount : ''}` : '')) : `<br>Under construction ${Math.floor(e.progress * 100)}%`;
       if (e.kind === 'building' && e.owner === 0 && e.constructed && !e.gatherType && e.hp < e.maxHp) { // what villagers would pay to make it whole
         const rc = repairCost(e.type, e.maxHp - e.hp, e.maxHp), rcr = Object.fromEntries(Object.entries(rc).map(([k, v]) => [k, Math.ceil(v)]));
@@ -152,7 +153,8 @@ export function createHud(ui) {
     const own = sel.filter(e => e.owner === 0), vills = own.filter(e => e.type === 'villager'), bld = own.find(e => e.kind === 'building' && e.constructed);
     // Every selected own building, foundations too, uses the same confirmation dialog.
     const del = own.find(e => e.kind === 'building');
-    let key = `${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20 / workSpeed(bld)) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
+    const ferry = own.find(e => e.cargo?.length); // a loaded Transport Ship gets an Unload tile
+    let key = `${ferry ? 'U' + ferry.id + ':' + ferry.cargo.length : ''}${del ? 'D' + del.id : ''}${vills.length ? 'V' : ''}${bld ? bld.id + ':' + bld.queue.length : ''}${bld && bld.research ? 'R' + Math.ceil(bld.research.remaining / 20 / workSpeed(bld)) : ''}${p.techs.size}${p.age}${p.ageUp ? 'a' : ''}${['food', 'wood', 'gold', 'stone'].map(k => Math.floor(p.res[k] / 25)).join(',')}${canAfford(p, BUILDINGS.wall.cost) ? 'W' : ''}${p.pop >= p.popCap ? 'P' : ''}${ui.placing || ''}`; // the 5-stone Wall is finer than the 25-step buckets
     if (key !== cmdKey) {
       cmdKey = key; const btns = []; tips.clear();
       const notesFor = (locked, d, short, popFull) => locked ? ['Requires ' + ageTitle(d.age)] : [...(short.length ? [reasonText('resources')] : []), ...(popFull ? [reasonText(popFullReason(p))] : [])];
@@ -172,6 +174,7 @@ export function createHud(ui) {
         if (bld.type === 'town_center') { const next = AGES[ageIndex(p.age) + 1]; if (next) { const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
           btns.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age', ok: !why, short: shortOf(p, cost), notes: why ? [reasonText(why)] : [], extra: why === 'needs buildings' ? `<span class="c">+${ageUpNeed(p.age)} bldg${ageUpNeed(p.age) > 1 ? 's' : ''}</span>` : '', cx: ' age' })); } }
       }
+      if (ferry) btns.push(tile(`data-unload="${ferry.id}"`, { kind: 'unload', id: 'unload', name: 'Unload', cost: {}, tint: 't-age', ok: true, extra: `<span class="c">${ferry.cargo.length} aboard</span>` }));
       if (del) btns.push(tile(`data-delete="${del.id}"`, { kind: 'delete', id: 'delete', name: 'Delete', cost: {}, tint: 't-del', ok: true, extra: '<span class="c">No refund</span>' }));
       const struct = btns.map(b => b.key).join('|');
       if (struct !== cmds._struct) { cmds.innerHTML = btns.map(b => b.html).join(''); cmds._struct = struct; }
@@ -215,6 +218,7 @@ export function createHud(ui) {
     else if (b.dataset.pause) ui.togglePause();
     else if (b.dataset.resign) { if (ui.resignArmed) { ui.resignArmed = false; ui.game.command(0, { type: 'resign' }); hud.closeMenu(); } else { ui.resignArmed = true; setTimeout(() => { ui.resignArmed = false; }, 3000); if (!$('gamemenu').classList.contains('hidden')) hud.openMenu(); } }
     else if (b.dataset.delete) { ui.actions?.delete(+b.dataset.delete); cmdKey = ''; }
+    else if (b.dataset.unload) { ui.cmd({ type: 'unload', transportId: +b.dataset.unload }); cmdKey = ''; }
     else if (b.dataset.build) ui.startPlacing(b.dataset.build);
     else if (b.dataset.train) { const n = e.shiftKey ? 5 : 1; for (let i = 0; i < n; i++) { const r = ui.cmd({ type: 'train', buildingId: +b.dataset.b, unit: b.dataset.train }); if (!r.ok) break; } cmdKey = ''; }
     else if (b.dataset.research) { ui.cmd({ type: 'research', buildingId: +b.dataset.b, tech: b.dataset.research }); cmdKey = ''; }

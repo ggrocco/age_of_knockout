@@ -4,8 +4,9 @@ import { createBot, matchOptions, THINK_EVERY as every } from '../ai/bot.js';
 import { roundById } from '../rounds/index.js';
 import { popLimit } from '../data/ages.js';
 
+// opts.mapType: 'rivers' (default) or 'islands'; opts.limit: stop after this many ticks; opts.keepGame: return the game too.
 export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts = {}) {
-  const rules = roundById(roundId), g = createGame({ seed, rules, ...matchOptions(diffs) }), bots = [createBot(g, 0, diffs[0]), createBot(g, 1, diffs[1])];
+  const rules = roundById(roundId), g = createGame({ seed, rules, mapType: opts.mapType, ...matchOptions(diffs) }), bots = [createBot(g, 0, diffs[0]), createBot(g, 1, diffs[1])];
   const out = { ended: false, winner: null, reason: null, ticks: 0, errors: [], maxRejects: 0, cap: g.capTicks };
   const limit = opts.limit || g.capTicks + 50;
   try {

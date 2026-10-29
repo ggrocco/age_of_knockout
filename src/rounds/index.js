@@ -26,8 +26,9 @@ const tiebreak = (game, reason) => {
   return { winner: s[1] > s[0] ? 1 : 0, reason, scores: s };
 };
 // A side is out when it has no units and nothing that can make units (or a standing Wonder): it can never act again.
+// Ships don't count (a last boat out on the water can't keep a beaten side in the game); a Dock does, as it trains them.
 export const isEliminated = (game, pid) => {
-  for (const u of game.units.values()) if (u.owner === pid) return false;
+  for (const u of game.units.values()) if (u.owner === pid && !u.naval) return false;
   for (const b of game.buildings.values()) if (b.owner === pid && b.constructed && (BUILDINGS[b.type].trains?.length || b.type === 'wonder')) return false;
   return true;
 };

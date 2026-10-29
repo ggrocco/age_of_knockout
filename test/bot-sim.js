@@ -1,12 +1,12 @@
-// Usage: node test/bot-sim.js [seeds=5] [difficulties like medium,medium]
+// Usage: node test/bot-sim.js [seeds=5] [difficulties like medium,medium] [map type: rivers|islands]
 import { simulateMatch } from '../src/tournament/sim.js';
 import { ROUNDS } from '../src/rounds/index.js';
-const seeds = +(process.argv[2] || 5), diffs = (process.argv[3] || 'medium,medium').split(',');
+const seeds = +(process.argv[2] || 5), diffs = (process.argv[3] || 'medium,medium').split(','), mapType = process.argv[4] || 'rivers';
 let bad = 0;
 for (const r of ROUNDS) {
   const rows = [];
   for (let s = 1; s <= seeds; s++) {
-    const t0 = Date.now(), m = simulateMatch(r.id, s, diffs);
+    const t0 = Date.now(), m = simulateMatch(r.id, s, diffs, { mapType });
     const ok = m.ended && !m.errors.length && m.ticks <= m.cap + 50 && m.maxRejects <= 20; if (!ok) bad++;
     rows.push({ seed: s, ok, winner: m.winner, reason: m.reason, ticks: m.ticks, ms: Date.now() - t0, rej: m.maxRejects, err: m.errors[0] });
   }

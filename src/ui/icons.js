@@ -32,6 +32,7 @@ export const ICONS = {
   mine: svg(`<path d="M3 20.5l5-8.6 4 3 4-5 5 10.6z" ${D}/><path d="M14.2 4.2 5.2 13.2"/><path d="M11.2 3.6c2.8-.4 5.4.8 6.6 3.4-.6-1.2-2.8-1.6-4.4-1.4z" ${D}/><circle cx="17" cy="16.2" r="2.8"/><circle cx="17" cy="16.2" r=".8" ${S}/><path d="M17 13.4v5.6M14.2 16.2h5.6"/><path d="M2 20.5h20"/>`),
   tower: svg(`<path d="M8.5 21V10.5H7V4.5h2.4v2H11v-2h2v2h1.6v-2H17v6h-1.5V21z" ${D}/><rect x="11.3" y="12.4" width="1.4" height="3.2" rx=".5" ${S}/><path d="M10.8 21v-2.6a1.2 1.2 0 0 1 2.4 0V21"/><path d="M5.5 21h13"/>`),
   wall: svg(`<path d="M2.6 20.5V6.5h3.2v2.4h2v-2.4H11v2.4h2V6.5h3.2v2.4h2V6.5h3.2v14z" ${D}/><path d="M2.6 12.7h18.8M2.6 16.6h18.8M9.4 8.9v3.8M15.6 8.9v3.8M6 12.7v3.9M12.4 12.7v3.9M18.6 12.7v3.9M9.4 16.6v3.9M15.6 16.6v3.9"/><path d="M1.5 20.5h21"/>`),
+  dock: svg(`<path d="M2.5 13.5h12v3h-12z" ${D}/><path d="M4.5 16.5v4M8.5 16.5v4M12.5 16.5v4"/><path d="M16.5 20.5V5.5l4 3h-4M16.5 9.5l-5 3"/><path d="M1.5 20.5c1.6 1 3 1 4.6 0s3 -1 4.6 0 3 1 4.6 0"/>`),
   // units
   villager: svg(`<circle cx="12" cy="9.3" r="3" ${D}/><path d="M8 8.4a4 4 0 0 1 8 0zM6.6 8.6h10.8"/><path d="M5.5 20.5c0-3.9 2.9-6.2 6.5-6.2s6.5 2.3 6.5 6.2z" ${D}/>`),
   clubman: svg(`<path d="M11.8 12.2c-1-2.8.6-6.6 4.2-8.4 3.2-.4 4.6 2.4 3.8 5.2-.8 2.8-4.4 4.6-8 3.2z" ${D}/><path d="M11.6 12.4 4.6 19.4"/><circle cx="15.6" cy="7.4" r=".75" ${S}/><circle cx="17.8" cy="10" r=".75" ${S}/><circle cx="18.2" cy="6" r=".75" ${S}/>`),
@@ -57,6 +58,12 @@ export const ICONS = {
   drone: svg(`<rect x="9.4" y="9.8" width="5.2" height="4.4" rx="1.6" ${D}/><path d="M9.6 10.8 6.6 7.8M14.4 10.8l3-3M9.6 13.2l-3 3M14.4 13.2l3 3"/><circle cx="5.2" cy="6.4" r="2.4" ${D}/><circle cx="18.8" cy="6.4" r="2.4" ${D}/><circle cx="5.2" cy="17.6" r="2.4" ${D}/><circle cx="18.8" cy="17.6" r="2.4" ${D}/><circle cx="12" cy="12" r="1.1" ${S}/>`),
   mech: svg(`<rect x="9" y="2.8" width="6" height="4.6" rx="1.2" ${D}/><path d="M10.4 5.2h3.2"/><rect x="7" y="8.6" width="10" height="6.2" rx="1.6" ${D}/><path d="M7 10.2H4.4v5.2M17 10.2h2.6v5.2"/><path d="M9.6 14.8 8.2 20.6H5.4M14.4 14.8l1.4 5.8h2.8"/>`),
   railgun: svg(`<rect x="2.5" y="11.2" width="15" height="3.6" rx="1" ${D}/><path d="M4 13h13"/><path d="M8 14.8 6 20.4M12.6 14.8l2 5.6M4.4 20.4h12"/><path d="M21 8.2l-1.7 3.3h2.7L20.3 15"/>`),
+  fishing_ship: svg(`<path d="M3 14.5h18l-2.6 5h-12.8z" ${D}/><path d="M11 14.5V4.5l5.5 8h-5.5"/><path d="M11 6.5 4.5 13"/><circle cx="4.5" cy="14.8" r=".9" ${S}/>`),
+  transport_ship: svg(`<path d="M2.5 14.5h19l-3 5h-13z" ${D}/><path d="M5.5 14.5v-4h13v4"/><path d="M8 10.5V8h3v2.5M13 10.5V8h3v2.5"/><path d="M12 8V3.5l4 2-4 1.5"/>`),
+  unload: svg(`<path d="M2.5 15.5h11l-2 4h-7z" ${D}/><path d="M17 3.5v11M13.5 11l3.5 3.5 3.5-3.5"/><path d="M15 20.5h7"/>`),
+  war_galley: svg(`<path d="M2.5 13.5h19l-3 5h-13z" ${D}/><path d="M12 13.5V3.5M7.5 5.5h9l-1 6h-7z"/><path d="M5 18.5 3 21.5M9 18.5l-1.4 3M15 18.5l1.4 3M19 18.5l2 3"/>`),
+  frigate: svg(`<path d="M2.5 14.5h19l-2.4 5.5H4.9z" ${D}/><path d="M8 14.5V3.5M16 14.5V5.5M5 5.5h6v3.5H5zM13 7.5h6v3h-6zM5 11h6M13 12.5h6"/><circle cx="7" cy="17" r=".9" ${S}/><circle cx="12" cy="17" r=".9" ${S}/><circle cx="17" cy="17" r=".9" ${S}/>`),
+  destroyer: svg(`<path d="M1.5 15.5h21l-3.6 4.5H4.2z" ${D}/><path d="M7.5 15.5v-3.5h7v3.5M10 12V8.5h3V12M11.5 8.5V4.5"/><path d="M14.5 13.5h5M4 14.5l3.5-1"/>`),
   king: svg(`<path d="M4.2 18.6 3.6 8.2l4.9 4.3L12 5.8l3.5 6.7 4.9-4.3-.6 10.4z" ${D}/><path d="M4.4 20.8h15.2"/><circle cx="3.6" cy="7.6" r="1.1" ${S}/><circle cx="12" cy="5" r="1.1" ${S}/><circle cx="20.4" cy="7.6" r="1.1" ${S}/>`),
   // ui
   age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${D}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
@@ -65,7 +72,7 @@ export const ICONS = {
   unknown: svg(`<circle cx="12" cy="12" r="8.2" ${D}/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r=".9" ${S}/>`),
 };
 // Class fallbacks so a future unit never renders a blank tile.
-const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank };
+const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank, ship: ICONS.war_galley, transport: ICONS.transport_ship };
 // Tech tiles reuse a representative existing icon (weapon/shield/arrow/economy) instead of the "?" glyph.
 const TECH_ICON = {
   hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight,

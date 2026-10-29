@@ -11,7 +11,11 @@ export function distPoint(px, py, e) {
 }
 export function centerOf(e) { const r = rectOf(e); return { x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2 }; }
 export const tileOf = e => { const c = centerOf(e); return { x: Math.floor(c.x), y: Math.floor(c.y) }; };
-export const RES_KIND = { tree: 'wood', berry: 'food', gold: 'gold', stone: 'stone' };
+export const RES_KIND = { tree: 'wood', berry: 'food', gold: 'gold', stone: 'stone', fish: 'food' };
+// Map tiles: 0 land, 1 deep water, 2 gold vein, 3 quarry, 4 shallows. Soldiers walk every tile but deep water; ships
+// (a unit with `naval`) sail deep water and shallows only.
+export const WATER = 1, SHALLOWS = 4;
+export const passable = (tile, naval) => naval ? tile === WATER || tile === SHALLOWS : tile !== WATER;
 // The tiles of a wall dragged from tile a to tile b, snapped to a straight line: horizontal if |dx| > 2|dy|, vertical if
 // |dy| > 2|dx|, else a 45-degree diagonal of length max(|dx|, |dy|) (so it may end beside b, not on it). Runs from a,
 // includes both ends, and keeps at most the first 64 tiles.
