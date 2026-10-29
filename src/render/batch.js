@@ -4,6 +4,41 @@ import { createCosmetics } from './cosmetics.js';
 // Picking uses CPU proxies; cameras draw only the resident batch on layer 0.
 export const PROXY_LAYER = 1;
 
+// A batched part shows only while it and every ancestor up to its entity's group are visible.
+function shownWithin(part, group) {
+  let shown = group.visible;
+  for (let node = part; shown && node !== group; node = node.parent) shown = node.visible;
+  return shown;
+}
+
+// A batch copy of cached model geometry: shares its arrays, adds the cosmetic flag. Never modifies the cached
+// geometry or its pinned bounds.
+function batchCopy(geometry, animated, vertexCount) {
+  const copy = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(geometry.attributes)) copy.setAttribute(name, attribute);
+  copy.setIndex(geometry.index);
+  copy.setAttribute('cosmetic', new THREE.Float32BufferAttribute(new Float32Array(vertexCount).fill(animated ? 1 : 0), 1));
+  if (animated) {
+    if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+    // Rotations are about the part origin. Smoke grows to 1.4x and rises by 0.9;
+    // bobbing can add 0.055. This conservative sphere covers every cosmetic mode.
+    copy.boundingSphere = new THREE.Sphere(new THREE.Vector3(),
+      (geometry.boundingSphere.center.length() + geometry.boundingSphere.radius) * 1.4 + 1);
+  } else copy.boundingSphere = geometry.boundingSphere;
+  return copy;
+}
+
+// Matrix texture ranges to upload: one span per texture row holding dirty instances.
+function dirtyRowRanges(dirtyIds, stride) {
+  const rows = new Map();
+  for (const id of dirtyIds) {
+    const start = id * 16, row = Math.floor(start / stride), range = rows.get(row);
+    if (range) { range[0] = Math.min(range[0], start); range[1] = Math.max(range[1], start + 16); }
+    else rows.set(row, [start, start + 16]);
+  }
+  return rows.values();
+}
+
 export function createModelBatch(material) {
   let instanceCapacity = 512, vertexCapacity = 1 << 18;
   const cosmetics = createCosmetics(instanceCapacity), drawMaterial = material.clone();
@@ -17,44 +52,40 @@ export function createModelBatch(material) {
   const geometryIds = new Map(), entries = new Map(), dirtyIds = new Set();
   let uploadedTexture = null;
 
+  // One batch geometry per cached model geometry and variant (static, or animated by the cosmetics shader).
   function geometryId(geometry, animated) {
     let ids = geometryIds.get(geometry);
     if (!ids) geometryIds.set(geometry, ids = []);
     const variant = animated ? 1 : 0;
     if (ids[variant] !== undefined) return ids[variant];
     const need = geometry.attributes.position.count;
-    if (mesh.unusedVertexCount < need) {
-      const used = vertexCapacity - mesh.unusedVertexCount;
-      while (used + need > vertexCapacity) vertexCapacity *= 2;
-      mesh.setGeometrySize(vertexCapacity, vertexCapacity);
-    }
-    // Share source arrays, but never modify cached model geometry or its pinned bounds.
-    const copy = new THREE.BufferGeometry();
-    for (const [name, attribute] of Object.entries(geometry.attributes)) copy.setAttribute(name, attribute);
-    copy.setIndex(geometry.index);
-    copy.setAttribute('cosmetic', new THREE.Float32BufferAttribute(new Float32Array(need).fill(variant), 1));
-    if (animated) {
-      if (!geometry.boundingSphere) geometry.computeBoundingSphere();
-      // Rotations are about the part origin. Smoke grows to 1.4x and rises by 0.9;
-      // bobbing can add 0.055. This conservative sphere covers every cosmetic mode.
-      copy.boundingSphere = new THREE.Sphere(new THREE.Vector3(),
-        (geometry.boundingSphere.center.length() + geometry.boundingSphere.radius) * 1.4 + 1);
-    } else copy.boundingSphere = geometry.boundingSphere;
-    ids[variant] = mesh.addGeometry(copy); copy.dispose();
+    reserveVertices(need);
+    const copy = batchCopy(geometry, animated, need);
+    ids[variant] = mesh.addGeometry(copy);
+    copy.dispose();
     return ids[variant];
+  }
+  // Doubles the batch's vertex storage until `need` more vertices fit.
+  function reserveVertices(need) {
+    if (mesh.unusedVertexCount >= need) return;
+    const used = vertexCapacity - mesh.unusedVertexCount;
+    while (used + need > vertexCapacity) vertexCapacity *= 2;
+    mesh.setGeometrySize(vertexCapacity, vertexCapacity);
   }
 
   function update(group) {
-    const parts = entries.get(group); if (!parts) return 0;
+    const parts = entries.get(group);
+    if (!parts) return 0;
     let writes = 0;
     for (const entry of parts) {
       const { part, id } = entry;
-      let shown = group.visible;
-      for (let o = part; shown && o !== group; o = o.parent) shown = o.visible;
+      const shown = shownWithin(part, group);
       mesh.setVisibleAt(id, shown);
       if (shown && (!entry.world || !entry.world.equals(part.matrixWorld))) {
         (entry.world ??= new THREE.Matrix4()).copy(part.matrixWorld);
-        mesh.setMatrixAt(id, part.matrixWorld); dirtyIds.add(id); writes++;
+        mesh.setMatrixAt(id, part.matrixWorld);
+        dirtyIds.add(id);
+        writes++;
       }
     }
     return writes;
@@ -77,7 +108,8 @@ export function createModelBatch(material) {
       entries.set(group, parts);
     },
     remove(group) {
-      const parts = entries.get(group); if (!parts) return;
+      const parts = entries.get(group);
+      if (!parts) return;
       for (const { id } of parts) { mesh.deleteInstance(id); dirtyIds.delete(id); }
       entries.delete(group);
     },
@@ -88,15 +120,10 @@ export function createModelBatch(material) {
       // isolated; if its storage changes, the public setters still upload correctly.
       const texture = mesh._matricesTexture;
       if (texture?.addUpdateRange && uploadedTexture === texture && dirtyIds.size) {
-        const stride = texture.image.width * 4, rows = new Map();
-        for (const id of dirtyIds) {
-          const start = id * 16, row = Math.floor(start / stride), range = rows.get(row);
-          if (range) { range[0] = Math.min(range[0], start); range[1] = Math.max(range[1], start + 16); }
-          else rows.set(row, [start, start + 16]);
-        }
-        for (const [start, end] of rows.values()) texture.addUpdateRange(start, end - start);
+        for (const [start, end] of dirtyRowRanges(dirtyIds, texture.image.width * 4)) texture.addUpdateRange(start, end - start);
       } else texture?.clearUpdateRanges(); // a resized/new texture needs its complete contents
-      uploadedTexture = texture; dirtyIds.clear();
+      uploadedTexture = texture;
+      dirtyIds.clear();
     },
     dispose() { mesh.dispose(); mesh.customDepthMaterial.dispose(); drawMaterial.dispose(); cosmetics.dispose(); },
   };
