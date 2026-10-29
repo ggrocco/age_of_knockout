@@ -6,7 +6,7 @@ Capture the Relics. Lose once and you're out.
 
 **Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
-![A Bronze Age base in Wonder Race: mud-brick houses, two towers and a Wonder under construction](docs/screenshots/wonder.jpg)
+![A Bronze Age base in Wonder Race: mud-brick houses, towers, a Temple and a Wonder under construction, with a Dock, War Galleys and a Transport Ship in the home bay](docs/screenshots/wonder.jpg)
 
 ## Run
 
@@ -24,7 +24,7 @@ For hardware render measurements, start the dev server and open `http://localhos
 
 ## How a tournament works
 
-![Main menu: time-limit slider, difficulty picker, Begin Tournament and five quick-match buttons](docs/screenshots/menu-time-limit.png)
+![Main menu: difficulty and map pickers, time-limit slider, Begin Tournament and five quick-match buttons](docs/screenshots/menu-time-limit.png)
 
 Pick a **difficulty**, set the **Time limit** slider, and press **Begin Tournament**, or jump straight into one
 game type with a **Quick** button. Both choices are saved in this browser.
@@ -40,7 +40,7 @@ Relaxed opponents work at half your speed and wait 30 minutes, and until the Bro
 Easy opponents keep a smaller army than medium and hard ones, but put their economy into reaching the next age and
 quickly replace lost villagers.
 
-![Round 1 bracket: you against Ramses, the other fifteen first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
+![Round 1 bracket: the rules, time limit and map, you against Ramses, the other first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
 Before each round the bracket shows the rules, the time limit and your opponent. **Back to menu** returns to the
 main menu before round 1; from round 2 on the button reads **Leave tournament** and asks to confirm, since leaving
@@ -109,7 +109,7 @@ Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 
 1800 in AI Future, and villagers work it faster (normal speed in Stone, up to 2.4x in AI Future). When you advance,
 every Farm you already have grows to the new size and keeps its share of food left.
 
-![Industrial Age Death Match base: brick houses with chimneys, a factory, a castle and red-brick towers](docs/screenshots/deathmatch.jpg)
+![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with Frigates, a War Galley and Fishing Ships at the Dock](docs/screenshots/deathmatch.jpg)
 
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
@@ -212,7 +212,7 @@ real iPhone.
 
 ## Buildings by era
 
-![buildings.html: Town Center, House, Granary, Storage Pit and Farm rendered in every era from Stone to Modern](docs/screenshots/gallery.jpg)
+![buildings.html: Government Center, Temple, Dock and Wonder rendered in every era from Bronze to AI Future, with what each trains and researches](docs/screenshots/gallery.jpg)
 
 Open `http://localhost:8000/buildings.html` to see every building in every era, rendered with the game's own
 models. Under each era it lists what the building trains by then and any upgrade it can start researching in that
@@ -221,7 +221,7 @@ reads `src/data`, so new eras and buildings appear on reload.
 
 ## Age Ladder
 
-![ages.html: the Stone to Medieval Ages with the buildings and units each one brings](docs/screenshots/age-ladder.jpg)
+![ages.html: the Stone to Medieval Ages with the buildings (the Dock among them) and units each one brings](docs/screenshots/age-ladder.jpg)
 
 [Open the Age Ladder](https://ggrocco.github.io/age_of_knockout/ages.html) (or `http://localhost:8000/ages.html`) to see
 every Age side by side: the buildings and units it brings, rendered with the game's own models; which buildings you
