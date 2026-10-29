@@ -137,3 +137,17 @@ test('river maps are the default and stay as they were', () => {
   assert.deepEqual(generateMap(7), generateMap(7, 112, 'rivers'));
   assert.equal(generateMap(7).type, 'rivers');
 });
+test('islands: each home island holds enough to climb four Ages (to Medieval) with half again to spare', async () => {
+  const { homeBudget, climbCost, CLIMB_MARGIN } = await import('../src/sim/map.js');
+  const { AGE_COST } = await import('../src/data/ages.js');
+  const need = climbCost();
+  for (const k of ['food', 'gold']) assert.ok(need[k] >= ['tool', 'bronze', 'iron', 'medieval'].reduce((s, a) => s + (AGE_COST[a].cost[k] || 0), 0), 'age-ups counted: ' + k);
+  for (let seed = 1; seed <= 60; seed++) {
+    const m = generateMap(seed, 112, 'islands');
+    for (const pid of [0, 1]) {
+      const b = homeBudget(m, pid);
+      assert.ok(b.ok, `seed ${seed} player ${pid}: ${JSON.stringify(b)}`);
+      assert.ok(b.have.gold >= need.gold * CLIMB_MARGIN && b.have.stone >= need.stone * CLIMB_MARGIN && b.have.wood >= need.wood * CLIMB_MARGIN);
+    }
+  }
+});

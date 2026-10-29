@@ -133,7 +133,9 @@ the whole tournament, the bracket's other matches included:
 
 - **Rivers** (default): the river map below, where soldiers can always walk to the enemy.
 - **Islands**: each side starts on its own island, and a third island in the middle holds the relics and rich gold
-  and stone. No ground joins them: build a Dock and Transport Ships to attack, fetch relics or claim the centre.
+  and stone. No ground joins them: build a Dock and Transport Ships to attack, fetch relics or claim the centre. Every
+  home island holds enough wood, gold and stone (with Farms for food) to advance at least four Ages, to the Medieval
+  Age, without leaving it.
 
 **Water and ships.** On a river map a river runs between the two bases, from edge to edge, opening into a lake
 past each ford, and each player has a home bay off it, a short walk from the Town Center. There is always a way to

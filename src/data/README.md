@@ -305,6 +305,11 @@ none checked against the openage data (deviations from AoE1 listed where there i
   ground at all joins two islands (generation retries otherwise), lagoons cut off from the open sea are filled in, and
   each home island gets 4 extra woodlines (the sea takes the rest of the map's forests). Fish: up to 6 shoals off each
   home island, 2 round the centre. The home gold patch is there; the mid-map ore patches are not.
+  Each home island must hold enough to climb four Ages (Stone to Medieval) without leaving it, with half again to
+  spare, or generation tries another layout (`homeBudget` / `climbCost` in `map.js`, from the data tables): the four
+  age-ups, the two cheapest gate buildings of each Age left, 20 villagers and their Houses, a Dock and a Transport Ship,
+  and Farms (wood, at Stone Age capacity) for the food the berries don't cover. Today that is 4400 food, 1690 wood,
+  2150 gold, 200 stone; a home island holds at least 1200 food (berries), 7100 wood, 4700 gold and 1800 stone.
 - **Bot on islands**: before it has a Transport Ship it keeps only 6 soldiers (nobody can land before then), builds its
   Dock as soon as it reaches the Bronze Age (ahead of the age-up reserve) and its transports (`transports`: relaxed and
   easy 1, medium and hard 2) before any warship. Attack waves sail as one convoy to the shore nearest the enemy Town

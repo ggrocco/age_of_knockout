@@ -219,3 +219,14 @@ test('on an island map the bot ferries an army to the enemy island and relic squ
   assert.ok([...r.relics.values()].some(x => r.relicOwner(x) === 0 && x.stored !== null), 'a relic stored at home');
   assert.ok(rb.maxRejects < 20, JSON.stringify(rb.why));
 });
+
+test('on an island map a lone bot climbs four Ages (to Medieval) on its home island alone', () => {
+  const g = createGame({ seed: 1, mapType: 'islands' }), b = createBot(g, 0, 'easy'), home = g.map.starts[0];
+  let villagerAbroad = false;
+  for (let i = 0; i < 20 * 60 * 35 && g.players[0].age !== 'medieval'; i++) {
+    g.tick(); if (g.time % 20 === 0) b.think();
+    if (g.time % 600 === 0) villagerAbroad ||= [...g.units.values()].some(u => u.owner === 0 && u.type === 'villager' && !sameIsland(g, u, home));
+  }
+  assert.equal(g.players[0].age, 'medieval', 'reached the Medieval Age within 35 minutes');
+  assert.equal(villagerAbroad, false, 'every villager stayed on the home island');
+});

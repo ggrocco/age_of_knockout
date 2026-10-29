@@ -1,4 +1,8 @@
 import { makeRng } from './rng.js';
+import { AGES, AGE_COST } from '../data/ages.js';
+import { BUILDINGS } from '../data/buildings.js';
+import { UNITS } from '../data/units.js';
+import { farmStats } from '../data/farms.js';
 // 180-degree rotationally symmetric map so both players get identical terrain and resources.
 // type: 'rivers' (a river with land crossings between the players) or 'islands' (no way across but by ship).
 export const MAP_TYPES = ['rivers', 'islands'];
@@ -32,11 +36,39 @@ function connected(m) {
   const seen = walk(m, tileIndex(m, m.starts[0]), true);
   return [m.starts[1], ...m.relicSpots].every(p => seen[tileIndex(m, p)]);
 }
-// Islands: no ground at all joins a start to the other start or to the central island, and the relic spots share the
-// central island (resources block there, so none is walled off).
+// Islands: no ground at all joins a start to the other start or to the central island, the relic spots share the
+// central island (resources block there, so none is walled off), and each home island can pay to climb CLIMB_AGES Ages
+// (the islands are mirror images, so checking one checks both).
 function apart(m) {
   const home = walk(m, tileIndex(m, m.starts[0]), false), centre = walk(m, tileIndex(m, m.relicSpots[0]), true);
-  return !home[tileIndex(m, m.starts[1])] && !home[tileIndex(m, m.relicSpots[0])] && m.relicSpots.every(p => centre[tileIndex(m, p)]);
+  return !home[tileIndex(m, m.starts[1])] && !home[tileIndex(m, m.relicSpots[0])] && m.relicSpots.every(p => centre[tileIndex(m, p)]) && homeBudget(m, 0).ok;
+}
+
+// A home island must hold enough to climb CLIMB_AGES Ages (Stone to Medieval) without leaving it, with half again to
+// spare (CLIMB_MARGIN): the age-ups, the two cheapest gate buildings of each Age left, CLIMB_VILLAGERS villagers and the
+// Houses for them, and a Dock and a Transport Ship to leave by. Food its berries don't cover comes from Farms, which
+// cost wood (at Stone Age capacity, the least a Farm holds). All from the data tables, so it follows their changes.
+export const CLIMB_AGES = 4, CLIMB_MARGIN = 1.5, CLIMB_VILLAGERS = 20;
+const sum = c => Object.values(c).reduce((a, v) => a + v, 0);
+export function climbCost(ages = CLIMB_AGES) {
+  const need = { food: 0, wood: 0, gold: 0, stone: 0 }, add = (c, k = 1) => { for (const r in need) need[r] += (c[r] || 0) * k; };
+  for (const a of AGES.slice(1, ages + 1)) add(AGE_COST[a].cost);
+  for (const a of AGES.slice(0, ages)) for (const c of Object.entries(BUILDINGS).filter(([id, d]) => d.age === a && id !== 'town_center' && !d.extra).map(([, d]) => d.cost).sort((x, y) => sum(x) - sum(y)).slice(0, 2)) add(c);
+  add(UNITS.villager.cost, CLIMB_VILLAGERS);
+  add(BUILDINGS.house.cost, Math.ceil(Math.max(0, CLIMB_VILLAGERS - BUILDINGS.town_center.pop) / BUILDINGS.house.pop));
+  add(BUILDINGS.dock.cost); add(UNITS.transport_ship.cost);
+  return need;
+}
+// What lies on player pid's home land (ground joined to its start, deep water parting it): loose resources and ore
+// patch reserves; fish need a Dock and the sea, so they don't count. ok: it covers climbCost() with the margin.
+export function homeBudget(m, pid) {
+  const land = walk(m, tileIndex(m, m.starts[pid]), false), have = { food: 0, wood: 0, gold: 0, stone: 0 };
+  const KIND = { tree: 'wood', berry: 'food', gold: 'gold', stone: 'stone' };
+  for (const r of m.resources) if (KIND[r.type] && land[tileIndex(m, r)]) have[KIND[r.type]] += r.amount;
+  for (const p of m.orePatches) if (land[p.tiles[0]]) have[p.kind] += p.reserve;
+  const need = climbCost(), want = r => need[r] * CLIMB_MARGIN, farm = BUILDINGS.farm.cost.wood / farmStats('stone').amount;
+  const wood = have.wood - Math.max(0, want('food') - have.food) * farm; // what the Farms for the missing food take
+  return { have, need, ok: wood >= want('wood') && have.gold >= want('gold') && have.stone >= want('stone') };
 }
 function build(seed, size, type) {
   const rng = makeRng(seed), tiles = new Uint8Array(size * size), rot = (x, y) => ({ x: size - 1 - x, y: size - 1 - y });
