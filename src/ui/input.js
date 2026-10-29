@@ -6,14 +6,18 @@ import { lineTiles } from '../sim/util.js';
 // The ghost line for a wall: ok[i] is canPlace for tiles[i], the per-tile check the wall command uses; a repeated tile is listed
 // (and counted) once. Placement only: stone is not checked here, the command's 'resources' toast covers that. DOM-free.
 export function wallPlan(game, pid, tiles) {
-  const seen = new Set(), out = [], ok = [];
+  const seen = new Set(), uniqueTiles = [], ok = [];
   let count = 0;
-  for (const t of tiles) {
-    const key = `${t.x},${t.y}`; if (seen.has(key)) continue; seen.add(key);
-    const can = canPlace(game, pid, 'wall', t.x, t.y); if (can) count++;
-    out.push(t); ok.push(can);
+  for (const tile of tiles) {
+    const key = `${tile.x},${tile.y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const placeable = canPlace(game, pid, 'wall', tile.x, tile.y);
+    if (placeable) count++;
+    uniqueTiles.push(tile);
+    ok.push(placeable);
   }
-  return { tiles: out, ok, count };
+  return { tiles: uniqueTiles, ok, count };
 }
 
 // Buttons and keyboard shortcuts share this confirmation gate. Recheck the captured match/target before deleting.
@@ -22,94 +26,191 @@ export function requestBuildingDeletion(ui, id) {
   if (!building || building.kind !== 'building' || building.owner !== 0 || game.result) return;
   ui.confirmDelete?.(building, () => {
     if (ui.game !== game || game.result || game.entities.get(id) !== building || building.owner !== 0) return;
-    if (ui.cmd({ type: 'delete', id }).ok) { ui.sel.delete(id); ui.toast?.(`${BUILDINGS[building.type].name} deleted`); }
+    if (ui.cmd({ type: 'delete', id }).ok) {
+      ui.sel.delete(id);
+      ui.toast?.(`${BUILDINGS[building.type].name} deleted`);
+    }
   });
 }
 
-// Mouse + keyboard (desktop) and touch (phone) input. Both paths share selectAt/orderAt so behaviour matches.
-export function createInput(ui) {
-  const el = document.getElementById('viewport'), keys = new Set(), drag = { on: false, x: 0, y: 0, moved: false }, box = document.getElementById('dragbox');
-  let mouse = { x: 0, y: 0 }, lastClick = { t: 0, id: -1 }, shiftDown = false;
-  let wallDrag = null, wallCur = null; // desktop wall drag: the start tile while the button is held, and the last tile under the cursor
-  let spaceDown = false, grab = null; // hold Space and left-drag to pan: grab is the last cursor point while dragging
-  const g = () => ui.game;
-  const selectedUnitIds = () => [...ui.sel].filter(id => g().entities.get(id)?.kind === 'unit');
-  const setSel = ids => { ui.sel.clear(); for (const i of ids) ui.sel.add(i); ui.inspect = null; };
-  // The building the Delete tile and key act on: the first own building in the selection, finished or not (same pick as the HUD).
-  const selectedBuilding = () => [...ui.sel].map(id => g().entities.get(id)).find(e => e && e.kind === 'building' && e.owner === 0) || null;
-  const onScreen = u => { const p = ui.view.project(u.x, u.y), r = el.getBoundingClientRect(); return p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom; };
-  const tileForPlacing = (cx, cy) => { const p = ui.view.pickGround(cx, cy); if (!p) return null; const s = BUILDINGS[ui.placing].size; return { x: Math.round(p.x - s / 2), y: Math.round(p.y - s / 2) }; };
+// Own, finished and damaged: villagers ordered onto it repair it (a Farm or Mine is gathered from instead).
+const repairable = target => target && target.kind === 'building' && target.owner === 0 && target.constructed
+  && !target.gatherType && target.hp < target.maxHp;
 
-  // Own, finished and damaged: villagers ordered onto it repair it (a Farm or Mine is gathered from instead).
-  const repairable = t => t && t.kind === 'building' && t.owner === 0 && t.constructed && !t.gatherType && t.hp < t.maxHp;
+// Mouse + keyboard (desktop) and touch (phone) input. Both paths share selectOwn/orderAt so behaviour matches.
+export function createInput(ui) {
+  const viewportEl = document.getElementById('viewport'), dragBox = document.getElementById('dragbox');
+  const keys = new Set(), drag = { on: false, x: 0, y: 0, moved: false };
+  let mouse = { x: 0, y: 0 }, lastClick = { t: 0, id: -1 }, shiftDown = false;
+  // desktop wall drag: the start tile while the button is held, and the last tile under the cursor
+  let wallDragStart = null, wallDragEnd = null;
+  let spaceDown = false, grab = null; // hold Space and left-drag to pan: grab is the last cursor point while dragging
+  const game = () => ui.game;
+  const isVillager = id => game().entities.get(id).type === 'villager';
+  const walks = id => !game().entities.get(id).naval;
+  // Villagers and Fishing Ships both gather; the command sends each only to its own kind of resource (fish are the ships').
+  const gathers = id => {
+    const entity = game().entities.get(id);
+    return entity.type === 'villager' || UNITS[entity.type].capacity;
+  };
+  const isLoadedTransport = id => game().entities.get(id).cargo?.length;
+  const selectedUnitIds = () => [...ui.sel].filter(id => game().entities.get(id)?.kind === 'unit');
+  const selectedVillagerIds = () => selectedUnitIds().filter(isVillager);
+  const setSelection = ids => {
+    ui.sel.clear();
+    for (const id of ids) ui.sel.add(id);
+    ui.inspect = null;
+  };
+  // The building the Delete tile and key act on: the first own building in the selection, finished or not (same pick as the HUD).
+  const selectedBuilding = () => [...ui.sel].map(id => game().entities.get(id))
+    .find(entity => entity && entity.kind === 'building' && entity.owner === 0) || null;
+  const onScreen = unit => {
+    const point = ui.view.project(unit.x, unit.y), rect = viewportEl.getBoundingClientRect();
+    return point.x > rect.left && point.x < rect.right && point.y > rect.top && point.y < rect.bottom;
+  };
+  // The top-left tile of the building being placed, centred on the ground under a screen point.
+  const tileForPlacing = (screenX, screenY) => {
+    const ground = ui.view.pickGround(screenX, screenY);
+    if (!ground) return null;
+    const size = BUILDINGS[ui.placing].size;
+    return { x: Math.round(ground.x - size / 2), y: Math.round(ground.y - size / 2) };
+  };
+  const showDragBox = (fromX, fromY, toX, toY) => {
+    dragBox.classList.remove('hidden');
+    Object.assign(dragBox.style, {
+      left: Math.min(fromX, toX) + 'px', top: Math.min(fromY, toY) + 'px',
+      width: Math.abs(toX - fromX) + 'px', height: Math.abs(toY - fromY) + 'px',
+    });
+  };
+  const hideDragBox = () => dragBox.classList.add('hidden');
+  const keepPlacing = () => shiftDown && !ui.touch;
 
   // ----- shared logic -----
   // Left-click / tap on an own entity: select, double-click selects all of that type on screen.
-  function selectOwn(ent, additive) {
+  function selectOwn(entity, additive) {
     const now = performance.now();
-    if (additive) { if (ui.sel.has(ent.id)) ui.sel.delete(ent.id); else ui.sel.add(ent.id); }
-    else if (ent.kind === 'unit' && now - lastClick.t < 350 && lastClick.id === ent.id) setSel(g().visibleEntities(0).filter(u => u.owner === 0 && u.type === ent.type && onScreen(u)).map(u => u.id));
-    else setSel([ent.id]);
-    lastClick = { t: now, id: ent.id };
+    if (additive) {
+      if (ui.sel.has(entity.id)) ui.sel.delete(entity.id);
+      else ui.sel.add(entity.id);
+    } else if (entity.kind === 'unit' && now - lastClick.t < 350 && lastClick.id === entity.id) {
+      const sameType = game().visibleEntities(0).filter(unit => unit.owner === 0 && unit.type === entity.type && onScreen(unit));
+      setSelection(sameType.map(unit => unit.id));
+    } else setSelection([entity.id]);
+    lastClick = { t: now, id: entity.id };
   }
-  // Right-click / tap-with-selection: the context order for whatever is under the pointer.
-  function orderAt(t, gp, ids) {
-    const vids = ids.filter(id => g().entities.get(id).type === 'villager');
+  // The order for right-clicking (or tapping) an entity, or null when the click is just a move to that spot.
+  function contextCommand(target, ids) {
+    const kind = target.kind, villagerIds = ids.filter(isVillager);
     // Own Transport Ship under the pointer: everyone selected who walks goes aboard.
-    const walkers = ids.filter(id => !g().entities.get(id).naval);
-    if (t && t.kind === 'unit' && t.owner === 0 && t.cargo && walkers.length) return ui.cmd({ type: 'board', ids: walkers, transportId: t.id });
-    if (t && (t.kind === 'unit' || t.kind === 'building') && t.owner === 1) return ui.cmd({ type: 'attack', ids, targetId: t.id });
-    // Villagers and Fishing Ships both gather; the command sends each only to its own kind of resource (fish are the ships').
-    if (t && t.kind === 'resource') return ui.cmd({ type: 'gather', ids: ids.filter(id => { const e = g().entities.get(id); return e.type === 'villager' || UNITS[e.type].capacity; }), resourceId: t.id });
-    if (t && t.kind === 'building' && t.owner === 0 && t.gatherType && t.constructed) return ui.cmd({ type: 'gather', ids: vids, resourceId: t.id });
-    if (t && t.kind === 'building' && t.owner === 0 && !t.constructed) return ui.cmd({ type: 'construct', ids: vids, targetId: t.id });
-    if (vids.length && repairable(t)) return ui.cmd({ type: 'repair', ids: vids, targetId: t.id });
-    if (t && t.kind === 'relic') return ui.cmd({ type: 'relic', ids, relicId: t.id });
-    // Loaded transports sent onto ground land everyone there (the rest of the selection moves as usual).
-    const loaded = ids.filter(id => g().entities.get(id).cargo?.length), n = g().map.size;
-    if (gp && loaded.length && g().map.tiles[Math.floor(gp.y) * n + Math.floor(gp.x)] !== 1) {
-      let r = null;
-      for (const id of loaded) r = ui.cmd({ type: 'unload', transportId: id, x: gp.x, y: gp.y });
-      const rest = ids.filter(id => !loaded.includes(id));
-      return rest.length ? ui.cmd({ type: 'move', ids: rest, x: gp.x, y: gp.y }) : r;
+    const walkerIds = ids.filter(walks);
+    if (kind === 'unit' && target.owner === 0 && target.cargo && walkerIds.length) {
+      return { type: 'board', ids: walkerIds, transportId: target.id };
     }
-    if (gp) return ui.cmd({ type: 'move', ids, x: gp.x, y: gp.y });
+    if ((kind === 'unit' || kind === 'building') && target.owner === 1) return { type: 'attack', ids, targetId: target.id };
+    if (kind === 'resource') return { type: 'gather', ids: ids.filter(gathers), resourceId: target.id };
+    const ownBuilding = kind === 'building' && target.owner === 0;
+    if (ownBuilding && target.gatherType && target.constructed) {
+      return { type: 'gather', ids: villagerIds, resourceId: target.id };
+    }
+    if (ownBuilding && !target.constructed) return { type: 'construct', ids: villagerIds, targetId: target.id };
+    if (villagerIds.length && repairable(target)) return { type: 'repair', ids: villagerIds, targetId: target.id };
+    if (kind === 'relic') return { type: 'relic', ids, relicId: target.id };
     return null;
   }
+  // Loaded transports sent onto ground land everyone there (the rest of the selection moves as usual).
+  function unloadAt(ground, ids, loaded) {
+    let result = null;
+    for (const id of loaded) result = ui.cmd({ type: 'unload', transportId: id, x: ground.x, y: ground.y });
+    const rest = ids.filter(id => !loaded.includes(id));
+    return rest.length ? ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y }) : result;
+  }
+  const isDeepWater = ground => {
+    const map = game().map;
+    return map.tiles[Math.floor(ground.y) * map.size + Math.floor(ground.x)] === 1;
+  };
+  // Right-click / tap-with-selection: the context order for whatever is under the pointer.
+  function orderAt(target, ground, ids) {
+    const command = target ? contextCommand(target, ids) : null;
+    if (command) return ui.cmd(command);
+    const loaded = ids.filter(isLoadedTransport);
+    if (ground && loaded.length && !isDeepWater(ground)) return unloadAt(ground, ids, loaded);
+    if (ground) return ui.cmd({ type: 'move', ids, x: ground.x, y: ground.y });
+    return null;
+  }
+  // Orders the selected units at a screen point and drops a marker on the ground when the order took.
+  function orderAtPoint(entity, ground, ids) {
+    const result = orderAt(entity, ground, ids);
+    if (result && result.ok && ground) ui.marker(ground.x, ground.y);
+  }
   function boxSelect(x0, y0, x1, y1, additive) {
-    const [xa, xb] = [Math.min(x0, x1), Math.max(x0, x1)], [ya, yb] = [Math.min(y0, y1), Math.max(y0, y1)];
-    const inBox = e => { const c = e.kind === 'building' ? { x: e.x + e.size / 2, y: e.y + e.size / 2 } : e, p = ui.view.project(c.x, c.y); return p.x >= xa && p.x <= xb && p.y >= ya && p.y <= yb; };
-    const mine = g().visibleEntities(0).filter(e => e.owner === 0 && inBox(e));
-    const units = mine.filter(e => e.kind === 'unit'), pick = units.length ? units : mine.filter(e => e.kind === 'building').slice(0, 1);
-    if (additive) for (const u of pick) ui.sel.add(u.id); else setSel(pick.map(u => u.id));
+    const left = Math.min(x0, x1), right = Math.max(x0, x1), top = Math.min(y0, y1), bottom = Math.max(y0, y1);
+    const inBox = entity => {
+      const centre = entity.kind === 'building' ? { x: entity.x + entity.size / 2, y: entity.y + entity.size / 2 } : entity;
+      const point = ui.view.project(centre.x, centre.y);
+      return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+    };
+    const mine = game().visibleEntities(0).filter(entity => entity.owner === 0 && inBox(entity));
+    // Units win over buildings; with no unit in the box, the first building is picked.
+    const units = mine.filter(entity => entity.kind === 'unit');
+    const picked = units.length ? units : mine.filter(entity => entity.kind === 'building').slice(0, 1);
+    if (additive) for (const entity of picked) ui.sel.add(entity.id);
+    else setSelection(picked.map(entity => entity.id));
   }
   function place(tile) {
     if (!tile) return;
-    const vills = selectedUnitIds().filter(id => g().entities.get(id).type === 'villager');
-    const r = ui.cmd({ type: 'build', ids: vills, building: ui.placing, x: tile.x, y: tile.y });
-    if (r.ok && !(shiftDown && !ui.touch)) ui.stopPlacing();
+    const result = ui.cmd({ type: 'build', ids: selectedVillagerIds(), building: ui.placing, x: tile.x, y: tile.y });
+    if (result.ok && !keepPlacing()) ui.stopPlacing();
   }
-  // Issue a wall line from tile a to tile b; toasts the placed count and stone spent (ui.cmd toasts a failure's reason).
-  function placeWall(a, b) {
-    const tiles = lineTiles(a, b), vills = selectedUnitIds().filter(id => g().entities.get(id).type === 'villager');
-    const r = ui.cmd({ type: 'wall', ids: vills, tiles });
-    if (r.ok) ui.toast?.(`Wall: ${r.placed < tiles.length ? `${r.placed} of ${tiles.length}` : r.placed} tile${tiles.length > 1 ? 's' : ''} placed, ${r.placed * BUILDINGS.wall.cost.stone} stone`);
-    if (r.ok && !(shiftDown && !ui.touch)) ui.stopPlacing();
-    return r;
+  // Issue a wall line from tile `from` to tile `to`; toasts the placed count and stone spent (ui.cmd toasts a failure's reason).
+  function placeWall(from, to) {
+    const tiles = lineTiles(from, to);
+    const result = ui.cmd({ type: 'wall', ids: selectedVillagerIds(), tiles });
+    if (result.ok) {
+      const placed = result.placed < tiles.length ? `${result.placed} of ${tiles.length}` : result.placed;
+      const stone = result.placed * BUILDINGS.wall.cost.stone;
+      ui.toast?.(`Wall: ${placed} tile${tiles.length > 1 ? 's' : ''} placed, ${stone} stone`);
+    }
+    if (result.ok && !keepPlacing()) ui.stopPlacing();
+    return result;
   }
   // Phone: the first tap sets the start, the second the end; a third starts a new line. Place (place-ok) issues it.
   function wallTap(x, y) {
-    const t = tileForPlacing(x, y); if (!t) return;
-    if (!ui.wallStart || ui.wallEnd) { ui.wallStart = t; ui.wallEnd = null; } else ui.wallEnd = t;
+    const tile = tileForPlacing(x, y);
+    if (!tile) return;
+    if (!ui.wallStart || ui.wallEnd) {
+      ui.wallStart = tile;
+      ui.wallEnd = null;
+    } else ui.wallEnd = tile;
   }
-  const idleVillagers = () => g().visibleEntities(0).filter(u => u.owner === 0 && u.type === 'villager' && u.order.type === 'idle');
+  const idleVillagers = () => game().visibleEntities(0)
+    .filter(unit => unit.owner === 0 && unit.type === 'villager' && unit.order.type === 'idle');
   ui.actions = {
-    idle() { const idle = idleVillagers(); if (!idle.length) return ui.toast?.('No idle villagers'); ui.idleIdx = (ui.idleIdx || 0) % idle.length; const u = idle[ui.idleIdx++]; setSel([u.id]); ui.view.centerOn(u.x, u.y); },
-    home() { const tc = [...g().buildings.values()].find(b => b.owner === 0 && b.type === 'town_center'); if (tc) { ui.view.centerOn(tc.x + 1.5, tc.y + 1.5); setSel([tc.id]); } },
+    idle() { // cycles through the idle villagers, one per press
+      const idle = idleVillagers();
+      if (!idle.length) return ui.toast?.('No idle villagers');
+      ui.idleIdx = (ui.idleIdx || 0) % idle.length;
+      const villager = idle[ui.idleIdx++];
+      setSelection([villager.id]);
+      ui.view.centerOn(villager.x, villager.y);
+    },
+    home() {
+      const townCenter = [...game().buildings.values()].find(building => building.owner === 0 && building.type === 'town_center');
+      if (!townCenter) return;
+      ui.view.centerOn(townCenter.x + 1.5, townCenter.y + 1.5);
+      setSelection([townCenter.id]);
+    },
     box() { ui.boxMode = !ui.boxMode; },
-    clear() { ui.stopPlacing(); ui.boxMode = false; setSel([]); },
+    clear() {
+      ui.stopPlacing();
+      ui.boxMode = false;
+      setSelection([]);
+    },
     'place-ok'() {
-      if (ui.placing === 'wall') { if (!ui.wallStart) return ui.toast?.('Tap where the wall starts'); if (!ui.wallEnd) return ui.toast?.('Tap where the wall ends'); return placeWall(ui.wallStart, ui.wallEnd); }
+      if (ui.placing === 'wall') {
+        if (!ui.wallStart) return ui.toast?.('Tap where the wall starts');
+        if (!ui.wallEnd) return ui.toast?.('Tap where the wall ends');
+        return placeWall(ui.wallStart, ui.wallEnd);
+      }
       if (ui.placing && ui.placeTile) place(ui.placeTile);
     },
     'place-cancel'() { ui.stopPlacing(); },
@@ -117,153 +218,324 @@ export function createInput(ui) {
   };
 
   // ----- mouse (desktop) -----
-  el.addEventListener('mousedown', e => {
+  viewportEl.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
-    if (spaceDown && ui.game) { grab = { x: e.clientX, y: e.clientY }; el.classList.add('grabbing'); return; }
-    drag.on = true; drag.x = e.clientX; drag.y = e.clientY; drag.moved = false;
-    if (ui.game && ui.placing === 'wall') wallDrag = wallCur = tileForPlacing(e.clientX, e.clientY);
+    if (spaceDown && ui.game) {
+      grab = { x: e.clientX, y: e.clientY };
+      viewportEl.classList.add('grabbing');
+      return;
+    }
+    drag.on = true;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    drag.moved = false;
+    if (ui.game && ui.placing === 'wall') wallDragStart = wallDragEnd = tileForPlacing(e.clientX, e.clientY);
   });
   window.addEventListener('mousemove', e => {
     mouse = { x: e.clientX, y: e.clientY };
-    if (grab) { if (ui.game) panBy(grab, mouse); grab = mouse; return; }
-    if (drag.on) {
-      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
-      if (drag.moved && !ui.placing) { box.classList.remove('hidden'); Object.assign(box.style, { left: Math.min(drag.x, e.clientX) + 'px', top: Math.min(drag.y, e.clientY) + 'px', width: Math.abs(e.clientX - drag.x) + 'px', height: Math.abs(e.clientY - drag.y) + 'px' }); }
+    if (grab) {
+      if (ui.game) panBy(grab, mouse);
+      grab = mouse;
+      return;
     }
+    if (!drag.on) return;
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) drag.moved = true;
+    if (drag.moved && !ui.placing) showDragBox(drag.x, drag.y, e.clientX, e.clientY);
   });
   window.addEventListener('mouseup', e => {
-    if (e.button === 0 && grab) { grab = null; el.classList.remove('grabbing'); return; }
-    if (e.button !== 0 || !drag.on) return; drag.on = false; box.classList.add('hidden');
-    const start = wallDrag; wallDrag = null;
+    if (e.button === 0 && grab) {
+      grab = null;
+      viewportEl.classList.remove('grabbing');
+      return;
+    }
+    if (e.button !== 0 || !drag.on) return;
+    drag.on = false;
+    hideDragBox();
+    const start = wallDragStart;
+    wallDragStart = null;
     // a wall drag ends wherever the button is let go, even over the HUD: the ghost line showed the ground tile under the cursor
-    if (start && ui.game && ui.placing === 'wall') return placeWall(start, tileForPlacing(e.clientX, e.clientY) || wallCur || start);
-    if (!el.contains(e.target) || !ui.game) return;
+    if (start && ui.game && ui.placing === 'wall') {
+      return placeWall(start, tileForPlacing(e.clientX, e.clientY) || wallDragEnd || start);
+    }
+    if (!viewportEl.contains(e.target) || !ui.game) return;
     if (ui.placing === 'wall') return;
     if (ui.placing) return place(tileForPlacing(e.clientX, e.clientY));
     if (drag.moved) return boxSelect(drag.x, drag.y, e.clientX, e.clientY, shiftDown);
-    const ent = ui.view.pickEntity(e.clientX, e.clientY);
-    if (!ent) return setSel([]);
-    if (ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building')) selectOwn(ent, e.shiftKey);
-    else { setSel([]); ui.inspect = ent; }
+    clickAt(e);
   });
-  window.addEventListener('keydown', e => { if (ui.deleteConfirmOpen) return; shiftDown = e.shiftKey; keys.add(e.key.toLowerCase()); onKey(e); });
+  // A plain left click: select an own unit or building, or inspect anything else.
+  function clickAt(e) {
+    const entity = ui.view.pickEntity(e.clientX, e.clientY);
+    if (!entity) return setSelection([]);
+    if (entity.owner === 0 && (entity.kind === 'unit' || entity.kind === 'building')) selectOwn(entity, e.shiftKey);
+    else {
+      setSelection([]);
+      ui.inspect = entity;
+    }
+  }
+  window.addEventListener('keydown', e => {
+    if (ui.deleteConfirmOpen) return;
+    shiftDown = e.shiftKey;
+    keys.add(e.key.toLowerCase());
+    onKey(e);
+  });
   window.addEventListener('keyup', e => {
-    shiftDown = e.shiftKey; keys.delete(e.key.toLowerCase());
-    if (e.key === ' ' && spaceDown) { e.preventDefault(); setSpace(false); } // Firefox clicks a focused button on Space keyup
+    shiftDown = e.shiftKey;
+    keys.delete(e.key.toLowerCase());
+    if (e.key === ' ' && spaceDown) { // Firefox clicks a focused button on Space keyup
+      e.preventDefault();
+      setSpace(false);
+    }
   });
-  window.addEventListener('blur', () => { keys.clear(); setSpace(false); });
-  function setSpace(on) { spaceDown = on; el.classList.toggle('grab', on); if (!on) { grab = null; el.classList.remove('grabbing'); } }
-  el.addEventListener('contextmenu', e => {
-    e.preventDefault(); if (!ui.game) return;
-    if (ui.placing) { cancelDrag(); return ui.stopPlacing(); }
-    const ids = selectedUnitIds(); if (!ids.length) return;
-    const r = orderAt(ui.view.pickEntity(e.clientX, e.clientY), ui.view.pickGround(e.clientX, e.clientY), ids);
-    const gp = ui.view.pickGround(e.clientX, e.clientY); if (r && r.ok && gp) ui.marker(gp.x, gp.y);
+  window.addEventListener('blur', () => {
+    keys.clear();
+    setSpace(false);
   });
-  el.addEventListener('wheel', e => { e.preventDefault(); if (ui.view) ui.view.setZoom(ui.view.zoom * (e.deltaY > 0 ? 1.1 : 0.9)); }, { passive: false });
-  // Cancelling a placement mid-drag (Esc / right-click) also ends the drag, so letting go of the button neither places nor box-selects.
-  function cancelDrag() { drag.on = false; wallDrag = null; box.classList.add('hidden'); }
+  function setSpace(on) {
+    spaceDown = on;
+    viewportEl.classList.toggle('grab', on);
+    if (on) return;
+    grab = null;
+    viewportEl.classList.remove('grabbing');
+  }
+  viewportEl.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (!ui.game) return;
+    if (ui.placing) {
+      cancelDrag();
+      return ui.stopPlacing();
+    }
+    const ids = selectedUnitIds();
+    if (!ids.length) return;
+    const result = orderAt(ui.view.pickEntity(e.clientX, e.clientY), ui.view.pickGround(e.clientX, e.clientY), ids);
+    const ground = ui.view.pickGround(e.clientX, e.clientY);
+    if (result && result.ok && ground) ui.marker(ground.x, ground.y);
+  });
+  viewportEl.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (ui.view) ui.view.setZoom(ui.view.zoom * (e.deltaY > 0 ? 1.1 : 0.9));
+  }, { passive: false });
+  // Cancelling a placement mid-drag (Esc / right-click) also ends the drag, so letting go of the button neither places
+  // nor box-selects.
+  function cancelDrag() {
+    drag.on = false;
+    wallDragStart = null;
+    hideDragBox();
+  }
   function onKey(e) {
     if (!ui.game) return;
     // Esc cancels a placement first; otherwise it pauses and resumes. While paused (the pause modal) other shortcuts wait.
-    if (e.key === 'Escape') { if (ui.placing) { cancelDrag(); ui.stopPlacing(); } else if (!ui.game.result) { e.preventDefault(); ui.togglePause(); } }
-    else if (ui.paused) return;
-    else if (e.key === ' ') { e.preventDefault(); if (!e.repeat) setSpace(true); } // held Space + left-drag pans the map
-    else if (e.key === 'Delete' || e.key === 'Backspace') { const b = selectedBuilding(); if (b) { e.preventDefault(); if (!e.repeat) ui.actions.delete(b.id); } } // Backspace is the Mac "delete" key; held keys must not auto-repeat requests.
+    if (e.key === 'Escape') return onEscape(e);
+    if (ui.paused) return;
+    if (e.key === ' ') { // held Space + left-drag pans the map
+      e.preventDefault();
+      if (!e.repeat) setSpace(true);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') deleteKey(e);
     else if (e.key === '.') ui.actions.idle();
     else if (e.key.toLowerCase() === 'h') ui.actions.home();
-    else if (e.key === '+' || e.key === '=') ui.view.setZoom(ui.view.zoom * 0.9); else if (e.key === '-') ui.view.setZoom(ui.view.zoom * 1.1);
+    else if (e.key === '+' || e.key === '=') ui.view.setZoom(ui.view.zoom * 0.9);
+    else if (e.key === '-') ui.view.setZoom(ui.view.zoom * 1.1);
+  }
+  function onEscape(e) {
+    if (ui.placing) {
+      cancelDrag();
+      ui.stopPlacing();
+    } else if (!ui.game.result) {
+      e.preventDefault();
+      ui.togglePause();
+    }
+  }
+  // Backspace is the Mac "delete" key; held keys must not auto-repeat requests.
+  function deleteKey(e) {
+    const building = selectedBuilding();
+    if (!building) return;
+    e.preventDefault();
+    if (!e.repeat) ui.actions.delete(building.id);
   }
 
   // ----- minimap (mouse + touch) -----
-  const mm = document.getElementById('minimap');
-  const mmPoint = (cx, cy) => { const r = mm.getBoundingClientRect(); return ui.minimap.toWorld((cx - r.left) * mm.width / r.width, (cy - r.top) * mm.height / r.height); };
-  mm.addEventListener('mousedown', e => { if (!ui.game) return; const w = mmPoint(e.clientX, e.clientY); if (e.button === 0) ui.view.centerOn(w.x, w.y); else if (e.button === 2) { const ids = selectedUnitIds(); if (ids.length) ui.cmd({ type: 'move', ids, x: w.x, y: w.y }); } });
-  mm.addEventListener('contextmenu', e => e.preventDefault());
-  const mmTouch = e => { e.preventDefault(); if (!ui.game) return; const t = e.touches[0] || e.changedTouches[0]; const w = mmPoint(t.clientX, t.clientY); ui.view.centerOn(w.x, w.y); };
-  mm.addEventListener('touchstart', mmTouch, { passive: false }); mm.addEventListener('touchmove', mmTouch, { passive: false });
+  const minimapEl = document.getElementById('minimap');
+  const minimapPoint = (screenX, screenY) => {
+    const rect = minimapEl.getBoundingClientRect();
+    const canvasX = (screenX - rect.left) * minimapEl.width / rect.width;
+    const canvasY = (screenY - rect.top) * minimapEl.height / rect.height;
+    return ui.minimap.toWorld(canvasX, canvasY);
+  };
+  minimapEl.addEventListener('mousedown', e => {
+    if (!ui.game) return;
+    const world = minimapPoint(e.clientX, e.clientY);
+    if (e.button === 0) ui.view.centerOn(world.x, world.y);
+    else if (e.button === 2) { // right-click on the minimap moves the selected units there
+      const ids = selectedUnitIds();
+      if (ids.length) ui.cmd({ type: 'move', ids, x: world.x, y: world.y });
+    }
+  });
+  minimapEl.addEventListener('contextmenu', e => e.preventDefault());
+  const minimapTouch = e => {
+    e.preventDefault();
+    if (!ui.game) return;
+    const touch = e.touches[0] || e.changedTouches[0];
+    const world = minimapPoint(touch.clientX, touch.clientY);
+    ui.view.centerOn(world.x, world.y);
+  };
+  minimapEl.addEventListener('touchstart', minimapTouch, { passive: false });
+  minimapEl.addEventListener('touchmove', minimapTouch, { passive: false });
 
   // ----- touch (phone) -----
   // 1 finger: tap = select / order, drag = pan (or box-select in box mode). 2 fingers: pinch-zoom + pan.
-  const TT = { start: null, last: null, moved: false, pinch: null };
-  const pts = e => [...e.touches].map(t => ({ x: t.clientX, y: t.clientY }));
+  const gesture = { start: null, last: null, moved: false, pinch: null };
+  const touchPoints = e => [...e.touches].map(touch => ({ x: touch.clientX, y: touch.clientY }));
+  const pinchOf = (a, b) => ({ distance: Math.hypot(a.x - b.x, a.y - b.y), centre: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
+  const resetGesture = () => {
+    gesture.start = null;
+    gesture.pinch = null;
+    gesture.moved = false;
+  };
   function panBy(prev, cur) { // keep the world point under the finger fixed
-    const v = ui.view, a = v.pickGround(prev.x, prev.y), b = v.pickGround(cur.x, cur.y);
-    if (a && b) { v.pan(a.x - b.x, a.y - b.y); v.refreshCamera(); }
+    const view = ui.view, from = view.pickGround(prev.x, prev.y), to = view.pickGround(cur.x, cur.y);
+    if (!from || !to) return;
+    view.pan(from.x - to.x, from.y - to.y);
+    view.refreshCamera();
   }
-  function setPlaceTile(x, y) { const t = tileForPlacing(x, y); if (t) ui.placeTile = t; }
+  function setPlaceTile(x, y) {
+    const tile = tileForPlacing(x, y);
+    if (tile) ui.placeTile = tile;
+  }
   function tap(x, y) {
     if (ui.placing === 'wall') return wallTap(x, y);
     if (ui.placing) return setPlaceTile(x, y);
-    const ent = ui.view.pickEntity(x, y), gp = ui.view.pickGround(x, y), ids = selectedUnitIds();
-    const own = ent && ent.owner === 0 && (ent.kind === 'unit' || ent.kind === 'building');
-    const helps = own && ent.kind === 'building' && ids.some(id => g().entities.get(id).type === 'villager') && (!ent.constructed || (ent.gatherType && ent.constructed) || repairable(ent));
-    const boards = own && ent.cargo && ids.some(id => !g().entities.get(id).naval); // a tap on own transport with walkers selected: board it
-    if (own && !helps && !boards) return selectOwn(ent, false);
-    if (ids.length) { const r = orderAt(ent, gp, ids); if (r && r.ok && gp) ui.marker(gp.x, gp.y); return; }
-    setSel([]); if (ent) ui.inspect = ent;
+    const entity = ui.view.pickEntity(x, y), ground = ui.view.pickGround(x, y), ids = selectedUnitIds();
+    const own = entity && entity.owner === 0 && (entity.kind === 'unit' || entity.kind === 'building');
+    // Tapping an own building the selected villagers can work on (build, gather from, repair) orders them there
+    // instead of selecting it.
+    const villagersCanWork = own && entity.kind === 'building' && ids.some(isVillager)
+      && (!entity.constructed || (entity.gatherType && entity.constructed) || repairable(entity));
+    const boards = own && entity.cargo && ids.some(walks); // a tap on own transport with walkers selected: board it
+    if (own && !villagersCanWork && !boards) return selectOwn(entity, false);
+    if (ids.length) return orderAtPoint(entity, ground, ids);
+    setSelection([]);
+    if (entity) ui.inspect = entity;
   }
-  el.addEventListener('touchstart', e => {
-    e.preventDefault(); if (!ui.game) return;
-    const p = pts(e);
-    if (p.length >= 2) { TT.moved = true; box.classList.add('hidden'); const [a, b] = p; TT.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } }; TT.last = null; return; }
-    TT.start = { ...p[0], t: performance.now() }; TT.last = p[0]; TT.moved = false; TT.pinch = null;
-    if (ui.placing && ui.placing !== 'wall') setPlaceTile(p[0].x, p[0].y); // a wall end is set only by a finished tap (touchEnd), so pans and pinches leave it alone
-  }, { passive: false });
-  el.addEventListener('touchmove', e => {
-    e.preventDefault(); if (!ui.game) return;
-    const p = pts(e);
-    if (p.length >= 2 && TT.pinch) {
-      const [a, b] = p, d = Math.hypot(a.x - b.x, a.y - b.y), c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      // zoom about the pinch centre: the world point under the fingers stays under them
-      const v = ui.view, anchor = v.pickGround(TT.pinch.c.x, TT.pinch.c.y);
-      if (d > 8 && TT.pinch.d > 8) { v.setZoom(v.zoom * TT.pinch.d / d); v.refreshCamera(); }
-      const now = v.pickGround(c.x, c.y);
-      if (anchor && now) { v.pan(anchor.x - now.x, anchor.y - now.y); v.refreshCamera(); }
-      TT.pinch = { d, c }; return;
+  viewportEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!ui.game) return;
+    const points = touchPoints(e);
+    if (points.length >= 2) {
+      gesture.moved = true;
+      hideDragBox();
+      const [a, b] = points;
+      gesture.pinch = pinchOf(a, b);
+      gesture.last = null;
+      return;
     }
-    if (p.length !== 1 || !TT.start) return;
-    const cur = p[0];
-    if (!TT.moved && Math.hypot(cur.x - TT.start.x, cur.y - TT.start.y) > 10) TT.moved = true;
-    if (!TT.moved) return;
+    gesture.start = { ...points[0], t: performance.now() };
+    gesture.last = points[0];
+    gesture.moved = false;
+    gesture.pinch = null;
+    // a wall end is set only by a finished tap (touchEnd), so pans and pinches leave it alone
+    if (ui.placing && ui.placing !== 'wall') setPlaceTile(points[0].x, points[0].y);
+  }, { passive: false });
+  // Two fingers: zoom about the pinch centre, so the world point under the fingers stays under them.
+  function pinchMove(a, b) {
+    const pinch = pinchOf(a, b);
+    const view = ui.view, anchor = view.pickGround(gesture.pinch.centre.x, gesture.pinch.centre.y);
+    if (pinch.distance > 8 && gesture.pinch.distance > 8) {
+      view.setZoom(view.zoom * gesture.pinch.distance / pinch.distance);
+      view.refreshCamera();
+    }
+    const now = view.pickGround(pinch.centre.x, pinch.centre.y);
+    if (anchor && now) {
+      view.pan(anchor.x - now.x, anchor.y - now.y);
+      view.refreshCamera();
+    }
+    gesture.pinch = pinch;
+  }
+  viewportEl.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!ui.game) return;
+    const points = touchPoints(e);
+    if (points.length >= 2 && gesture.pinch) {
+      const [a, b] = points;
+      return pinchMove(a, b);
+    }
+    if (points.length !== 1 || !gesture.start) return;
+    const cur = points[0], start = gesture.start;
+    if (!gesture.moved && Math.hypot(cur.x - start.x, cur.y - start.y) > 10) gesture.moved = true;
+    if (!gesture.moved) return;
     if (ui.placing && ui.placing !== 'wall') setPlaceTile(cur.x, cur.y);
-    else if (ui.boxMode && !ui.placing) { box.classList.remove('hidden'); Object.assign(box.style, { left: Math.min(TT.start.x, cur.x) + 'px', top: Math.min(TT.start.y, cur.y) + 'px', width: Math.abs(cur.x - TT.start.x) + 'px', height: Math.abs(cur.y - TT.start.y) + 'px' }); }
-    else panBy(TT.last, cur);
-    TT.last = cur;
+    else if (ui.boxMode && !ui.placing) showDragBox(start.x, start.y, cur.x, cur.y);
+    else panBy(gesture.last, cur);
+    gesture.last = cur;
   }, { passive: false });
   const touchEnd = e => {
-    e.preventDefault(); box.classList.add('hidden');
-    if (e.touches.length > 0) { TT.pinch = null; TT.moved = true; TT.start = null; return; } // one finger of a gesture lifted
-    if (TT.start && ui.game) {
-      const s = TT.start, l = TT.last || s;
-      if (!TT.moved && performance.now() - s.t < 500) tap(s.x, s.y);
-      else if (TT.moved && ui.boxMode && !ui.placing) boxSelect(s.x, s.y, l.x, l.y, false);
+    e.preventDefault();
+    hideDragBox();
+    if (e.touches.length > 0) { // one finger of a gesture lifted
+      gesture.pinch = null;
+      gesture.moved = true;
+      gesture.start = null;
+      return;
     }
-    TT.start = null; TT.pinch = null; TT.moved = false;
+    if (gesture.start && ui.game) {
+      const start = gesture.start, last = gesture.last || start;
+      if (!gesture.moved && performance.now() - start.t < 500) tap(start.x, start.y);
+      else if (gesture.moved && ui.boxMode && !ui.placing) boxSelect(start.x, start.y, last.x, last.y, false);
+    }
+    resetGesture();
   };
-  el.addEventListener('touchend', touchEnd, { passive: false });
-  el.addEventListener('touchcancel', e => { e.preventDefault(); box.classList.add('hidden'); TT.start = null; TT.pinch = null; TT.moved = false; }, { passive: false });
+  viewportEl.addEventListener('touchend', touchEnd, { passive: false });
+  viewportEl.addEventListener('touchcancel', e => {
+    e.preventDefault();
+    hideDragBox();
+    resetGesture();
+  }, { passive: false });
   // stop iOS from zooming / scrolling the page underneath the game
-  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault());
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, e => e.preventDefault());
+
+  // ----- per frame: keyboard panning and the placement ghosts -----
+  function panWithKeys(dt) {
+    const step = 22 * dt * (ui.view.halfExtents()[1] / 14); // pan by what is on screen, not the raw zoom level
+    let dx = 0, dz = 0;
+    if (keys.has('a') || keys.has('arrowleft')) { dx -= 1; dz += 1; }
+    if (keys.has('d') || keys.has('arrowright')) { dx += 1; dz -= 1; }
+    if (keys.has('w') || keys.has('arrowup')) { dx -= 1; dz -= 1; }
+    if (keys.has('s') || keys.has('arrowdown')) { dx += 1; dz += 1; }
+    if (dx || dz) ui.view.pan(dx * step * 0.7, dz * step * 0.7);
+  }
+  // desktop: the hovered tile, or the dragged line; phone: the start tile, then the tapped line
+  function showWallGhost() {
+    ui.view.showGhost(null);
+    let from, to;
+    if (ui.touch) {
+      from = ui.wallStart;
+      to = ui.wallEnd || from;
+    } else {
+      const hovered = tileForPlacing(mouse.x, mouse.y);
+      if (hovered) wallDragEnd = hovered;
+      from = wallDragStart || hovered;
+      to = wallDragStart ? wallDragEnd : hovered;
+    }
+    if (!from || !to) return ui.view.showGhostLine(null);
+    const plan = wallPlan(game(), 0, lineTiles(from, to));
+    ui.view.showGhostLine(plan.tiles, plan.ok);
+  }
+  function showBuildingGhost() {
+    ui.view.showGhostLine(null);
+    const tile = ui.touch ? ui.placeTile : tileForPlacing(mouse.x, mouse.y);
+    if (!tile) return;
+    const ok = canPlace(game(), 0, ui.placing, tile.x, tile.y) && canAfford(game().players[0], BUILDINGS[ui.placing].cost);
+    ui.view.showGhost(ui.placing, tile.x, tile.y, ok);
+  }
 
   return { update(dt) {
     if (!ui.game) return;
-    if (ui.deleteConfirmOpen) { keys.clear(); return; }
-    const s = 22 * dt * (ui.view.halfExtents()[1] / 14); // pan by what is on screen, not the raw zoom level
-    let dx = 0, dz = 0;
-    if (keys.has('a') || keys.has('arrowleft')) { dx -= 1; dz += 1; } if (keys.has('d') || keys.has('arrowright')) { dx += 1; dz -= 1; }
-    if (keys.has('w') || keys.has('arrowup')) { dx -= 1; dz -= 1; } if (keys.has('s') || keys.has('arrowdown')) { dx += 1; dz += 1; }
-    if (dx || dz) ui.view.pan(dx * s * 0.7, dz * s * 0.7);
-    if (ui.placing === 'wall') {
-      // desktop: the hovered tile, or the dragged line; phone: the start tile, then the tapped line
-      ui.view.showGhost(null);
-      let a, b;
-      if (ui.touch) { a = ui.wallStart; b = ui.wallEnd || a; }
-      else { const cur = tileForPlacing(mouse.x, mouse.y); if (cur) wallCur = cur; a = wallDrag || cur; b = wallDrag ? wallCur : cur; }
-      if (a && b) { const plan = wallPlan(g(), 0, lineTiles(a, b)); ui.view.showGhostLine(plan.tiles, plan.ok); } else ui.view.showGhostLine(null);
-    } else if (ui.placing) {
-      ui.view.showGhostLine(null);
-      const t = ui.touch ? ui.placeTile : tileForPlacing(mouse.x, mouse.y); if (t) { const ok = canPlace(g(), 0, ui.placing, t.x, t.y) && canAfford(g().players[0], BUILDINGS[ui.placing].cost); ui.view.showGhost(ui.placing, t.x, t.y, ok); }
-    } else wallDrag = null;
+    if (ui.deleteConfirmOpen) {
+      keys.clear();
+      return;
+    }
+    panWithKeys(dt);
+    if (ui.placing === 'wall') showWallGhost();
+    else if (ui.placing) showBuildingGhost();
+    else wallDragStart = null;
   } };
 }

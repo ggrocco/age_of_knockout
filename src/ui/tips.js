@@ -10,7 +10,9 @@ import { icon } from './icons.js';
 
 export const RES = ['food', 'wood', 'gold', 'stone'];
 export const COLORS = { food: '#e0554d', wood: '#a06a35', gold: '#facc15', stone: '#9ca3af' };
-const CLASS_LABEL = { civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored', ship: 'Warship', transport: 'Transport' };
+const CLASS_LABEL = {
+  civ: 'Worker', inf: 'Infantry', archer: 'Ranged', cav: 'Cavalry', siege: 'Siege', armor: 'Armored', ship: 'Warship', transport: 'Transport',
+};
 
 // Only claims what the sim actually does (see docs and src/sim); Market has no trade yet, it just counts toward Age-up.
 export const DESC = {
@@ -76,74 +78,151 @@ export const DESC = {
 };
 
 // Cost chips: coloured dot + amount. `short` lists resources the player lacks; `compact` shortens 1000 to 1k.
-export const costHtml = (cost, short = [], compact = false) => RES.filter(k => cost[k]).map(k =>
-  `<span class="c${short.includes(k) ? ' short' : ''}"><i class="dot" style="background:${COLORS[k]}"></i>${compact && cost[k] >= 1000 ? cost[k] / 1000 + 'k' : cost[k]}${compact ? '' : `<em>${k}</em>`}</span>`).join('');
+const costChip = (cost, resource, short, compact) => {
+  const amount = compact && cost[resource] >= 1000 ? cost[resource] / 1000 + 'k' : cost[resource];
+  const label = compact ? '' : `<em>${resource}</em>`;
+  return `<span class="c${short.includes(resource) ? ' short' : ''}">`
+    + `<i class="dot" style="background:${COLORS[resource]}"></i>${amount}${label}</span>`;
+};
+export const costHtml = (cost, short = [], compact = false) =>
+  RES.filter(resource => cost[resource]).map(resource => costChip(cost, resource, short, compact)).join('');
 
-const cap = s => s[0].toUpperCase() + s.slice(1);
+const capitalize = text => text[0].toUpperCase() + text.slice(1);
 const row = (label, value, wide) => `<div${wide ? ' class="wide"' : ''}><dt>${label}</dt><dd>${value}</dd></div>`;
-const names = ids => ids.map(i => (UNITS[i] || BUILDINGS[i]).name).join(', ');
+const nameList = ids => ids.map(id => (UNITS[id] || BUILDINGS[id]).name).join(', ');
+// The hover card's header: icon orb, title and subtitle.
+const tipHeader = (iconHtml, title, sub) =>
+  `<div class="tip-h"><span class="orb">${iconHtml}</span><div><h4>${title}</h4><span class="sub">${sub}</span></div></div>`;
 
-const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train units, and completed Wonders. Other buildings alone cannot keep an empire alive, and neither can ships without a Dock.';
+const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train units, and completed Wonders.'
+  + ' Other buildings alone cannot keep an empire alive, and neither can ships without a Dock.';
+const ELIMINATION_ALSO_WINS = ' You can also win by eliminating the enemy empire.';
 const ROUND_INFO = {
   conquest: { icon: 'town_center', goal: CONQUEST_GOAL },
   deathmatch: { icon: 'barracks', goal: CONQUEST_GOAL, start: 'Iron Age with 20,000 of each resource.' },
-  regicide: { icon: 'king', goal: 'Kill the enemy King while protecting yours. Losing your King ends the match immediately. You can also win by eliminating the enemy empire.' },
-  wonder: { icon: 'wonder', goal: `Reach the Bronze Age, complete a Wonder, and keep it standing for ${WONDER_TICKS / 1200} uninterrupted game minutes. Losing all your completed Wonders resets the countdown. You can also win by eliminating the enemy empire.`, start: '3,000 of each resource.' },
-  relics: { icon: 'villager', goal: `Control all 5 relics for ${RELIC_TICKS / 1200} uninterrupted game minutes. Carry them with units or store them in a Town Center or Government Center. Losing control of any relic resets the countdown. You can also win by eliminating the enemy empire.` },
+  regicide: {
+    icon: 'king',
+    goal: 'Kill the enemy King while protecting yours. Losing your King ends the match immediately.' + ELIMINATION_ALSO_WINS,
+  },
+  wonder: {
+    icon: 'wonder',
+    goal: `Reach the Bronze Age, complete a Wonder, and keep it standing for ${WONDER_TICKS / 1200} uninterrupted game minutes.`
+      + ' Losing all your completed Wonders resets the countdown.' + ELIMINATION_ALSO_WINS,
+    start: '3,000 of each resource.',
+  },
+  relics: {
+    icon: 'villager',
+    goal: `Control all 5 relics for ${RELIC_TICKS / 1200} uninterrupted game minutes.`
+      + ' Carry them with units or store them in a Town Center or Government Center.'
+      + ' Losing control of any relic resets the countdown.' + ELIMINATION_ALSO_WINS,
+  },
 };
 
-// A production queue as "Villager x2, Scout": same units grouped in first-queued order, so a full queue fits a phone's info panel.
+// A production queue as "Villager x2, Scout": same units grouped in first-queued order, so a full queue fits
+// a phone's info panel.
 export const queueText = queue => {
-  const n = new Map(); for (const q of queue) n.set(q.unit, (n.get(q.unit) || 0) + 1);
-  return [...n].map(([u, c]) => UNITS[u].name + (c > 1 ? ` ×${c}` : '')).join(', ');
+  const counts = new Map();
+  for (const item of queue) counts.set(item.unit, (counts.get(item.unit) || 0) + 1);
+  return [...counts].map(([unit, count]) => UNITS[unit].name + (count > 1 ? ` ×${count}` : '')).join(', ');
 };
-export const roundTimeLabel = (round, capTicks = round.capTicks) => capTicks === Infinity ? 'No time limit' : `${capTicks / 1200} minutes`;
-export const roundLimitText = (round, capTicks = round.capTicks) => roundTimeLabel(round, capTicks) + (capTicks === Infinity ? '' : ' of game time');
+export const roundTimeLabel = (round, capTicks = round.capTicks) =>
+  capTicks === Infinity ? 'No time limit' : `${capTicks / 1200} minutes`;
+export const roundLimitText = (round, capTicks = round.capTicks) =>
+  roundTimeLabel(round, capTicks) + (capTicks === Infinity ? '' : ' of game time');
 export const TIME_LIMIT_RULE = 'If no one wins before the limit, the higher score wins.';
 export const NO_TIME_LIMIT_RULE = 'Play until a victory condition is met or a player resigns.';
 
 // Uses the same hover-card layout as buildings; durations come from the actual round rules.
 export function roundTipHtml(round, capTicks = round.capTicks) {
   const info = ROUND_INFO[round.id];
-  return `<div class="tip-h"><span class="orb">${icon(info.icon)}</span><div><h4>${round.name}</h4><span class="sub">Game mode</span></div></div>`
+  const endRule = capTicks === Infinity
+    ? row('Match ends', NO_TIME_LIMIT_RULE, true)
+    : row('At the limit', TIME_LIMIT_RULE + ' An exact tie goes to you.', true);
+  return tipHeader(icon(info.icon), round.name, 'Game mode')
     + `<dl>${row('Goal', info.goal, true)}${row('Time limit', roundLimitText(round, capTicks), true)}`
-    + (capTicks === Infinity ? row('Match ends', NO_TIME_LIMIT_RULE, true) : row('At the limit', TIME_LIMIT_RULE + ' An exact tie goes to you.', true))
+    + endRule
     + (info.start ? row('Starting resources', info.start, true) : '') + '</dl>'
     + '<p>Score rewards combat, economy, exploration, research, relics and Wonders.</p>'
     + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
 }
 
-// state: { kind: 'unit'|'building'|'tech'|'age'|'delete'|'unload', id, next?, age? (the player's era, for era-scaled stats), short?: string[], notes?: string[] }
-export function tipHtml({ kind, id, next, age = 'stone', short = [], notes = [] }) {
-  let title, sub, cost, stats = '', desc = DESC[id], ic = id, cls;
-  if (kind === 'unit') {
-    const u = UNITS[id]; cls = u.cls; title = u.name; sub = `${CLASS_LABEL[u.cls]} unit, ${ageTitle(u.age)}`; cost = u.cost;
-    const atkLabel = `${u.atk} ${u.atkType === 'pierce' ? 'pierce' : 'melee'}`;
-    stats = row('HP', u.hp) + row('Attack', atkLabel) + row('Armor', `${u.marmor} melee / ${u.parmor} pierce`) + row('Range', u.range <= 1 ? 'Melee' : `${u.range} tiles`) + row('Speed', `${u.speed} tiles/s`) + row('Trains in', `${u.trainTime}s`);
-    if (u.bonus) stats += row('Bonus', Object.entries(u.bonus).map(([k, v]) => `+${v} vs ${CLASS_LABEL[k] || k}`).join(', '), true);
-  } else if (kind === 'building') {
-    const b = BUILDINGS[id]; title = b.name; sub = `Building, ${ageTitle(b.age)}`; cost = b.cost;
-    stats = row('HP', b.hp) + row('Build time', `${b.buildTime}s`);
-    if (b.trains) stats += row('Trains', names(b.trains), true);
-    if (b.pop) stats += row('Adds', `+${b.pop} population`, true);
-    if (b.drops) stats += row('Drop-off', b.drops.map(cap).join(', '), true);
-    if (id === 'farm') { const f = farmStats(age); stats += row('Holds', `${f.amount} food`, true) + row('Work speed', f.rate > 1 ? `+${Math.round((f.rate - 1) * 100)}% food gathering` : 'Normal', true); }
-  } else if (kind === 'tech') {
-    const t = TECHS[id]; title = t.name; sub = `Research, ${ageTitle(t.age)}`; cost = t.cost; desc = t.desc;
-    stats = row('Research time', `${t.time}s`, true);
-    if (t.requires) stats += row('Requires', TECHS[t.requires].name, true);
-  } else if (kind === 'delete') {
-    title = 'Delete'; sub = 'Your selected building'; cost = {}; ic = 'delete';
-  } else if (kind === 'unload') {
-    title = 'Unload'; sub = 'Your selected Transport Ship'; cost = {}; ic = 'unload';
-  } else {
-    const a = AGE_COST[next]; title = `Advance to ${ageTitle(next)}`; sub = `Takes ${a.time}s`; cost = a.cost; ic = 'age';
-    const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);
-    desc += need ? ` Needs a Town Center and ${need} finished building${need > 1 ? 's' : ''} from your current Age.` : ' Needs a Town Center.';
-    const unlocks = [...Object.values(BUILDINGS), ...Object.values(UNITS).filter(u => u.trainable !== false)].filter(d => d.age === next).map(d => d.name);
-    stats = unlocks.length ? row('Unlocks', unlocks.join(', '), true) : '';
+// Each *Tip helper returns what the card shows for one kind of tile: title, subtitle, cost, the stats rows,
+// the description and which icon to draw.
+function unitTip(id) {
+  const unit = UNITS[id];
+  const attack = `${unit.atk} ${unit.atkType === 'pierce' ? 'pierce' : 'melee'}`;
+  let stats = row('HP', unit.hp) + row('Attack', attack) + row('Armor', `${unit.marmor} melee / ${unit.parmor} pierce`)
+    + row('Range', unit.range <= 1 ? 'Melee' : `${unit.range} tiles`) + row('Speed', `${unit.speed} tiles/s`)
+    + row('Trains in', `${unit.trainTime}s`);
+  if (unit.bonus) {
+    const bonuses = Object.entries(unit.bonus)
+      .map(([unitClass, amount]) => `+${amount} vs ${CLASS_LABEL[unitClass] || unitClass}`);
+    stats += row('Bonus', bonuses.join(', '), true);
   }
-  return `<div class="tip-h"><span class="orb">${icon(ic, cls)}</span><div><h4>${title}</h4><span class="sub">${sub}</span></div></div>`
-    + `<p>${desc}</p><dl>${stats}</dl><div class="tip-cost">${costHtml(cost, short)}</div>`
-    + notes.map(n => `<p class="note">${n}</p>`).join('');
+  const sub = `${CLASS_LABEL[unit.cls]} unit, ${ageTitle(unit.age)}`;
+  return { title: unit.name, sub, cost: unit.cost, stats, desc: DESC[id], iconId: id, unitClass: unit.cls };
+}
+
+// A Farm holds more food and is worked faster in each Age.
+function farmRows(age) {
+  const farm = farmStats(age);
+  const workSpeed = farm.rate > 1 ? `+${Math.round((farm.rate - 1) * 100)}% food gathering` : 'Normal';
+  return row('Holds', `${farm.amount} food`, true) + row('Work speed', workSpeed, true);
+}
+
+function buildingTip(id, age) {
+  const building = BUILDINGS[id];
+  let stats = row('HP', building.hp) + row('Build time', `${building.buildTime}s`);
+  if (building.trains) stats += row('Trains', nameList(building.trains), true);
+  if (building.pop) stats += row('Adds', `+${building.pop} population`, true);
+  if (building.drops) stats += row('Drop-off', building.drops.map(capitalize).join(', '), true);
+  if (id === 'farm') stats += farmRows(age);
+  const sub = `Building, ${ageTitle(building.age)}`;
+  return { title: building.name, sub, cost: building.cost, stats, desc: DESC[id], iconId: id };
+}
+
+function techTip(id) {
+  const tech = TECHS[id];
+  let stats = row('Research time', `${tech.time}s`, true);
+  if (tech.requires) stats += row('Requires', TECHS[tech.requires].name, true);
+  return { title: tech.name, sub: `Research, ${ageTitle(tech.age)}`, cost: tech.cost, stats, desc: tech.desc, iconId: id };
+}
+
+const deleteTip = id => ({
+  title: 'Delete', sub: 'Your selected building', cost: {}, stats: '', desc: DESC[id], iconId: 'delete',
+});
+const unloadTip = id => ({
+  title: 'Unload', sub: 'Your selected Transport Ship', cost: {}, stats: '', desc: DESC[id], iconId: 'unload',
+});
+
+// Advancing to the `next` Age: what it needs and the buildings and units it unlocks.
+function ageTip(id, next) {
+  const ageUp = AGE_COST[next];
+  const need = ageUpNeed(AGES[AGES.indexOf(next) - 1]);
+  const needText = need
+    ? ` Needs a Town Center and ${need} finished building${need > 1 ? 's' : ''} from your current Age.`
+    : ' Needs a Town Center.';
+  const trainable = Object.values(UNITS).filter(unit => unit.trainable !== false);
+  const unlocks = [...Object.values(BUILDINGS), ...trainable].filter(def => def.age === next).map(def => def.name);
+  const stats = unlocks.length ? row('Unlocks', unlocks.join(', '), true) : '';
+  const title = `Advance to ${ageTitle(next)}`;
+  return { title, sub: `Takes ${ageUp.time}s`, cost: ageUp.cost, stats, desc: DESC[id] + needText, iconId: 'age' };
+}
+
+function tipParts(kind, id, next, age) {
+  if (kind === 'unit') return unitTip(id);
+  if (kind === 'building') return buildingTip(id, age);
+  if (kind === 'tech') return techTip(id);
+  if (kind === 'delete') return deleteTip(id);
+  if (kind === 'unload') return unloadTip(id);
+  return ageTip(id, next);
+}
+
+// state: { kind: 'unit'|'building'|'tech'|'age'|'delete'|'unload', id, next?, age? (the player's era, for era-scaled stats),
+// short?: string[], notes?: string[] }
+export function tipHtml({ kind, id, next, age = 'stone', short = [], notes = [] }) {
+  const tip = tipParts(kind, id, next, age);
+  return tipHeader(icon(tip.iconId, tip.unitClass), tip.title, tip.sub)
+    + `<p>${tip.desc}</p><dl>${tip.stats}</dl><div class="tip-cost">${costHtml(tip.cost, short)}</div>`
+    + notes.map(note => `<p class="note">${note}</p>`).join('');
 }
