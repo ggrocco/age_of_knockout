@@ -9,14 +9,21 @@ export const validQuality = value => Object.hasOwn(QUALITY, value);
 export function readQuality(search = '', storage) {
   const requested = new URLSearchParams(search).get('quality');
   if (validQuality(requested)) return requested;
-  try { const saved = storage?.getItem(KEY); if (validQuality(saved)) return saved; } catch { /* Private browsing may deny storage. */ }
+  try {
+    const saved = storage?.getItem(KEY);
+    if (validQuality(saved)) return saved;
+  } catch { /* Private browsing may deny storage. */ }
   return 'high';
 }
 export function saveQuality(value, storage) {
   if (!validQuality(value)) return false;
-  try { if (!storage) return false; storage.setItem(KEY, value); return true; }
-  catch { return false; /* The setting still applies to this session. */ }
+  try {
+    if (!storage) return false;
+    storage.setItem(KEY, value);
+    return true;
+  } catch { return false; /* The setting still applies to this session. */ }
 }
+// The device's pixel ratio, capped by the preset and by its pixel budget for this canvas size.
 export function renderPixelRatio(width, height, deviceRatio, preset) {
   return Math.min(Math.max(1, deviceRatio || 1), preset.pixelRatio,
     Math.sqrt(preset.maxPixels / (Math.max(1, width) * Math.max(1, height))));

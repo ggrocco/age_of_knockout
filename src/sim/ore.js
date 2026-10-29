@@ -13,25 +13,36 @@ const KINDS = ['gold', 'stone'], CENTRE_CLEAR = 8; // CENTRE_CLEAR: keep off the
 
 export function initOre(game) {
   const n = game.map.size;
-  game.patches = new Map(game.map.orePatches.map(p => [p.id, { ...p, tiles: [...p.tiles], startReserve: p.reserve }])); // own copies: the map's list stays untouched
+  // Own copies: the map's list stays untouched.
+  const ownCopy = patch => ({ ...patch, tiles: [...patch.tiles], startReserve: patch.reserve });
+  game.patches = new Map(game.map.orePatches.map(patch => [patch.id, ownCopy(patch)]));
   game.patchAt = new Int32Array(n * n);
-  for (const p of game.patches.values()) for (const i of p.tiles) game.patchAt[i] = p.id;
-  game.nextPatchId = Math.max(0, ...game.patches.keys()) + 1; // never reused, so a surviving twin's `twin` can't point at a newer patch
+  for (const patch of game.patches.values()) for (const i of patch.tiles) game.patchAt[i] = patch.id;
+  // Never reused, so a surviving twin's `twin` can't point at a newer patch.
+  game.nextPatchId = Math.max(0, ...game.patches.keys()) + 1;
   game.terrainVersion = 0;
   game.oreRng = makeRng((game.seed ^ 0x6f7265) >>> 0);
 }
 
 // Take up to `want` from a pile, a Farm or a Mine; returns the amount taken. A Mine draws on its patch's shared reserve.
-export function drawFrom(game, res, want) {
-  if (res.patch) {
-    const p = game.patches.get(res.patch);
-    if (!p) { res.amount = 0; return 0; }
-    const take = Math.min(want, p.reserve); p.reserve -= take; res.amount = p.reserve;
-    if (p.reserve <= 0) exhaustPatch(game, p);
-    return take;
+export function drawFrom(game, source, want) {
+  if (source.patch) return drawFromPatch(game, source, want);
+  const take = Math.min(want, source.amount);
+  source.amount -= take;
+  if (source.amount <= 0) game.depleted(source);
+  return take;
+}
+
+function drawFromPatch(game, mine, want) {
+  const patch = game.patches.get(mine.patch);
+  if (!patch) {
+    mine.amount = 0;
+    return 0;
   }
-  const take = Math.min(want, res.amount); res.amount -= take;
-  if (res.amount <= 0) game.depleted(res);
+  const take = Math.min(want, patch.reserve);
+  patch.reserve -= take;
+  mine.amount = patch.reserve;
+  if (patch.reserve <= 0) exhaustPatch(game, patch);
   return take;
 }
 
@@ -39,8 +50,15 @@ export function drawFrom(game, res, want) {
 export function exhaustPatch(game, patch) {
   if (game.patches.get(patch.id) !== patch) return;
   patch.reserve = 0;
-  for (const b of [...game.buildings.values()]) if (b.patch === patch.id) { b.amount = 0; game.remove(b); }
-  for (const i of patch.tiles) { game.map.tiles[i] = 0; game.patchAt[i] = 0; }
+  for (const building of [...game.buildings.values()]) {
+    if (building.patch !== patch.id) continue;
+    building.amount = 0;
+    game.remove(building);
+  }
+  for (const i of patch.tiles) {
+    game.map.tiles[i] = 0;
+    game.patchAt[i] = 0;
+  }
   game.terrainVersion++;
   game.patches.delete(patch.id);
   const next = Math.floor(patch.startReserve / 3);
@@ -52,43 +70,72 @@ export function exhaustPatch(game, patch) {
 // At most 200 tries from game.oreRng; null if none fits.
 export function mirroredSpot(game, w, h, accept, whole = null) {
   const n = game.map.size, rng = game.oreRng;
-  for (let k = 0; k < 200; k++) {
-    const x = 1 + rng.int(n - w - 1), y = 1 + rng.int(n - h - 1), mx = n - x - w, my = n - y - h; // rect stays in [1, n-1)
-    if (x < mx + w && mx < x + w && y < my + h && my < y + h) continue; // overlaps its mirror
-    let ok = true;
-    for (let ty = y; ty < y + h && ok; ty++) for (let tx = x; tx < x + w && ok; tx++) ok = accept(tx, ty) && accept(n - 1 - tx, n - 1 - ty);
-    if (ok && (!whole || (whole(x, y) && whole(mx, my)))) return { x, y };
+  for (let tries = 0; tries < 200; tries++) {
+    const x = 1 + rng.int(n - w - 1), y = 1 + rng.int(n - h - 1); // rect stays in [1, n-1)
+    const mirrorX = n - x - w, mirrorY = n - y - h;
+    if (x < mirrorX + w && mirrorX < x + w && y < mirrorY + h && mirrorY < y + h) continue; // overlaps its mirror
+    if (!acceptsRect(n, x, y, w, h, accept)) continue;
+    if (!whole || (whole(x, y) && whole(mirrorX, mirrorY))) return { x, y };
   }
   return null;
+}
+
+// accept(tx, ty) holds on every tile of the w x h rectangle at (x, y) and on its mirror tile.
+function acceptsRect(n, x, y, w, h, accept) {
+  for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) {
+    if (!accept(tx, ty) || !accept(n - 1 - tx, n - 1 - ty)) return false;
+  }
+  return true;
 }
 
 // accept(x, y) for mirroredSpot: dry, empty, unreserved plain land with no loose relic on it (a pile or a Mine would
 // make the relic unfetchable), more than 13 tiles from both starts and clear of the centre.
 function openLand(game) {
-  const n = game.map.size, mid = (n - 1) / 2, starts = game.map.starts, relics = new Set();
-  for (const r of game.relics.values()) if (r.holder === null && r.stored === null) relics.add(Math.floor(r.y) * n + Math.floor(r.x));
-  return (x, y) => { const i = y * n + x; return game.map.tiles[i] === 0 && game.occAt(x, y) === 0 && !game.reserved.has(i) && !relics.has(i)
-    && starts.every(s => Math.hypot(x - s.x, y - s.y) > 13) && Math.hypot(x - mid, y - mid) > CENTRE_CLEAR; };
+  const n = game.map.size, mid = (n - 1) / 2, starts = game.map.starts, relicTiles = new Set();
+  for (const relic of game.relics.values()) {
+    if (relic.holder === null && relic.stored === null) relicTiles.add(Math.floor(relic.y) * n + Math.floor(relic.x));
+  }
+  return (x, y) => {
+    const i = y * n + x;
+    if (game.map.tiles[i] !== 0 || game.occAt(x, y) !== 0 || game.reserved.has(i) || relicTiles.has(i)) return false;
+    return starts.every(start => Math.hypot(x - start.x, y - start.y) > 13) && Math.hypot(x - mid, y - mid) > CENTRE_CLEAR;
+  };
 }
 
 // A mirrored pair of fresh 4x3 patches on dry, empty land well away from both starts. False at the kind's cap or with no room.
 export function spawnPatchPair(game, kind, reserve) {
-  let live = 0; for (const p of game.patches.values()) if (p.kind === kind) live++;
+  let live = 0;
+  for (const patch of game.patches.values()) if (patch.kind === kind) live++;
   if (live + 2 > PATCH_CAP[kind]) return false;
   const n = game.map.size;
   const spot = mirroredSpot(game, 4, 3, openLand(game));
   if (!spot) return false;
-  const own = [];
-  for (let y = spot.y; y < spot.y + 3; y++) for (let x = spot.x; x < spot.x + 4; x++) own.push(y * n + x);
-  let id = game.nextPatchId; for (const k of game.patches.keys()) id = Math.max(id, k + 1); // above every live id too
-  const a = { id, kind, tiles: own, reserve, startReserve: reserve, twin: id + 1 }, b = { id: id + 1, kind, tiles: own.map(i => n * n - 1 - i), reserve, startReserve: reserve, twin: id };
+  const tiles = [];
+  for (let y = spot.y; y < spot.y + 3; y++) for (let x = spot.x; x < spot.x + 4; x++) tiles.push(y * n + x);
+  let id = game.nextPatchId;
+  for (const liveId of game.patches.keys()) id = Math.max(id, liveId + 1); // above every live id too
+  const patch = { id, kind, tiles, reserve, startReserve: reserve, twin: id + 1 };
+  const twin = { id: id + 1, kind, tiles: tiles.map(i => n * n - 1 - i), reserve, startReserve: reserve, twin: id };
   game.nextPatchId = id + 2;
-  for (const p of [a, b]) { game.patches.set(p.id, p); for (const i of p.tiles) { game.map.tiles[i] = ORE_TILE[kind]; game.patchAt[i] = p.id; } }
+  addPatch(game, patch);
+  addPatch(game, twin);
   game.terrainVersion++;
   return true;
 }
 
-const pileSum = (game, kind) => { let sum = 0; for (const r of game.resources.values()) if (r.type === kind) sum += r.amount; return sum; };
+function addPatch(game, patch) {
+  game.patches.set(patch.id, patch);
+  for (const i of patch.tiles) {
+    game.map.tiles[i] = ORE_TILE[patch.kind];
+    game.patchAt[i] = patch.id;
+  }
+}
+
+const pileSum = (game, kind) => {
+  let sum = 0;
+  for (const resource of game.resources.values()) if (resource.type === kind) sum += resource.amount;
+  return sum;
+};
 
 // createGame calls this once the map's piles are in: the totals the respawn threshold is measured against.
 export function recordPileStart(game) {
@@ -100,24 +147,44 @@ export function recordPileStart(game) {
 // (seeded directly, so a standing Town Center doesn't block its own start) through tiles that aren't water and aren't
 // occupied. Ore ground and wall foundations count as open, as in map.js `connected`; buildings and resources block.
 function walkable(game) {
-  const n = game.map.size, seen = new Uint8Array(n * n), stack = [], size = BUILDINGS.town_center.size;
+  const n = game.map.size, seen = new Uint8Array(n * n), stack = seedTownCenters(game, seen);
   const open = (x, y) => x >= 0 && y >= 0 && x < n && y < n && game.map.tiles[y * n + x] !== 1 && game.occAt(x, y) === 0;
-  for (const s of game.map.starts) for (let y = s.y - 1; y < s.y - 1 + size; y++) for (let x = s.x - 1; x < s.x - 1 + size; x++) {
-    const i = y * n + x; if (x >= 0 && y >= 0 && x < n && y < n && !seen[i]) { seen[i] = 1; stack.push(i); }
-  }
+  const visit = (x, y) => {
+    if (!open(x, y) || seen[y * n + x]) return;
+    seen[y * n + x] = 1;
+    stack.push(y * n + x);
+  };
   while (stack.length) {
     const i = stack.pop(), x = i % n, y = (i / n) | 0;
-    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) if (open(nx, ny) && !seen[ny * n + nx]) { seen[ny * n + nx] = 1; stack.push(ny * n + nx); }
+    visit(x + 1, y);
+    visit(x - 1, y);
+    visit(x, y + 1);
+    visit(x, y - 1);
   }
   return seen;
+}
+
+// Marks both Town Center footprints as seen; returns their tiles as the flood's starting stack.
+function seedTownCenters(game, seen) {
+  const n = game.map.size, size = BUILDINGS.town_center.size, stack = [];
+  for (const start of game.map.starts) for (let y = start.y - 1; y < start.y - 1 + size; y++) {
+    for (let x = start.x - 1; x < start.x - 1 + size; x++) {
+      const i = y * n + x;
+      if (x < 0 || y < 0 || x >= n || y >= n || seen[i]) continue;
+      seen[i] = 1;
+      stack.push(i);
+    }
+  }
+  return stack;
 }
 
 // whole(x, y) for mirroredSpot: some tile on a side of the w x h block at (x, y) was reached by the flood and is still free
 // (the flood is shared by both kinds in one updateRespawn call, so an earlier block may have filled it since).
 const reachedSide = (game, seen, w, h) => (x, y) => {
   const n = game.map.size;
-  for (let k = 0; k < w; k++) for (const ty of [y - 1, y + h]) if (ty >= 0 && ty < n && seen[ty * n + x + k] && game.occAt(x + k, ty) === 0) return true;
-  for (let k = 0; k < h; k++) for (const tx of [x - 1, x + w]) if (tx >= 0 && tx < n && seen[(y + k) * n + tx] && game.occAt(tx, y + k) === 0) return true;
+  const reached = (tx, ty) => seen[ty * n + tx] && game.occAt(tx, ty) === 0;
+  for (let k = 0; k < w; k++) for (const ty of [y - 1, y + h]) if (ty >= 0 && ty < n && reached(x + k, ty)) return true;
+  for (let k = 0; k < h; k++) for (const tx of [x - 1, x + w]) if (tx >= 0 && tx < n && reached(tx, y + k)) return true;
   return false;
 };
 
@@ -131,9 +198,16 @@ export function updateRespawn(game) {
     seen ??= walkable(game);
     const spot = mirroredSpot(game, 2, 2, openLand(game), reachedSide(game, seen, 2, 2));
     if (!spot) continue;
-    const n = game.map.size;
-    for (let y = spot.y; y < spot.y + 2; y++) for (let x = spot.x; x < spot.x + 2; x++)
-      for (const [px, py] of [[x, y], [n - 1 - x, n - 1 - y]]) game.addResource({ type: kind, x: px + 0.5, y: py + 0.5, amount: PILE_AMOUNT[kind] });
+    addPileBlock(game, kind, spot);
     game.lastRespawn[kind] = game.time;
+  }
+}
+
+// A 2x2 block of fresh piles at `spot`, each placed with its mirror pile.
+function addPileBlock(game, kind, spot) {
+  const n = game.map.size, amount = PILE_AMOUNT[kind];
+  for (let y = spot.y; y < spot.y + 2; y++) for (let x = spot.x; x < spot.x + 2; x++) {
+    game.addResource({ type: kind, x: x + 0.5, y: y + 0.5, amount });
+    game.addResource({ type: kind, x: n - 1 - x + 0.5, y: n - 1 - y + 0.5, amount });
   }
 }

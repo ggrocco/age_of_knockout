@@ -8,254 +8,489 @@ import { drawFrom } from './ore.js';
 import { canRepair } from './commands.js';
 import { landingTiles, landingNear } from './formation.js';
 
+// How close a worker stands to its job, how much a villager carries (a unit's `capacity` overrides it), and gather rates
+// per resource per second.
 const REACH = 1.0, CARRY = 10, RATE = { food: 0.7, wood: 0.6, gold: 0.5, stone: 0.5 };
+const NO_DROPS = [];
 const IDLE = () => ({ type: 'idle' });
-const goalNear = (t, r) => (x, y) => distPoint(x + 0.5, y + 0.5, t) <= r;
+const goalNear = (target, radius) => (x, y) => distPoint(x + 0.5, y + 0.5, target) <= radius;
 
 // Move along the current path (computing it if needed). 'arrived' | 'moving' | 'wait' | 'fail'
-function travel(game, u, goal, to) {
-  if (!u.path) {
-    if (u.retry > game.time) return 'wait';
-    u.path = findPath(game.map, game.blocked, { x: Math.floor(u.x), y: Math.floor(u.y) }, to, goal, u.naval);
-    if (!u.path) { u.retry = game.time + 40; return 'fail'; }
-    if (u.path.length === 0) { u.path = null; u.x = Math.floor(u.x) + 0.5; u.y = Math.floor(u.y) + 0.5; return 'arrived'; }
+function travel(game, unit, goal, to) {
+  if (!unit.path) {
+    const status = planPath(game, unit, goal, to);
+    if (status !== null) return status;
   }
-  const w = u.path[0];
-  if (game.occAt(w.x, w.y)) { u.path = null; return 'moving'; }
-  const tx = w.x + 0.5, ty = w.y + 0.5, dx = tx - u.x, dy = ty - u.y, d = Math.hypot(dx, dy), step = u.speed * DT;
-  if (d <= step) { u.x = tx; u.y = ty; u.path.shift(); if (!u.path.length) { u.path = null; return 'arrived'; } }
-  else { u.x += dx / d * step; u.y += dy / d * step; }
+  return stepAlongPath(game, unit);
+}
+
+// Plan a path for a unit that has none (on the water for a ship). 'wait' while a failed search's retry delay runs, 'fail'
+// (and a 40-tick retry delay), 'arrived' when it already stands at the goal (snapped to its tile centre), or null when it
+// has a path to walk.
+function planPath(game, unit, goal, to) {
+  if (unit.retry > game.time) return 'wait';
+  unit.path = findPath(game.map, game.blocked, { x: Math.floor(unit.x), y: Math.floor(unit.y) }, to, goal, unit.naval);
+  if (!unit.path) {
+    unit.retry = game.time + 40;
+    return 'fail';
+  }
+  if (unit.path.length !== 0) return null;
+  unit.path = null;
+  unit.x = Math.floor(unit.x) + 0.5;
+  unit.y = Math.floor(unit.y) + 0.5;
+  return 'arrived';
+}
+
+// One tick's walk towards the next waypoint. A waypoint that has been built on drops the path, so it is planned again.
+function stepAlongPath(game, unit) {
+  const waypoint = unit.path[0];
+  if (game.occAt(waypoint.x, waypoint.y)) {
+    unit.path = null;
+    return 'moving';
+  }
+  const targetX = waypoint.x + 0.5, targetY = waypoint.y + 0.5;
+  const dx = targetX - unit.x, dy = targetY - unit.y, distance = Math.hypot(dx, dy), step = unit.speed * DT;
+  if (distance <= step) {
+    unit.x = targetX;
+    unit.y = targetY;
+    unit.path.shift();
+    if (unit.path.length) return 'moving';
+    unit.path = null;
+    return 'arrived';
+  }
+  unit.x += dx / distance * step;
+  unit.y += dy / distance * step;
   return 'moving';
 }
-const stop = u => { u.order = IDLE(); u.path = null; };
-// Walled off: attack the enemy building in the way, and take up `o` again once it falls (doAttack restores `resume`).
-// travel just set a 40-tick retry for the failed path; clear it so the unit heads for the breach at once.
-const breach = (u, id, o) => { u.order = { type: 'attack', target: id, fails: 0, resume: o }; u.path = null; u.retry = 0; };
-// Hand back the order `o` interrupted (a breach's, or the job a build was given over), at once and with no retry wait.
-const resume = (u, o) => { u.order = o.resume; u.path = null; u.retry = 0; };
-// A build that ends (done, gone or unreachable) takes up the job it interrupted, if any, else the villager stops.
-const endBuild = (u, o) => o.resume ? resume(u, o) : stop(u);
 
-export function updateUnit(game, u) {
-  if (u.cd > 0) u.cd--;
-  const o = u.order;
-  switch (o.type) {
-    case 'idle': return aggro(game, u);
-    case 'move': return doMove(game, u, o);
-    case 'gather': return doGather(game, u, o);
-    case 'build': return doBuild(game, u, o);
-    case 'repair': return doRepair(game, u, o);
-    case 'attack': return doAttack(game, u, o);
-    case 'relic': return doRelic(game, u, o);
-    case 'board': return doBoard(game, u, o);
-    case 'unload': return doUnload(game, u, o);
+const stop = unit => {
+  unit.order = IDLE();
+  unit.path = null;
+};
+// Walled off: attack the enemy building in the way, and take up `order` again once it falls (doAttack restores `resume`).
+// travel just set a 40-tick retry for the failed path; clear it so the unit heads for the breach at once.
+const breach = (unit, wallId, order) => {
+  unit.order = { type: 'attack', target: wallId, fails: 0, resume: order };
+  unit.path = null;
+  unit.retry = 0;
+};
+// Hand back the order `order` interrupted (a breach's, or the job a build was given over), at once and with no retry wait.
+const resume = (unit, order) => {
+  unit.order = order.resume;
+  unit.path = null;
+  unit.retry = 0;
+};
+// A build that ends (done, gone or unreachable) takes up the job it interrupted, if any, else the villager stops.
+const endBuild = (unit, order) => order.resume ? resume(unit, order) : stop(unit);
+
+// The way to `to` has failed: break through the enemy building in the way (then take up `order` again), or count a failure
+// and give up after the fourth.
+function breachOrFail(game, unit, order, to, goal) {
+  const wallId = breachTarget(game, unit, to, goal);
+  if (wallId !== null) return breach(unit, wallId, order);
+  if (++order.fails > 3) stop(unit);
+}
+
+export function updateUnit(game, unit) {
+  if (unit.cd > 0) unit.cd--;
+  const order = unit.order;
+  switch (order.type) {
+    case 'idle': return aggro(game, unit);
+    case 'move': return doMove(game, unit, order);
+    case 'gather': return doGather(game, unit, order);
+    case 'build': return doBuild(game, unit, order);
+    case 'repair': return doRepair(game, unit, order);
+    case 'attack': return doAttack(game, unit, order);
+    case 'relic': return doRelic(game, unit, order);
+    case 'board': return doBoard(game, unit, order);
+    case 'unload': return doUnload(game, unit, order);
   }
 }
 
 // A move that cannot reach its tile first settles for within 2 tiles of it. If even that fails and enemy buildings are in the
 // way, the unit breaks through them, then tries for the exact tile again (slack back to 0); otherwise it stops. Ships never
 // breach: walls stand on land.
-function doMove(game, u, o) {
-  const to = { x: Math.floor(o.x), y: Math.floor(o.y) }, goal = (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack;
-  const r = travel(game, u, goal, to);
-  if (r === 'arrived') return stop(u);
-  if (r !== 'fail') return;
-  if (o.slack < 2) { o.slack = 2; u.retry = 0; return; }
-  const id = u.naval ? null : breachTarget(game, u, to, goal);
-  if (id === null) return stop(u);
-  o.slack = 0; breach(u, id, o);
+function doMove(game, unit, order) {
+  const to = { x: Math.floor(order.x), y: Math.floor(order.y) };
+  const goal = (x, y) => Math.abs(x - to.x) <= order.slack && Math.abs(y - to.y) <= order.slack;
+  const status = travel(game, unit, goal, to);
+  if (status === 'arrived') return stop(unit);
+  if (status !== 'fail') return;
+  if (order.slack < 2) {
+    order.slack = 2;
+    unit.retry = 0;
+    return;
+  }
+  const wallId = unit.naval ? null : breachTarget(game, unit, to, goal);
+  if (wallId === null) return stop(unit);
+  order.slack = 0;
+  breach(unit, wallId, order);
 }
 
+// The nearest resource of `kind` closer than maxDist: a loose pile, tree or bush, or one of the unit's own Farms and Mines.
 // Ships fish and land at a Dock; villagers gather everything else and never drop at a Dock.
-function nearestResource(game, u, kind, maxDist) {
-  let best = null, bd = maxDist;
-  const consider = e => { const d = Math.hypot(e.x - u.x, e.y - u.y); if (d < bd) { bd = d; best = e; } };
-  for (const r of game.resources.values()) if (RES_KIND[r.type] === kind && r.amount > 0 && (r.type === 'fish') === u.naval) consider(r);
-  if (!u.naval) for (const b of game.buildings.values()) if (b.owner === u.owner && b.constructed && b.gatherType === kind && b.amount > 0) consider(b); // own Farms and Mines
-  return best;
-}
-function nearestDrop(game, u, kind) {
-  let best = null, bd = Infinity;
-  for (const b of game.buildings.values()) {
-    if (b.owner !== u.owner || !b.constructed || !(BUILDINGS[b.type].drops || []).includes(kind) || !BUILDINGS[b.type].naval !== !u.naval) continue;
-    const d = distPoint(u.x, u.y, b); if (d < bd) { bd = d; best = b; }
+function nearestResource(game, unit, kind, maxDist) {
+  let nearest = null, nearestDist = maxDist;
+  const consider = source => {
+    const distance = Math.hypot(source.x - unit.x, source.y - unit.y);
+    if (distance < nearestDist) {
+      nearestDist = distance;
+      nearest = source;
+    }
+  };
+  for (const resource of game.resources.values()) {
+    if (RES_KIND[resource.type] === kind && resource.amount > 0 && (resource.type === 'fish') === unit.naval) consider(resource);
   }
-  return best;
+  if (unit.naval) return nearest;
+  for (const building of game.buildings.values()) {
+    const ownWorkplace = building.owner === unit.owner && building.constructed && building.gatherType === kind;
+    if (ownWorkplace && building.amount > 0) consider(building);
+  }
+  return nearest;
 }
 
-function doGather(game, u, o) {
-  let res = game.entities.get(o.res);
-  const kind = o.kind;
-  if (!res || res.dead || res.amount <= 0 || (res.kind === 'building' && !res.constructed)) {
-    if (o.phase === 'work') o.phase = u.carry.amount > 0 ? 'drop' : 'go';
-    res = nearestResource(game, u, kind, 12);
-    if (!res) { if (u.carry.amount > 0) { o.res = -1; o.phase = 'drop'; } else return stop(u); }
-    else { o.res = res.id; u.path = null; }
-  }
-  if (o.phase === 'go') {
-    if (!res) return stop(u);
-    if (distPoint(u.x, u.y, res) <= REACH) { o.phase = 'work'; u.path = null; return; }
-    const r = travel(game, u, goalNear(res, 0.95), centerOf(res));
-    if (r === 'fail') { if (++o.fails > 3) stop(u); else o.res = -1; }
-  } else if (o.phase === 'work') {
-    const p = game.players[u.owner], rate = RATE[kind] * DT * p.gatherMult[kind] * p.workRate * (res.type === 'farm' ? farmStats(p.age).rate : 1); // Farms work faster each era
-    if (u.carry.type !== kind) u.carry = { type: kind, amount: 0 };
-    if (res.kind === 'building') res.gatherers = (res.gatherers || 0) + 1;
-    const take = drawFrom(game, res, rate); u.carry.amount += take; game.players[u.owner].gathered += take; // removes an empty pile/Farm, exhausts a Mine's patch
-    if (u.carry.amount >= (UNITS[u.type].capacity ?? CARRY) || res.amount <= 0 || res.dead) { o.phase = 'drop'; u.path = null; }
-  } else { // drop
-    if (u.carry.amount <= 0) { o.phase = 'go'; return; }
-    const d = nearestDrop(game, u, u.carry.type);
-    if (!d) return stop(u);
-    if (distPoint(u.x, u.y, d) <= REACH) {
-      game.players[u.owner].res[u.carry.type] += u.carry.amount; u.carry = { type: null, amount: 0 };
-      o.phase = 'go'; u.path = null; return;
+// The nearest of the unit's finished buildings that takes `kind` in: a Dock for a ship, any other drop site for a villager.
+function nearestDrop(game, unit, kind) {
+  let nearest = null, nearestDist = Infinity;
+  for (const building of game.buildings.values()) {
+    if (building.owner !== unit.owner || !building.constructed) continue;
+    const spec = BUILDINGS[building.type];
+    if (!(spec.drops || NO_DROPS).includes(kind) || !spec.naval !== !unit.naval) continue;
+    const distance = distPoint(unit.x, unit.y, building);
+    if (distance < nearestDist) {
+      nearestDist = distance;
+      nearest = building;
     }
-    const r = travel(game, u, goalNear(d, 0.95), centerOf(d));
-    if (r === 'fail' && ++o.fails > 3) stop(u);
   }
+  return nearest;
+}
+
+// A gather source that can no longer be worked: gone, used up, or a Farm or Mine still being built.
+const isSpent = source => !source || source.dead || source.amount <= 0 || (source.kind === 'building' && !source.constructed);
+
+// Gathering cycles through three phases: 'go' to the source, 'work' it until the villager is full, 'drop' it off.
+function doGather(game, unit, order) {
+  let source = game.entities.get(order.res);
+  if (isSpent(source)) {
+    source = switchSource(game, unit, order);
+    if (!source && unit.carry.amount <= 0) return stop(unit);
+  }
+  if (order.phase === 'go') return walkToSource(game, unit, order, source);
+  if (order.phase === 'work') return gatherFrom(game, unit, order, source);
+  dropOff(game, unit, order);
+}
+
+// The source is spent: take the nearest other one of the kind within 12 tiles. With none left, a villager that carries
+// something still takes it home (res -1); doGather stops one that carries nothing. Returns the new source, or null.
+function switchSource(game, unit, order) {
+  if (order.phase === 'work') order.phase = unit.carry.amount > 0 ? 'drop' : 'go';
+  const source = nearestResource(game, unit, order.kind, 12);
+  if (source) {
+    order.res = source.id;
+    unit.path = null;
+  } else if (unit.carry.amount > 0) {
+    order.res = -1;
+    order.phase = 'drop';
+  }
+  return source;
+}
+
+// A source that cannot be reached is given up (res -1, so the next tick picks another); the fourth failure stops the villager.
+function walkToSource(game, unit, order, source) {
+  if (!source) return stop(unit);
+  if (distPoint(unit.x, unit.y, source) <= REACH) {
+    order.phase = 'work';
+    unit.path = null;
+    return;
+  }
+  const status = travel(game, unit, goalNear(source, 0.95), centerOf(source));
+  if (status !== 'fail') return;
+  if (++order.fails > 3) stop(unit);
+  else order.res = -1;
+}
+
+function gatherFrom(game, unit, order, source) {
+  const kind = order.kind, player = game.players[unit.owner];
+  const farmRate = source.type === 'farm' ? farmStats(player.age).rate : 1; // Farms work faster each era
+  const rate = RATE[kind] * DT * player.gatherMult[kind] * player.workRate * farmRate;
+  if (unit.carry.type !== kind) unit.carry = { type: kind, amount: 0 };
+  if (source.kind === 'building') source.gatherers = (source.gatherers || 0) + 1;
+  const taken = drawFrom(game, source, rate); // removes an empty pile/Farm, exhausts a Mine's patch
+  unit.carry.amount += taken;
+  player.gathered += taken;
+  if (unit.carry.amount >= (UNITS[unit.type].capacity ?? CARRY) || source.amount <= 0 || source.dead) {
+    order.phase = 'drop';
+    unit.path = null;
+  }
+}
+
+function dropOff(game, unit, order) {
+  const carry = unit.carry;
+  if (carry.amount <= 0) {
+    order.phase = 'go';
+    return;
+  }
+  const dropSite = nearestDrop(game, unit, carry.type);
+  if (!dropSite) return stop(unit);
+  if (distPoint(unit.x, unit.y, dropSite) <= REACH) {
+    game.players[unit.owner].res[carry.type] += carry.amount;
+    unit.carry = { type: null, amount: 0 };
+    order.phase = 'go';
+    unit.path = null;
+    return;
+  }
+  const status = travel(game, unit, goalNear(dropSite, 0.95), centerOf(dropSite));
+  if (status === 'fail' && ++order.fails > 3) stop(unit);
 }
 
 // The nearest building in a build queue (a wall line) that is still standing and unfinished; it is taken off the queue.
 // Finished or destroyed ones are dropped. A tie on distance goes to the earlier one in the queue.
-function nextInQueue(game, u, o) {
-  let best = null, bd = Infinity;
-  o.queue = (o.queue || []).filter(id => { const b = game.entities.get(id); return b && !b.dead && !b.constructed && b.owner === u.owner; });
-  for (const id of o.queue) { const b = game.entities.get(id), d = distPoint(u.x, u.y, b); if (d < bd) { bd = d; best = b; } }
-  if (best) o.queue = o.queue.filter(id => id !== best.id);
-  return best;
+function nextInQueue(game, unit, order) {
+  order.queue = (order.queue || []).filter(id => {
+    const building = game.entities.get(id);
+    return building && !building.dead && !building.constructed && building.owner === unit.owner;
+  });
+  let nearest = null, nearestDist = Infinity;
+  for (const id of order.queue) {
+    const building = game.entities.get(id), distance = distPoint(unit.x, unit.y, building);
+    if (distance < nearestDist) {
+      nearestDist = distance;
+      nearest = building;
+    }
+  }
+  if (nearest) order.queue = order.queue.filter(id => id !== nearest.id);
+  return nearest;
 }
 
-function doBuild(game, u, o) {
-  const b = game.entities.get(o.target);
-  if (!b || b.dead || b.constructed) { // done (or gone): move on to the nearest segment left in the queue
-    const next = o.queue && nextInQueue(game, u, o);
-    if (next) { o.target = next.id; o.fails = 0; u.path = null; u.retry = 0; return; }
-  }
-  if (!b || b.dead) return endBuild(u, o);
-  if (b.constructed) {
-    if (b.gatherType && b.amount > 0) { // a finished farm or mine is the last job in the chain: interrupted builds first, then work it
-      let last = o; while (last.resume?.type === 'build' || last.resume?.type === 'repair') last = last.resume;
-      last.resume = { type: 'gather', res: b.id, kind: b.gatherType, phase: 'go', fails: 0 }; // in place of any gather it interrupted
+function doBuild(game, unit, order) {
+  const building = game.entities.get(order.target);
+  if (!building || building.dead || building.constructed) { // done (or gone): move on to the nearest segment left in the queue
+    const next = order.queue && nextInQueue(game, unit, order);
+    if (next) {
+      order.target = next.id;
+      order.fails = 0;
+      unit.path = null;
+      unit.retry = 0;
+      return;
     }
-    return endBuild(u, o);
   }
-  if (distPoint(u.x, u.y, b) <= REACH) { b.workers++; u.path = null; return; }
-  const r = travel(game, u, goalNear(b, 0.95), centerOf(b));
-  if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) endBuild(u, o); }
+  if (!building || building.dead) return endBuild(unit, order);
+  if (building.constructed) {
+    if (building.gatherType && building.amount > 0) workAfterBuilds(order, building);
+    return endBuild(unit, order);
+  }
+  if (distPoint(unit.x, unit.y, building) <= REACH) {
+    building.workers++;
+    unit.path = null;
+    return;
+  }
+  const status = travel(game, unit, goalNear(building, 0.95), centerOf(building));
+  if (status === 'fail') failBuildStep(unit, order);
+}
+
+// A finished farm or mine is the last job in the chain: interrupted builds first, then work it (in place of any gather the
+// chain interrupted).
+function workAfterBuilds(order, building) {
+  let last = order;
+  while (last.resume?.type === 'build' || last.resume?.type === 'repair') last = last.resume;
+  last.resume = { type: 'gather', res: building.id, kind: building.gatherType, phase: 'go', fails: 0 };
+}
+
+// A build or repair whose building cannot be reached gives up after the fourth failure.
+function failBuildStep(unit, order) {
+  order.fails = (order.fails || 0) + 1;
+  if (order.fails > 3) endBuild(unit, order);
 }
 
 // AoE1 damage model (openage doc/reverse_engineering/game_mechanics/damage.md):
 // subtract the armor matching the attacker's attack type, add any bonus-vs-class,
 // clamp each term, floor at 1. Buildings carry melee/pierce armor (no cls), so the
 // bonus never applies to them; archers (pierce) bounce off their high pierce armor.
-export function damageTo(u, t) {
-  const armor = u.atkType === 'pierce' ? (t.parmor || 0) : (t.marmor || 0);
-  const bonus = (u.bonus && t.cls && u.bonus[t.cls]) || 0;
-  return Math.max(1, Math.max(0, u.atk - armor) + bonus);
+export function damageTo(attacker, target) {
+  const armor = attacker.atkType === 'pierce' ? (target.parmor || 0) : (target.marmor || 0);
+  const bonus = (attacker.bonus && target.cls && attacker.bonus[target.cls]) || 0;
+  return Math.max(1, Math.max(0, attacker.atk - armor) + bonus);
 }
 
-export function hit(game, u, t) {
-  game.damage(t, damageTo(u, t), u);
-  if (u.splash) {
-    const c = centerOf(t);
-    for (const list of [game.units, game.buildings]) for (const e of [...list.values()]) {
-      if (e === t || e.dead || e.owner === u.owner || e.aboard) continue;
-      if (distPoint(c.x, c.y, e) <= u.splash) game.damage(e, damageTo(u, e) * 0.5, u);
-    }
+export function hit(game, attacker, target) {
+  game.damage(target, damageTo(attacker, target), attacker);
+  if (attacker.splash) splashAround(game, attacker, target);
+}
+
+// Splash damage: half damage to every other enemy unit and building within `splash` of the target's centre, except units
+// in a transport's hold. The lists are copied first because a kill removes the entity from its Map.
+function splashAround(game, attacker, target) {
+  const center = centerOf(target);
+  for (const list of [game.units, game.buildings]) for (const entity of [...list.values()]) {
+    if (entity === target || entity.dead || entity.owner === attacker.owner || entity.aboard) continue;
+    if (distPoint(center.x, center.y, entity) <= attacker.splash) game.damage(entity, damageTo(attacker, entity) * 0.5, attacker);
   }
 }
 
-// Whether `u` could ever get `t` in range: a ship needs open water within reach of a target on land, and a soldier needs
-// ground within reach of a ship (so only ranged soldiers hit a ship on deep water; anyone can hit one in the shallows).
+// Whether `unit` could ever get `target` in range: a ship needs open water within reach of a target on land, and a soldier
+// needs ground within reach of a ship (so only ranged soldiers hit a ship on deep water; anyone can hit one in the shallows).
 // Same-layer targets are always reachable as far as this goes. game.toWater / game.toLand hold each tile's distance.
-export function canHit(game, u, t) {
-  if (t.aboard) return false; // in a transport's hold: sink the transport instead
-  const naval = !!u.naval;
-  if (t.kind === 'unit' ? !!t.naval === naval : !naval && !BUILDINGS[t.type]?.naval) return true;
-  const d = naval ? game.toWater : game.toLand, n = game.map.size, reach = Math.max(0.9, u.range - 0.5) + 0.05;
-  if (t.kind === 'unit') return d[Math.floor(t.y) * n + Math.floor(t.x)] <= reach;
-  let m = Infinity;
-  for (let y = t.y; y < t.y + t.size; y++) for (let x = t.x; x < t.x + t.size; x++) m = Math.min(m, d[y * n + x]);
-  return m - 0.5 <= reach;
+export function canHit(game, unit, target) {
+  if (target.aboard) return false; // in a transport's hold: sink the transport instead
+  const naval = !!unit.naval;
+  if (target.kind === 'unit' ? !!target.naval === naval : !naval && !BUILDINGS[target.type]?.naval) return true;
+  const distances = naval ? game.toWater : game.toLand, n = game.map.size;
+  const reach = Math.max(0.9, unit.range - 0.5) + 0.05;
+  if (target.kind === 'unit') return distances[Math.floor(target.y) * n + Math.floor(target.x)] <= reach;
+  return footprintMin(distances, n, target) - 0.5 <= reach;
+}
+
+// The smallest of `distances` over the tiles a building stands on.
+function footprintMin(distances, n, building) {
+  let smallest = Infinity;
+  for (let y = building.y; y < building.y + building.size; y++) {
+    for (let x = building.x; x < building.x + building.size; x++) smallest = Math.min(smallest, distances[y * n + x]);
+  }
+  return smallest;
 }
 
 // A breach order (one with `resume`) that loses its target hands back the order it interrupted, on the next tick and with no
-// retry wait. A target this unit can never get in range of (canHit) ends the order the same way, before any path search. A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap
-// the order round itself); a breach can wrap again, each layer restoring the one before. Only an attack with no breach counts fails.
-function doAttack(game, u, o) {
-  const t = game.entities.get(o.target);
-  if (!t || t.dead || t.owner === u.owner || (t.kind !== 'unit' && t.kind !== 'building') || !canHit(game, u, t)) {
-    if (!o.resume) return stop(u);
-    return resume(u, o);
+// retry wait. A target this unit can never get in range of (canHit) ends the order the same way, before any path search.
+// A walled-off attack first looks for an enemy building to break through (never the target itself: that would wrap the
+// order round itself); a breach can wrap again, each layer restoring the one before. Only an attack with no breach counts
+// fails.
+function doAttack(game, unit, order) {
+  const target = game.entities.get(order.target);
+  if (attackOver(game, unit, target)) {
+    if (!order.resume) return stop(unit);
+    return resume(unit, order);
   }
-  if (distPoint(u.x, u.y, t) <= u.range + 0.1) {
-    u.path = null;
-    if (u.cd === 0) { u.cd = u.cooldown; hit(game, u, t); }
+  if (distPoint(unit.x, unit.y, target) <= unit.range + 0.1) {
+    unit.path = null;
+    if (unit.cd === 0) {
+      unit.cd = unit.cooldown;
+      hit(game, unit, target);
+    }
     return;
   }
-  const tt = tileOf(t), key = tt.x + ',' + tt.y;
-  if (u.path && o.last !== key && (game.time + u.id) % 5 === 0) u.path = null;
-  o.last = key;
-  const goal = goalNear(t, Math.max(0.9, u.range - 0.5)), r = travel(game, u, goal, tt);
-  if (r !== 'fail') return;
-  const id = u.naval ? null : breachTarget(game, u, tt, goal);
-  if (id !== null && id !== o.target) return breach(u, id, o);
-  if (++o.fails > 3) stop(u);
+  chaseTarget(game, unit, order, target);
 }
 
-// An idle soldier or warship takes on the nearest enemy in sight that it can get in range of (canHit), units before buildings.
-function aggro(game, u) {
-  if (u.cls === 'civ' || !(u.atk > 0) || (game.time + u.id) % 5 !== 0) return; // workers and unarmed transports never pick fights
-  let best = null, bd = u.sight + 1;
-  for (const e of game.units.values()) {
-    if (e.owner === u.owner || e.aboard) continue;
-    const d = Math.hypot(e.x - u.x, e.y - u.y) - (e.cls === 'civ' ? 0.5 : 0); if (d < bd && canHit(game, u, e)) { bd = d; best = e; }
-  }
-  if (!best) for (const e of game.buildings.values()) {
-    if (e.owner === u.owner) continue;
-    const d = distPoint(u.x, u.y, e) + 2; if (d < bd && canHit(game, u, e)) { bd = d; best = e; }
-  }
-  if (best) { u.order = { type: 'attack', target: best.id, fails: 0, auto: true }; u.path = null; }
+const attackOver = (game, unit, target) => !target || target.dead || target.owner === unit.owner
+  || (target.kind !== 'unit' && target.kind !== 'building') || !canHit(game, unit, target);
+
+// Walk into range of the target. When it has moved to another tile, the path is dropped (staggered: one tick in 5 per unit)
+// so it is planned again towards where the target is now.
+function chaseTarget(game, unit, order, target) {
+  const targetTile = tileOf(target), tileKey = targetTile.x + ',' + targetTile.y;
+  if (unit.path && order.last !== tileKey && (game.time + unit.id) % 5 === 0) unit.path = null;
+  order.last = tileKey;
+  const goal = goalNear(target, Math.max(0.9, unit.range - 0.5)), status = travel(game, unit, goal, targetTile);
+  if (status !== 'fail') return;
+  const wallId = unit.naval ? null : breachTarget(game, unit, targetTile, goal);
+  if (wallId !== null && wallId !== order.target) return breach(unit, wallId, order);
+  if (++order.fails > 3) stop(unit);
 }
 
-function doRelic(game, u, o) {
-  const r = game.relics.get(o.relic);
-  if (o.phase === 'go') {
-    if (!r || r.holder !== null || r.stored !== null) return stop(u);
-    if (Math.hypot(r.x - u.x, r.y - u.y) <= REACH) { r.holder = u.id; u.relic = r.id; o.phase = 'store'; u.path = null; return; }
-    const t = { x: Math.floor(r.x), y: Math.floor(r.y) };
-    const goal = (x, y) => x === t.x && y === t.y, res = travel(game, u, goal, t);
-    if (res !== 'fail') return;
-    const id = breachTarget(game, u, t, goal); // a relic walled in by the enemy: break through, then take up the fetch again
-    if (id !== null) return breach(u, id, o);
-    if (++o.fails > 3) stop(u);
-  } else {
-    if (u.relic === null) return stop(u);
-    let d = null, bd = Infinity;
-    for (const b of game.buildings.values()) {
-      if (b.owner !== u.owner || !b.constructed || !(b.type === 'town_center' || b.type === 'government_center')) continue;
-      const dd = distPoint(u.x, u.y, b); if (dd < bd) { bd = dd; d = b; }
+// An idle soldier or warship looks round every 5 ticks (staggered by id) and takes on the nearest enemy within its sight + 1
+// that it can get in range of (canHit): a unit first (villagers count half a tile nearer), else a building (counted 2 tiles
+// further away). Workers and unarmed transports never pick fights.
+function aggro(game, unit) {
+  if (unit.cls === 'civ' || !(unit.atk > 0) || (game.time + unit.id) % 5 !== 0) return;
+  const reach = unit.sight + 1;
+  const target = nearestEnemyUnit(game, unit, reach) || nearestEnemyBuilding(game, unit, reach);
+  if (!target) return;
+  unit.order = { type: 'attack', target: target.id, fails: 0, auto: true };
+  unit.path = null;
+}
+
+function nearestEnemyUnit(game, unit, maxDist) {
+  let nearest = null, nearestDist = maxDist;
+  for (const other of game.units.values()) {
+    if (other.owner === unit.owner || other.aboard) continue;
+    const distance = Math.hypot(other.x - unit.x, other.y - unit.y) - (other.cls === 'civ' ? 0.5 : 0);
+    if (distance < nearestDist && canHit(game, unit, other)) {
+      nearestDist = distance;
+      nearest = other;
     }
-    if (!d) return stop(u);
-    if (bd <= REACH) { const rl = game.relics.get(u.relic); rl.holder = null; rl.stored = d.id; u.relic = null; return stop(u); }
-    const goal = goalNear(d, 0.95), to = centerOf(d), res = travel(game, u, goal, to);
-    if (res !== 'fail') return;
-    const id = breachTarget(game, u, to, goal); // the way home is walled off by the enemy: break through, then carry on home
-    if (id !== null) return breach(u, id, o);
-    if (++o.fails > 3) stop(u);
   }
+  return nearest;
+}
+
+function nearestEnemyBuilding(game, unit, maxDist) {
+  let nearest = null, nearestDist = maxDist;
+  for (const building of game.buildings.values()) {
+    if (building.owner === unit.owner) continue;
+    const distance = distPoint(unit.x, unit.y, building) + 2;
+    if (distance < nearestDist && canHit(game, unit, building)) {
+      nearestDist = distance;
+      nearest = building;
+    }
+  }
+  return nearest;
+}
+
+// A relic order: 'go' fetches the relic, then 'store' carries it to the nearest Town or Government Center.
+function doRelic(game, unit, order) {
+  if (order.phase === 'go') return fetchRelic(game, unit, order, game.relics.get(order.relic));
+  carryRelicHome(game, unit, order);
+}
+
+function fetchRelic(game, unit, order, relic) {
+  if (!relic || relic.holder !== null || relic.stored !== null) return stop(unit);
+  if (Math.hypot(relic.x - unit.x, relic.y - unit.y) <= REACH) {
+    relic.holder = unit.id;
+    unit.relic = relic.id;
+    order.phase = 'store';
+    unit.path = null;
+    return;
+  }
+  const to = { x: Math.floor(relic.x), y: Math.floor(relic.y) };
+  const goal = (x, y) => x === to.x && y === to.y;
+  // a relic walled in by the enemy: break through, then take up the fetch again
+  if (travel(game, unit, goal, to) === 'fail') breachOrFail(game, unit, order, to, goal);
+}
+
+const isRelicStore = (building, owner) => building.owner === owner && building.constructed
+  && (building.type === 'town_center' || building.type === 'government_center');
+
+function carryRelicHome(game, unit, order) {
+  if (unit.relic === null) return stop(unit);
+  let home = null, homeDist = Infinity;
+  for (const building of game.buildings.values()) {
+    if (!isRelicStore(building, unit.owner)) continue;
+    const distance = distPoint(unit.x, unit.y, building);
+    if (distance < homeDist) {
+      homeDist = distance;
+      home = building;
+    }
+  }
+  if (!home) return stop(unit);
+  if (homeDist <= REACH) return storeRelic(game, unit, home);
+  const goal = goalNear(home, 0.95), to = centerOf(home);
+  // the way home is walled off by the enemy: break through, then carry on home
+  if (travel(game, unit, goal, to) === 'fail') breachOrFail(game, unit, order, to, goal);
+}
+
+function storeRelic(game, unit, home) {
+  const relic = game.relics.get(unit.relic);
+  relic.holder = null;
+  relic.stored = home.id;
+  unit.relic = null;
+  stop(unit);
 }
 
 // Repair: stand by the building and put HP back (game.js repairBuilding pays for it) until it is whole, gone, no longer
 // ours, or the owner runs out of something it costs; then take up the interrupted job, like a finished build.
-function doRepair(game, u, o) {
-  const b = game.entities.get(o.target);
-  if (!b || b.dead || b.owner !== u.owner || !b.constructed || b.hp >= b.maxHp || !canRepair(game.players[u.owner], b.type)) return endBuild(u, o);
-  if (distPoint(u.x, u.y, b) <= REACH) { b.repairers = (b.repairers || 0) + 1; u.path = null; return; }
-  const r = travel(game, u, goalNear(b, 0.95), centerOf(b));
-  if (r === 'fail') { o.fails = (o.fails || 0) + 1; if (o.fails > 3) endBuild(u, o); }
+function doRepair(game, unit, order) {
+  const building = game.entities.get(order.target);
+  if (repairOver(game, unit, building)) return endBuild(unit, order);
+  if (distPoint(unit.x, unit.y, building) <= REACH) {
+    building.repairers = (building.repairers || 0) + 1;
+    unit.path = null;
+    return;
+  }
+  const status = travel(game, unit, goalNear(building, 0.95), centerOf(building));
+  if (status === 'fail') failBuildStep(unit, order);
 }
+
+const repairOver = (game, unit, building) => !building || building.dead || building.owner !== unit.owner
+  || !building.constructed || building.hp >= building.maxHp || !canRepair(game.players[unit.owner], building.type);
 
 // ---- transports ----
 // Close enough to step aboard: a transport waits on the water next to the shore, so a soldier on the shore tile beside it
@@ -263,36 +498,77 @@ function doRepair(game, u, o) {
 const BOARD_REACH = 1.6;
 // Board: walk to the transport (following it while it moves) and step aboard, out of sight, while it has room; a full,
 // lost or foreign transport ends the order. Boarding drops the unit's other orders; a relic it carries comes along.
-function doBoard(game, u, o) {
-  const t = game.entities.get(o.target);
-  if (!t || t.dead || t.owner !== u.owner || !t.cargo || t.cargo.length >= UNITS[t.type].carries) return stop(u);
-  if (Math.hypot(t.x - u.x, t.y - u.y) <= BOARD_REACH) {
-    t.cargo.push(u.id); u.aboard = t.id; u.x = t.x; u.y = t.y; stop(u);
+function doBoard(game, unit, order) {
+  const transport = game.entities.get(order.target);
+  if (cannotBoard(unit, transport)) return stop(unit);
+  if (Math.hypot(transport.x - unit.x, transport.y - unit.y) <= BOARD_REACH) return stepAboard(unit, transport);
+  const transportTile = tileOf(transport), tileKey = transportTile.x + ',' + transportTile.y;
+  if (unit.path && order.last !== tileKey) unit.path = null; // the transport moved: head for where it is now
+  order.last = tileKey;
+  const besideTransport = (x, y) => Math.hypot(x + 0.5 - transport.x, y + 0.5 - transport.y) <= BOARD_REACH - 0.1;
+  const status = travel(game, unit, besideTransport, transportTile);
+  if (status !== 'fail' || transport.order.type !== 'idle') return; // while it is still on its way to the shore, keep waiting
+  if (++order.fails > 8) return stop(unit);
+  if (order.fails % 3 === 0) callTransport(game, unit, transport);
+}
+
+const cannotBoard = (unit, transport) => !transport || transport.dead || transport.owner !== unit.owner || !transport.cargo
+  || transport.cargo.length >= UNITS[transport.type].carries;
+
+function stepAboard(unit, transport) {
+  transport.cargo.push(unit.id);
+  unit.aboard = transport.id;
+  unit.x = transport.x;
+  unit.y = transport.y;
+  stop(unit);
+}
+
+// It waits where this unit can't walk (a coast the base has walled in since): call it to a shore this unit can reach.
+function callTransport(game, unit, transport) {
+  const landing = landingNear(game, unit.x, unit.y, unit);
+  if (landing && Math.hypot(landing.sea.x - transport.x, landing.sea.y - transport.y) > 0.3) {
+    transport.order = { type: 'move', x: landing.sea.x, y: landing.sea.y, slack: 0 };
+    transport.path = null;
+    transport.retry = 0;
+  }
+}
+
+// Unload: sail to the landing (order.x, order.y), a water tile beside the shore tile (order.sx, order.sy), and put every
+// passenger ashore on the free ground nearest it. Passengers carrying a relic take it on to a Town Center; the rest walk on
+// to order.to, if given.
+function doUnload(game, unit, order) {
+  if (!unit.cargo?.length) return stop(unit);
+  const to = { x: Math.floor(order.x), y: Math.floor(order.y) };
+  const status = Math.hypot(order.x - unit.x, order.y - unit.y) <= 1
+    ? 'arrived'
+    : travel(game, unit, (x, y) => Math.abs(x - to.x) <= order.slack && Math.abs(y - to.y) <= order.slack, to);
+  if (status === 'fail') { // can't reach the landing: try for within a tile of it once, then give up
+    if (order.slack < 1) {
+      order.slack = 1;
+      unit.retry = 0;
+    } else stop(unit);
     return;
   }
-  const tt = tileOf(t), key = tt.x + ',' + tt.y;
-  if (u.path && o.last !== key) u.path = null; // the transport moved: head for where it is now
-  o.last = key;
-  const r = travel(game, u, (x, y) => Math.hypot(x + 0.5 - t.x, y + 0.5 - t.y) <= BOARD_REACH - 0.1, tt);
-  if (r !== 'fail' || t.order.type !== 'idle') return; // while it is still on its way to the shore, keep waiting
-  if (++o.fails > 8) return stop(u);
-  // It waits where this unit can't walk (a coast the base has walled in since): call it to a shore this unit can reach.
-  if (o.fails % 3 === 0) { const l = landingNear(game, u.x, u.y, u); if (l && Math.hypot(l.sea.x - t.x, l.sea.y - t.y) > 0.3) { t.order = { type: 'move', x: l.sea.x, y: l.sea.y, slack: 0 }; t.path = null; t.retry = 0; } }
+  if (status === 'arrived') putAshore(game, unit, order);
 }
-// Unload: sail to the landing (o.x, o.y), a water tile beside the shore tile (o.sx, o.sy), and put every passenger ashore on
-// the free ground nearest it. Passengers carrying a relic take it on to a Town Center; the rest walk on to o.to, if given.
-function doUnload(game, u, o) {
-  if (!u.cargo?.length) return stop(u);
-  const to = { x: Math.floor(o.x), y: Math.floor(o.y) };
-  const r = Math.hypot(o.x - u.x, o.y - u.y) <= 1 ? 'arrived' : travel(game, u, (x, y) => Math.abs(x - to.x) <= o.slack && Math.abs(y - to.y) <= o.slack, to);
-  if (r === 'fail') { if (o.slack < 1) { o.slack = 1; u.retry = 0; } else stop(u); return; }
-  if (r !== 'arrived') return;
-  const people = u.cargo.map(id => game.entities.get(id)).filter(Boolean), spots = landingTiles(game, o.sx, o.sy, people.length);
-  if (!spots.length) return stop(u); // the shore is full: keep them aboard
-  people.forEach((p, i) => {
-    const s = spots[Math.min(i, spots.length - 1)];
-    p.aboard = null; p.x = s.x; p.y = s.y; p.path = null; p.retry = 0;
-    p.order = p.relic !== null ? { type: 'relic', relic: p.relic, phase: 'store', fails: 0 } : o.to ? { type: 'move', x: o.to.x, y: o.to.y, slack: 0 } : IDLE();
+
+function putAshore(game, transport, order) {
+  const passengers = transport.cargo.map(id => game.entities.get(id)).filter(Boolean);
+  const spots = landingTiles(game, order.sx, order.sy, passengers.length);
+  if (!spots.length) return stop(transport); // the shore is full: keep them aboard
+  passengers.forEach((passenger, i) => {
+    const spot = spots[Math.min(i, spots.length - 1)];
+    passenger.aboard = null;
+    passenger.x = spot.x;
+    passenger.y = spot.y;
+    passenger.path = null;
+    passenger.retry = 0;
+    passenger.order = orderAshore(passenger, order);
   });
-  u.cargo = []; stop(u);
+  transport.cargo = [];
+  stop(transport);
 }
+
+const orderAshore = (passenger, order) => passenger.relic !== null
+  ? { type: 'relic', relic: passenger.relic, phase: 'store', fails: 0 }
+  : order.to ? { type: 'move', x: order.to.x, y: order.to.y, slack: 0 } : IDLE();

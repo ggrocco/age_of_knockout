@@ -15,5 +15,6 @@ export const parseMapType = value => MAP_TYPES.includes(value) ? value : null;
 export function readMapType(search = '', storage) {
   const requested = parseMapType(new URLSearchParams(search).get('map'));
   if (requested) return requested;
-  try { return parseMapType(storage?.getItem('mapType')) ?? DEFAULT_MAP_TYPE; } catch { return DEFAULT_MAP_TYPE; } // storage may be unavailable
+  try { return parseMapType(storage?.getItem('mapType')) ?? DEFAULT_MAP_TYPE; }
+  catch { return DEFAULT_MAP_TYPE; } // storage may be unavailable
 }

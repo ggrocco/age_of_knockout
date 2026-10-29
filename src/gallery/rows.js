@@ -9,20 +9,20 @@ const RES = ['food', 'wood', 'gold', 'stone'];
 
 // One row per building, one cell per age: available from its unlock age onward.
 export function galleryRows(buildings = BUILDINGS, ages = AGES) {
-  const idx = a => ages.indexOf(a);
+  const ageOrder = age => ages.indexOf(age);
   return Object.entries(buildings)
-    .sort(([, a], [, b]) => idx(a.age) - idx(b.age))
+    .sort(([, a], [, b]) => ageOrder(a.age) - ageOrder(b.age))
     .map(([type, spec]) => ({
       type, spec, name: spec.name, unlock: spec.age,
       cells: ages.map(age => ({
-        age, available: idx(age) >= idx(spec.age), unlocks: age === spec.age,
+        age, available: ageOrder(age) >= ageOrder(spec.age), unlocks: age === spec.age,
       })),
     }));
 }
 
 // Plain-text facts for the row header, all read from the tables.
 export function buildingFacts(spec) {
-  const cost = RES.filter(r => spec.cost[r]).map(r => `${spec.cost[r]} ${r}`).join(', ') || 'free';
+  const cost = RES.filter(res => spec.cost[res]).map(res => `${spec.cost[res]} ${res}`).join(', ') || 'free';
   const facts = [ageTitle(spec.age), `${spec.size}×${spec.size}`, `${spec.hp} hp`, cost, `${spec.buildTime}s`];
   if (spec.pop) facts.push(`+${spec.pop} pop`);
   if (spec.drops) facts.push(`drop: ${spec.drops.join('/')}`);
@@ -32,10 +32,14 @@ export function buildingFacts(spec) {
 
 // Units this building can train by the given age (unknown unit ids are kept, by id).
 export function trainsBy(spec, age) {
-  return (spec.trains || []).filter(u => !UNITS[u] || ageIndex(UNITS[u].age) <= ageIndex(age)).map(u => UNITS[u]?.name ?? u);
+  return (spec.trains || [])
+    .filter(id => !UNITS[id] || ageIndex(UNITS[id].age) <= ageIndex(age))
+    .map(id => UNITS[id]?.name ?? id);
 }
 
 // Upgrades this building can research from the given age on (those that unlock exactly then), with what they do.
 export function upgradesAt(type, age) {
-  return Object.values(TECHS).filter(t => t.building === type && t.age === age).map(t => ({ name: t.name, desc: t.desc }));
+  return Object.values(TECHS)
+    .filter(tech => tech.building === type && tech.age === age)
+    .map(tech => ({ name: tech.name, desc: tech.desc }));
 }
