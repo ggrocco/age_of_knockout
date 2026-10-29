@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export function createGrass(game, mask, count = 14000) {
+export function createGrass(game, mask, count = 14000, backend = null) {
   const positions = [], colors = [];
   // Three bent blades per clump, with dark roots and sunlit tips.
   for (let blade = 0; blade < 3; blade++) {
@@ -16,8 +16,9 @@ export function createGrass(game, mask, count = 14000) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals();
   const time = { value: 0 }, fog = { value: 1 };
-  const material = new THREE.MeshStandardMaterial({ color: 0x9aa769, vertexColors: true, roughness: 1, side: THREE.DoubleSide });
-  material.onBeforeCompile = shader => {
+  const params = { color: 0x9aa769, vertexColors: true, roughness: 1, side: THREE.DoubleSide };
+  const material = backend ? backend.grassMaterial(params, { mask, size: game.map.size, time, fog }) : new THREE.MeshStandardMaterial(params);
+  if (!backend) material.onBeforeCompile = shader => {
     shader.uniforms.grassTime = time; shader.uniforms.groundMask = { value: mask }; shader.uniforms.showFog = fog;
     shader.vertexShader = `uniform float grassTime; varying vec2 grassWorld;\n${shader.vertexShader}`
       .replace('#include <begin_vertex>', `#include <begin_vertex>

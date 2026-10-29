@@ -4,14 +4,22 @@ import { createCosmetics } from './cosmetics.js';
 // Picking uses CPU proxies; cameras draw only the resident batch on layer 0.
 export const PROXY_LAYER = 1;
 
-export function createModelBatch(material) {
-  let instanceCapacity = 512, vertexCapacity = 1 << 18;
-  const cosmetics = createCosmetics(instanceCapacity), drawMaterial = material.clone();
-  drawMaterial.onBeforeCompile = material.onBeforeCompile;
-  drawMaterial.customProgramCacheKey = material.customProgramCacheKey;
-  cosmetics.patch(drawMaterial);
+// `backend` is the WebGPU spike (webgpu.js); without it the material is patched GLSL for WebGLRenderer.
+export function createModelBatch(material, backend = null) {
+  let instanceCapacity = 512, vertexCapacity = 1 << 18, animation = null;
+  const cosmetics = createCosmetics(instanceCapacity);
+  let drawMaterial;
+  if (backend) drawMaterial = backend.modelMaterial(material);
+  else {
+    drawMaterial = material.clone();
+    drawMaterial.onBeforeCompile = material.onBeforeCompile;
+    drawMaterial.customProgramCacheKey = material.customProgramCacheKey;
+    cosmetics.patch(drawMaterial);
+  }
   const mesh = new THREE.BatchedMesh(instanceCapacity, vertexCapacity, vertexCapacity, drawMaterial);
-  mesh.customDepthMaterial = cosmetics.patch(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+  // WebGPU shadow passes reuse the material's positionNode, so only WebGL needs a patched depth material.
+  if (backend) animation = backend.animateBatch(drawMaterial, mesh, cosmetics.uniforms);
+  else mesh.customDepthMaterial = cosmetics.patch(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.frustumCulled = false;
   const geometryIds = new Map(), entries = new Map(), dirtyIds = new Set();
@@ -96,8 +104,8 @@ export function createModelBatch(material) {
         }
         for (const [start, end] of rows.values()) texture.addUpdateRange(start, end - start);
       } else texture?.clearUpdateRanges(); // a resized/new texture needs its complete contents
-      uploadedTexture = texture; dirtyIds.clear();
+      uploadedTexture = texture; dirtyIds.clear(); animation?.sync();
     },
-    dispose() { mesh.dispose(); mesh.customDepthMaterial.dispose(); drawMaterial.dispose(); cosmetics.dispose(); },
+    dispose() { mesh.dispose(); mesh.customDepthMaterial?.dispose(); drawMaterial.dispose(); cosmetics.dispose(); },
   };
 }

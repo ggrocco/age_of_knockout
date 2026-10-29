@@ -4,7 +4,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-export function createSkyLighting(renderer) {
+// WebGPU prefilters an equirectangular scene.environment by itself; WebGL needs the PMREM target.
+export function createSkyTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
   const ctx = canvas.getContext('2d'), sky = ctx.createLinearGradient(0, 0, 0, 256);
   for (const [at, color] of [[0, '#769fc0'], [0.35, '#c0d4dc'], [0.5, '#f1e4c2'], [0.54, '#78845b'], [1, '#393426']]) sky.addColorStop(at, color);
@@ -14,7 +15,11 @@ export function createSkyLighting(renderer) {
   ctx.fillStyle = glow; ctx.fillRect(0, 0, 512, 256);
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
   texture.mapping = THREE.EquirectangularReflectionMapping;
-  const generator = new THREE.PMREMGenerator(renderer), target = generator.fromEquirectangular(texture);
+  return texture;
+}
+
+export function createSkyLighting(renderer) {
+  const texture = createSkyTexture(), generator = new THREE.PMREMGenerator(renderer), target = generator.fromEquirectangular(texture);
   generator.dispose(); texture.dispose();
   return target;
 }
@@ -43,8 +48,9 @@ class WorldAO extends SSAOPass {
 }
 
 export function createLightingEffects(renderer, scene, camera, preset, cosmetics) {
-  // Float render targets are required by SSAOPass; direct rendering is the fallback.
-  if (!preset.ao || !renderer.extensions.has('EXT_color_buffer_float')) return {
+  // Float render targets are required by SSAOPass; direct rendering is the fallback. The WebGPU spike has no
+  // ambient occlusion yet (it needs the TSL post-processing stack), so it always renders directly.
+  if (!preset.ao || renderer.isWebGPURenderer || !renderer.extensions.has('EXT_color_buffer_float')) return {
     enabled: false, invalidate() {}, resize() {}, render() { renderer.render(scene, camera); }, dispose() {},
   };
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: preset.samples > 12 ? 4 : 2 });

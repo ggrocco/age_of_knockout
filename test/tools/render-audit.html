@@ -1,9 +1,9 @@
-<!doctype html><html><head><meta charset="utf-8"><title>CPU and GPU render audit</title><link rel="icon" href="/favicon.svg"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script><style>body{margin:0;background:#151a14;color:#fff;font:14px system-ui}#viewport{width:100vw;height:100vh}#status{position:fixed;top:8px;left:8px;background:#111e;padding:12px;max-width:95%;max-height:90vh;overflow:auto;white-space:pre-wrap}canvas{display:block;width:100%;height:100%}</style></head><body><div id="viewport"></div><pre id="status">Preparing audit…</pre><script type="module">
+<!doctype html><html><head><meta charset="utf-8"><title>CPU and GPU render audit</title><link rel="icon" href="/favicon.svg"><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/","three/webgpu":"/node_modules/three/build/three.webgpu.js","three/tsl":"/node_modules/three/build/three.tsl.js"}}</script><style>body{margin:0;background:#151a14;color:#fff;font:14px system-ui}#viewport{width:100vw;height:100vh}#status{position:fixed;top:8px;left:8px;background:#111e;padding:12px;max-width:95%;max-height:90vh;overflow:auto;white-space:pre-wrap}canvas{display:block;width:100%;height:100%}</style></head><body><div id="viewport"></div><pre id="status">Preparing audit…</pre><script type="module">
 import * as THREE from 'three';
 import {createGame} from '/src/sim/game.js';
 import {createBot,THINK_EVERY} from '/src/ai/bot.js';
 import {roundById} from '/src/rounds/index.js';
-import {createView} from '/src/render/view.js';
+import {createView,loadRenderBackend} from '/src/render/view.js';
 import {createMinimap} from '/src/render/minimap.js';
 const status=document.querySelector('#status'), progress=t=>status.textContent=t;
 let savedQuality;try{savedQuality=localStorage.getItem('age-of-knockout.graphics');}catch{}
@@ -22,9 +22,12 @@ for(let i=0;i<12000&&!game.result;i++){
  if(i%1000===0){progress('Simulating tick '+i);await next();}
 }
 progress('Creating view…');await next();
-const started=performance.now(),view=createView(document.querySelector('#viewport'),game),initMs=performance.now()-started;
-const gl=view.renderer.getContext(),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
-const report={gpu:view.gpu,softwareGpu:view.softwareGpu,ua:navigator.userAgent,viewport:[innerWidth,innerHeight,devicePixelRatio],multiDraw:!!gl.getExtension('WEBGL_multi_draw'),gpuTimer:!!ext,webgpu:!!navigator.gpu,initMs:+initMs.toFixed(2),sim:{seed:1,round:'deathmatch',ticks:game.time,units:game.units.size,buildings:game.buildings.size,resources:game.resources.size,ages:game.players.map(p=>p.age),tick:stats(tick),think:stats(think)},scenes:[]};
+// ?renderer=webgpu audits the WebGPU spike; its GPU time comes from timestamp queries instead of the WebGL timer extension.
+const backend=await loadRenderBackend(location.search,{trackTimestamp:true});
+const started=performance.now(),view=createView(document.querySelector('#viewport'),game,backend),initMs=performance.now()-started;
+const gl=backend?null:view.renderer.getContext(),ext=gl?.getExtension('EXT_disjoint_timer_query_webgl2');
+const gpuTimestamps=!!backend&&view.renderer.backend.trackTimestamp;
+const report={renderer:view.backend,gpu:view.gpu,softwareGpu:view.softwareGpu,ua:navigator.userAgent,viewport:[innerWidth,innerHeight,devicePixelRatio],multiDraw:gl?!!gl.getExtension('WEBGL_multi_draw'):null,gpuTimer:!!ext||gpuTimestamps,webgpu:!!navigator.gpu,initMs:+initMs.toFixed(2),sim:{seed:1,round:'deathmatch',ticks:game.time,units:game.units.size,buildings:game.buildings.size,resources:game.resources.size,ages:game.players.map(p=>p.age),tick:stats(tick),think:stats(think)},scenes:[]};
 view.centerOn(game.map.starts[0].x,game.map.starts[0].y);view.setZoom(13);view.sync();
 let frameRecord=null;
 const originalMatrix=view.scene.updateMatrixWorld.bind(view.scene);
@@ -38,18 +41,19 @@ const mm=createMinimap(minimap,game,view);
 let time=0;
 async function measure(name,count=150,live=false){
  progress('Measuring '+name);const batch=view.scene.children.find(o=>o.isBatchedMesh);
- const rows=[],queries=[];let last=0,nextDue=0;
+ const rows=[],queries=[],stamps=[];let last=0,nextDue=0;
  for(let i=-30;i<count;i++){
   let now=await next();while(now<nextDue-2)now=await next();nextDue=Math.max(nextDue,now-1000/60)+1000/60;
   if(i>=0)frameRecord={sceneMatrix:0,renderSubmit:0,batchPrep:0,batchPasses:0};else frameRecord=null;
   const query=ext&&i>=0?gl.createQuery():null;if(query)gl.beginQuery(ext.TIME_ELAPSED_EXT,query);
   const s=performance.now();if(live&&i%3===0){game.tick();for(let p=0;p<2;p++)if(game.time%THINK_EVERY.hard===(p*3)%THINK_EVERY.hard)bots[p].think();}if(live)view.sync();view.frame(1/60,time+=1/60);if(live&&i%3===0)mm.draw();const cpu=performance.now()-s;
   if(query){gl.endQuery(ext.TIME_ELAPSED_EXT);queries.push(query);}
+  if(gpuTimestamps){const ms=await view.renderer.resolveTimestampsAsync('render');if(i>=0&&ms>0)stamps.push(ms);}
   if(i>=0)rows.push({...frameRecord,cpu,cadence:now-last});last=now;
  }
  frameRecord=null;
- const gpu=[];for(let attempt=0;attempt<30&&queries.some(q=>!gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE));attempt++)await next();
- const disjoint=ext&&gl.getParameter(ext.GPU_DISJOINT_EXT);
+ const gpu=[...stamps];for(let attempt=0;attempt<30&&queries.some(q=>!gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE));attempt++)await next();
+ const disjoint=!!ext&&gl.getParameter(ext.GPU_DISJOINT_EXT);
  for(const q of queries){if(!disjoint&&gl.getQueryParameter(q,gl.QUERY_RESULT_AVAILABLE))gpu.push(gl.getQueryParameter(q,gl.QUERY_RESULT)/1e6);gl.deleteQuery(q);}
  const mmTimes=[];for(let i=0;i<30;i++){const s=performance.now();mm.draw();mmTimes.push(performance.now()-s);}
  let inView=0;for(const g of view.groups.values()){const p=g.position.clone().project(view.camera);if(Math.abs(p.x)<=1&&Math.abs(p.y)<=1)inView++;}
@@ -72,7 +76,7 @@ view.frame(1/60,time+=1/60);batch.setMatrixAt=setMatrix;
 const mmFog=[];for(let i=0;i<30;i++){game.time=Math.ceil((game.time+1)/4)*4;const s=performance.now();mm.draw();mmFog.push(performance.now()-s);}report.minimapWithFog=stats(mmFog);
 await measure('high-explored-live',180,true);
 report.matrixWrites={writes,unchanged,unchangedPercent:+(unchanged/writes*100).toFixed(1)};
-report.glError=gl.getError();
+report.glError=gl?gl.getError():null;
 progress('AUDIT COMPLETE\n'+JSON.stringify(report,null,2));const link=document.createElement('a');link.textContent='Download results';link.download='my-age-gpu-audit.json';link.href=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));link.style.cssText='position:fixed;bottom:8px;right:8px;background:white;color:black;padding:10px';document.body.appendChild(link);
 window.__auditReport=report;restoreQuality();
 </script></body></html>

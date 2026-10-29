@@ -285,6 +285,11 @@ restarting the match and are saved in this browser. The default is **High**; try
 on an M2 Max, then adjust for frame rate and battery use. These are starting recommendations, not measured
 performance guarantees on those devices. Use `&quality=balanced|high|ultra` to override the saved preference.
 
+`&renderer=webgpu` tries an experimental WebGPU renderer instead of WebGL. It draws the same scene through three.js
+node materials but has no ambient occlusion yet, so compare it with WebGL on the Balanced preset. To compare frame
+times on your own GPU, run `npm start` and open `/test/tools/render-audit.html` and
+`/test/tools/render-audit.html?renderer=webgpu`.
+
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Grass clumps |
 | --- | --- | --- | --- | --- |
 | Balanced | 1.5 / 2 million | 1024 | Off | 2,500 |
@@ -317,6 +322,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 | `?touch=1` | Force the touch layout |
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
+| `&renderer=webgpu` | Experimental WebGPU renderer (falls back to WebGL with a notice where WebGPU is missing); no ambient occlusion yet |
 
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,
 `?round=2&seed=3&autoplay=1&speed=8` to watch two bots race through the eras, and `?round=3&seed=1&touch=1` for the

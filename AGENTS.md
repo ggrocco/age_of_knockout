@@ -43,6 +43,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `?touch=1` | Force the phone/touch layout |
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused/results, immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
+| `&renderer=webgpu` | WebGPU spike (`src/render/webgpu.js`); WebGL when unavailable |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
 | `ages.html?team=1` | Age Ladder page, red team models |
 
@@ -107,6 +108,10 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     (Modern) and hoverbikes (AI Future); the Catapult and Trebuchet become a mortar and a rocket battery from the Age of
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers and the King keep one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
+  - `?renderer=webgpu` is a spike: `render/webgpu.js` (loaded by a dynamic import) re-expresses the GLSL
+    `onBeforeCompile` patches (model surfaces, cosmetics, grass, water) as TSL node materials, because
+    WebGPURenderer ignores them. The terrain bake runs in a private WebGL canvas, and there is no SSAO. A change to
+    one of those shaders needs the same change in both places.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and

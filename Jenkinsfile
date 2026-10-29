@@ -72,8 +72,10 @@ pipeline {
           check "/eof/v/$v/src/gallery/main.js" javascript
           check /src/gallery/main.js javascript
           check /src/ladder/main.js javascript
-          # the import map's two three.js paths: catches a Dockerfile COPY that no longer matches index.html
+          # the import map's three.js paths: catches a Dockerfile COPY that no longer matches index.html
           check /node_modules/three/build/three.module.js javascript
+          check /node_modules/three/build/three.webgpu.js javascript
+          check /node_modules/three/build/three.tsl.js javascript
           check /node_modules/three/examples/jsm/utils/BufferGeometryUtils.js javascript
         '''
       }

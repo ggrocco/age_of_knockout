@@ -8,7 +8,7 @@ function hash(x, y, seed) {
   n = Math.imul(n ^ (n >>> 13), 1274126177);
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
-export function createTerrain(game, renderer, preset) {
+export function createTerrain(game, renderer, preset, backend = null) {
   const { size: n, tiles } = game.map;
   const waterAt = (x, y) => x >= 0 && y >= 0 && x < n && y < n && tiles[y * n + x] === 1;
   // Distance to the opposite terrain type gives shores a sand / shallow-water fringe.
@@ -24,7 +24,7 @@ export function createTerrain(game, renderer, preset) {
     return (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v)
       + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
   };
-  const baked = bakeTerrain(renderer, game.map, game.seed, shore), texture = baked.texture;
+  const baked = bakeTerrain(renderer, game.map, game.seed, shore, 24, backend), texture = baked.texture;
   const geometry = new THREE.PlaneGeometry(n, n);
   const micro = new Uint8Array(128 * 128 * 4);
   for (let i = 0; i < 128 * 128; i++) {
@@ -67,12 +67,13 @@ export function createTerrain(game, renderer, preset) {
   normalTexture.magFilter = THREE.LinearFilter; normalTexture.minFilter = THREE.LinearMipmapLinearFilter;
   normalTexture.generateMipmaps = true; normalTexture.needsUpdate = true;
   const waterTime = { value: 0 };
-  const waterMaterial = new THREE.MeshPhysicalMaterial({
+  const waterParams = {
     color: 0x3c7776, normalMap: normalTexture, normalScale: new THREE.Vector2(0.32, 0.32),
     roughness: 0.22, metalness: 0.18, clearcoat: 0.65, clearcoatRoughness: 0.22,
     envMapIntensity: 1.1, transparent: true, opacity: 0.78, depthWrite: false,
-  });
-  waterMaterial.onBeforeCompile = shader => {
+  };
+  const waterMaterial = backend ? backend.waterMaterial(waterParams, { time: waterTime }) : new THREE.MeshPhysicalMaterial(waterParams);
+  if (!backend) waterMaterial.onBeforeCompile = shader => {
     shader.uniforms.waterTime = waterTime;
     shader.vertexShader = `attribute float shore; attribute float ford; varying float waterShore; varying float waterFord; varying vec2 waterWorld;\n${shader.vertexShader}`
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nwaterShore = shore; waterFord = ford; waterWorld = position.xz;');
@@ -93,7 +94,7 @@ export function createTerrain(game, renderer, preset) {
   // unseen terrain or pokes through completed or newly placed buildings.
   const maskData = new Uint8Array(n * n * 4), mask = new THREE.DataTexture(maskData, n, n);
   mask.magFilter = mask.minFilter = THREE.NearestFilter;
-  const grass = createGrass(game, mask); grass.setCount(preset.grass);
+  const grass = createGrass(game, mask, 14000, backend); grass.setCount(preset.grass);
   let maskStamp = -1, terrainStamp = game.terrainVersion;
   return { ground, water, grass: grass.mesh, setQuality(next) { grass.setCount(next.grass); },
     // The small grid is uploaded only when ore patches change; pixels are repainted on the GPU.

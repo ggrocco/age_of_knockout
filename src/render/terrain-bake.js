@@ -2,21 +2,16 @@ import * as THREE from 'three';
 
 // The small simulation grid stays on the CPU. The millions of decorative pixels
 // are generated into a mipmapped GPU texture, never read back during play.
-export function bakeTerrain(renderer, { size: n, tiles, starts }, seed, shore, scale = 24) {
-  const grid = new Float32Array(n * n * 4);
-  const updateGrid = () => {
-    for (let i = 0; i < n * n; i++) { grid[i * 4] = tiles[i]; grid[i * 4 + 1] = shore[i]; }
-    input.needsUpdate = true;
-  };
-  const input = new THREE.DataTexture(grid, n, n, THREE.RGBAFormat, THREE.FloatType);
-  const side = Math.min(n * scale, renderer.capabilities.maxTextureSize);
-  const target = new THREE.WebGLRenderTarget(side, side, {
-    type: THREE.UnsignedByteType, colorSpace: THREE.SRGBColorSpace,
-    minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true, depthBuffer: false,
-  });
-  target.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const material = new THREE.RawShaderMaterial({
+// With the WebGPU spike's `backend`, RawShaderMaterial is unavailable: the same shader runs in a private
+// WebGL context drawing to a canvas, which the WebGPU renderer then uploads as a CanvasTexture.
+export function bakeTerrain(renderer, map, seed, shore, scale = 24, backend = null) {
+  return backend ? bakeToCanvas(map, seed, shore, scale, backend) : bakeToTarget(renderer, map, seed, shore, scale);
+}
+
+function bakeMaterial({ size: n, starts }, seed, input, side, srgbOutput) {
+  return new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3,
+    defines: srgbOutput ? { SRGB_OUTPUT: 1 } : {},
     uniforms: {
       terrainGrid: { value: input }, terrainSeed: { value: seed >>> 0 },
       terrainSize: { value: n }, textureSide: { value: side },
@@ -27,13 +22,53 @@ export function bakeTerrain(renderer, { size: n, tiles, starts }, seed, shore, s
     fragmentShader: FRAGMENT,
     depthTest: false, depthWrite: false,
   });
+}
+
+function bakeGrid({ size: n, tiles }, shore) {
+  const grid = new Float32Array(n * n * 4), input = new THREE.DataTexture(grid, n, n, THREE.RGBAFormat, THREE.FloatType);
+  input.refill = () => {
+    for (let i = 0; i < n * n; i++) { grid[i * 4] = tiles[i]; grid[i * 4 + 1] = shore[i]; }
+    input.needsUpdate = true;
+  };
+  return input;
+}
+
+function bakeToCanvas(map, seed, shore, scale, backend) {
+  const canvas = document.createElement('canvas');
+  const gl = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
+  const side = Math.min(map.size * scale, backend.maxTextureSize, gl.capabilities.maxTextureSize);
+  gl.setPixelRatio(1); gl.setSize(side, side, false);
+  const input = bakeGrid(map, shore), material = bakeMaterial(map, seed, input, side, true);
+  const geometry = new THREE.PlaneGeometry(2, 2), scene = new THREE.Scene(), camera = new THREE.Camera();
+  scene.add(new THREE.Mesh(geometry, material));
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace; texture.minFilter = THREE.LinearMipmapLinearFilter; texture.generateMipmaps = true;
+  texture.anisotropy = Math.min(8, backend.maxAnisotropy);
+  const render = () => { input.refill(); gl.render(scene, camera); texture.needsUpdate = true; };
+  let stamp;
+  render();
+  return {
+    texture,
+    refresh(version) { if (version === stamp) return; render(); stamp = version; },
+    dispose() { texture.dispose(); input.dispose(); geometry.dispose(); material.dispose(); gl.dispose(); gl.forceContextLoss(); },
+  };
+}
+
+function bakeToTarget(renderer, map, seed, shore, scale) {
+  const input = bakeGrid(map, shore), side = Math.min(map.size * scale, renderer.capabilities.maxTextureSize);
+  const target = new THREE.WebGLRenderTarget(side, side, {
+    type: THREE.UnsignedByteType, colorSpace: THREE.SRGBColorSpace,
+    minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true, depthBuffer: false,
+  });
+  target.texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const material = bakeMaterial(map, seed, input, side, false);
   const geometry = new THREE.PlaneGeometry(2, 2), scene = new THREE.Scene();
   scene.add(new THREE.Mesh(geometry, material));
   const render = () => {
     const previous = renderer.getRenderTarget(), viewport = renderer.getViewport(new THREE.Vector4());
     const scissor = renderer.getScissor(new THREE.Vector4()), scissorTest = renderer.getScissorTest();
     try {
-      updateGrid();
+      input.refill();
       renderer.setRenderTarget(target); renderer.setViewport(0, 0, side, side); renderer.setScissorTest(false);
       renderer.render(scene, new THREE.Camera());
     } finally {
@@ -130,6 +165,10 @@ void main() {
   color = clamp(color+(detail-0.5)*17.0+grain*13.0,0.0,255.0);
   // The sRGB render attachment encodes linear output. Subsequent terrain sampling
   // therefore has exactly the same color-space contract as the old canvas texture.
+#ifdef SRGB_OUTPUT
+  bakedColor = vec4(color/255.0,1.0); // a canvas has no sRGB attachment; the CanvasTexture is tagged sRGB instead
+#else
   bakedColor = vec4(linearColor(color/255.0),1.0);
+#endif
 }
 `;

@@ -7,7 +7,7 @@ import { createContactShadows } from './contact-shadows.js';
 import { createTerrain } from './terrain.js';
 import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } from './quality.js';
 import { viewHalfHeight } from './camera-fit.js';
-import { createSkyLighting, createLightingEffects } from './lighting.js';
+import { createSkyLighting, createSkyTexture, createLightingEffects } from './lighting.js';
 
 let sessionQuality = null;
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
@@ -36,17 +36,34 @@ function disposeObject(root) {
   textures.forEach(t => t.dispose()); materials.forEach(m => m.dispose()); geometries.forEach(g => g.dispose());
 }
 
-export function createView(container, game) {
+// The renderer a page asked for: `?renderer=webgpu` opts into the WebGPU spike (webgpu.js), anything else is WebGL.
+export const requestedRenderer = search => new URLSearchParams(search).get('renderer') === 'webgpu' ? 'webgpu' : 'webgl';
+
+// Resolves to the WebGPU backend, or null (WebGL) when it was not requested or cannot start.
+export async function loadRenderBackend(search = location.search, options) {
+  if (requestedRenderer(search) !== 'webgpu') return null;
+  try { return await (await import('./webgpu.js')).createWebGPUBackend(options); }
+  catch (error) { console.warn(`WebGPU unavailable (${error.message}); using WebGL.`); return null; }
+}
+
+// `backend` comes from loadRenderBackend. Its renderer outlives the view: WebGPU starts asynchronously,
+// so one renderer serves every match of the page.
+export function createView(container, game, backend = null) {
   let storage; try { storage = window.localStorage; } catch { /* Storage is optional. */ }
   let qualityName = sessionQuality ?? readQuality(location.search, storage), preset = QUALITY[qualityName];
-  // Prefer the discrete GPU on dual-GPU laptops (a hint the browser may ignore).
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  let renderer, gpu, softwareGpu, maxTextureSize;
+  if (backend) ({ renderer, gpu, softwareGpu, maxTextureSize } = backend);
+  else {
+    // Prefer the discrete GPU on dual-GPU laptops (a hint the browser may ignore).
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    const gl = renderer.getContext(), gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    gpu = String(gl.getParameter(gpuInfo ? gpuInfo.UNMASKED_RENDERER_WEBGL : gl.RENDERER)); softwareGpu = SOFTWARE_GPU.test(gpu);
+    maxTextureSize = renderer.capabilities.maxTextureSize;
+  }
   renderer.info.autoReset = false;
   // With hardware acceleration off (or the GPU blocklisted) the browser rasterises on the CPU; drop to the cheapest preset.
-  const gl = renderer.getContext(), gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
-  const gpu = String(gl.getParameter(gpuInfo ? gpuInfo.UNMASKED_RENDERER_WEBGL : gl.RENDERER)), softwareGpu = SOFTWARE_GPU.test(gpu);
   if (softwareGpu) {
-    console.warn(`WebGL is using a software renderer (${gpu}); hardware acceleration looks disabled.`);
+    console.warn(`${backend ? 'WebGPU' : 'WebGL'} is using a software renderer (${gpu}); hardware acceleration looks disabled.`);
     if (sessionQuality === null && !new URLSearchParams(location.search).has('quality')) { qualityName = 'balanced'; preset = QUALITY.balanced; }
   }
 
@@ -57,18 +74,19 @@ export function createView(container, game) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x20271b);
   scene.matrixWorldAutoUpdate = false; scene.matrixAutoUpdate = false; // view.frame updates world matrices once, not once per render pass
   scene.add(new THREE.HemisphereLight(0xc9deeb, 0x776342, 1.55));
-  const skyLighting = renderer.extensions.has('EXT_color_buffer_float') ? createSkyLighting(renderer) : null;
-  scene.environment = skyLighting?.texture ?? null; scene.environmentIntensity = 0.4;
+  const skyLighting = backend ? null : renderer.extensions.has('EXT_color_buffer_float') ? createSkyLighting(renderer) : null;
+  const skyTexture = backend ? createSkyTexture() : null;
+  scene.environment = skyTexture ?? skyLighting?.texture ?? null; scene.environmentIntensity = 0.4;
   const sun = new THREE.DirectionalLight(0xffe5ba, 3.3), sunOffset = new THREE.Vector3(-22, 38, 16);
-  sun.castShadow = true; sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
+  sun.castShadow = true; sun.shadow.mapSize.setScalar(Math.min(preset.shadows, maxTextureSize));
   sun.shadow.radius = 2.5; sun.shadow.intensity = 0.85;
   sun.shadow.normalBias = 0.035; sun.shadow.bias = -0.00015;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 150;
   scene.add(sun, sun.target);
   const N = game.map.size;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 250);
-  const view = { renderer, scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
-  const batch = createModelBatch(MODEL_MATERIAL); scene.add(batch.mesh);
+  const view = { renderer, backend: backend ? 'webgpu' : 'webgl', scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
+  const batch = createModelBatch(MODEL_MATERIAL, backend); scene.add(batch.mesh);
   let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
   view.revision = 0; view.invalidate = () => { view.revision++; };
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();
@@ -96,8 +114,8 @@ export function createView(container, game) {
     if (name === qualityName) return;
     qualityName = name; preset = QUALITY[name]; view.quality = name;
     effects.dispose(); effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
-    sun.shadow.map?.dispose(); sun.shadow.map = null;
-    sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
+    if (!backend) { sun.shadow.map?.dispose(); sun.shadow.map = null; } // WebGPU's shadow node resizes its own map
+    sun.shadow.mapSize.setScalar(Math.min(preset.shadows, maxTextureSize));
     terrain.setQuality(preset); view.resize();
   };
   view.pan = (dx, dz) => { view.focus.x = Math.max(0, Math.min(N, view.focus.x + dx)); view.focus.z = Math.max(0, Math.min(N, view.focus.z + dz)); view.invalidate(); };
@@ -108,7 +126,7 @@ export function createView(container, game) {
   view.centerOn = (x, y) => { view.focus.set(x, 0, y); view.invalidate(); };
 
   // terrain
-  const terrain = createTerrain(game, renderer, preset), ground = terrain.ground;
+  const terrain = createTerrain(game, renderer, preset, backend), ground = terrain.ground;
   scene.add(ground, terrain.water, terrain.grass);
   const outer = new THREE.Mesh(geo.plane, new THREE.MeshBasicMaterial({ color: 0x1c2618 })); outer.rotation.x = -Math.PI / 2; outer.scale.set(N * 3, N * 3, 1); outer.position.set(N / 2, -0.05, N / 2); scene.add(outer);
   view.ground = ground;
@@ -119,10 +137,13 @@ export function createView(container, game) {
   const fog = new THREE.Mesh(geo.plane, new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false }));
   fog.rotation.x = -Math.PI / 2; fog.scale.set(N, N, 1); fog.position.set(N / 2, 0.08, N / 2); fog.renderOrder = 1; scene.add(fog);
   let fogStamp = -1;
+  // WebGPU blends in linear space and tone-maps afterwards; WebGL tone-maps and encodes each material before
+  // blending. The exponent was fitted so the WebGPU veil darkens explored ground as much as WebGL's does.
+  const fogAlpha = a => backend ? Math.round(255 * (1 - (1 - a / 255) ** 1.45)) : a, FOG_EXPLORED = fogAlpha(110), FOG_UNSEEN = fogAlpha(235);
   function updateFog() {
     if (game.time === fogStamp || game.time % 4 !== 0 && fogStamp >= 0) return; fogStamp = game.time;
     const p = game.players[0], d = fogImg.data;
-    for (let i = 0; i < N * N; i++) { d[i * 4] = 4; d[i * 4 + 1] = 6; d[i * 4 + 2] = 4; d[i * 4 + 3] = p.visible[i] ? 0 : p.explored[i] ? 110 : 235; }
+    for (let i = 0; i < N * N; i++) { d[i * 4] = 4; d[i * 4 + 1] = 6; d[i * 4 + 2] = 4; d[i * 4 + 3] = p.visible[i] ? 0 : p.explored[i] ? FOG_EXPLORED : FOG_UNSEEN; }
     fctx.putImageData(fogImg, 0, 0); fogTex.needsUpdate = true;
   }
   view.fogEnabled = true;
@@ -269,7 +290,7 @@ export function createView(container, game) {
   view.pickEntity = (cx, cy) => { setRay(cx, cy); const hits = ray.intersectObjects(view.pickables, true); for (const h of hits) { const id = h.object.userData.gid; if (id !== undefined && view.groups.get(id)) return view.groups.get(id).userData.entity; } return null; };
   view.pickGround = (cx, cy) => { setRay(cx, cy); const h = ray.intersectObject(ground)[0]; return h ? { x: h.point.x, y: h.point.z } : null; };
   view.project = (x, y) => { const v = new THREE.Vector3(x, 0.4, y).project(camera), r = renderer.domElement.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; };
-  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); shadows.dispose(); ghostLine.dispose(); for (const g of view.groups.values()) if (g.userData.kind === 'resource') disposeObject(g); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); };
+  view.dispose = () => { effects.dispose(); terrain.dispose(); skyLighting?.dispose(); skyTexture?.dispose(); batch.dispose(); shadows.dispose(); ghostLine.dispose(); for (const g of view.groups.values()) if (g.userData.kind === 'resource') disposeObject(g); disposeObject(scene); shadowMat.dispose(); shadowTexture.dispose(); sun.shadow.dispose(); if (!backend) { renderer.dispose(); renderer.forceContextLoss(); } renderer.domElement.remove(); };
   const markers = [];
   view.marker = (x, y) => { const m = new THREE.Mesh(geo.ring, new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, side: THREE.DoubleSide, depthTest: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, y); m.renderOrder = 6; m.userData.age = 0; scene.add(m); markers.push(m); effects.invalidate(); view.invalidate(); };
   const baseFrame = view.frame;

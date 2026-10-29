@@ -3,7 +3,7 @@ import { createBot, matchOptions, THINK_EVERY } from './ai/bot.js';
 import { ROUNDS, roundById, scoreOf } from './rounds/index.js';
 import { createTournament, LEVELS, LEVEL_NAME } from './tournament/bracket.js';
 import { createAsyncSimulator } from './tournament/async-sim.js';
-import { createView } from './render/view.js';
+import { createView, loadRenderBackend, requestedRenderer } from './render/view.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud, reasonText } from './ui/hud.js';
 import { createInput } from './ui/input.js';
@@ -14,6 +14,9 @@ import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
 import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
+// `?renderer=webgpu`: the WebGPU spike, started once before any match (null = WebGL).
+const renderBackend = await loadRenderBackend(location.search);
+let webgpuWarned = false;
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
 const pickSeed = () => +params.get('seed') || 1 + Math.floor(Math.random() * 100000);
 const TOUCH = params.get('touch') === '1' || matchMedia('(pointer: coarse)').matches;
@@ -74,7 +77,8 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   const game = createGame({ seed, rules: roundById(roundId), mapType: map, ...matchOptions([autoplay ? botDiff : null, oppDiff], { timeLimit: minutes }) });
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const vp = document.getElementById('viewport'); vp.innerHTML = '';
-  const view = createView(vp, game); view.selection = ui.sel;
+  const view = createView(vp, game, renderBackend); view.selection = ui.sel;
+  if (!renderBackend && requestedRenderer(location.search) === 'webgpu' && !webgpuWarned) { webgpuWarned = true; hud.toast('WebGPU is not available in this browser: using WebGL.'); }
   if (view.softwareGpu && !gpuWarned) { gpuWarned = true; hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.'); }
   ui.game = game; ui.view = view; ui.sel.clear(); ui.inspect = null; ui.placing = null; ui.wallStart = ui.wallEnd = null; ui.paused = false; ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
   const bots = [createBot(game, 1, oppDiff)];
