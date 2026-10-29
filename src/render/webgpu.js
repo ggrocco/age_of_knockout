@@ -62,9 +62,33 @@ export function modelMaterial(source) {
   return material;
 }
 
-// cosmetics.js: flags, spinners, floaters, smoke and bobbing, read from the same per-instance data texture.
-// Every mode is a transform in part space before the batching matrix, plus a bob after it. The batch node has
-// already applied the batching matrix to positionLocal, so this rebuilds it. Normals are not re-rotated (spike).
+// cosmetics.js: flags, spinners, floaters, smoke and bobbing. Every mode is a transform in part space before the
+// part's matrix, plus a bob after it. Call inside an Fn: `a` and `b` are the part's two cosmetic data texels, `p` and
+// `n` vec3 vars in part space (rotations turn `n` too). Returns the bob, a float var.
+// Values shared by several If branches are made vars first: a node first used inside one branch is undefined in its
+// siblings (z-axis spinners once turned with zeroed sin/cos and vanished).
+export function cosmeticParts(a, b, time, p, n = null) {
+  const angle = select(a.x.lessThan(1.5), time.mul(a.z), sin(time.mul(a.z).add(b.x)).mul(a.w)).toVar();
+  const c = cos(angle).toVar(), s = sin(angle).toVar(), lift = float(0).toVar();
+  const rx = v => vec3(v.x, c.mul(v.y).sub(s.mul(v.z)), s.mul(v.y).add(c.mul(v.z)));
+  const ry = v => vec3(c.mul(v.x).add(s.mul(v.z)), v.y, s.negate().mul(v.x).add(c.mul(v.z)));
+  const rz = v => vec3(c.mul(v.x).sub(s.mul(v.y)), s.mul(v.x).add(c.mul(v.y)), v.z);
+  If(a.x.greaterThan(0.5).and(a.x.lessThan(2.5)), () => {
+    for (const [test, turn] of [[a.y.lessThan(0.5), rx], [a.y.greaterThanEqual(0.5).and(a.y.lessThan(1.5)), ry], [a.y.greaterThanEqual(1.5), rz]]) {
+      If(test, () => { p.assign(turn(p)); if (n) n.assign(turn(n)); });
+    }
+  }).ElseIf(a.x.greaterThan(2.5).and(a.x.lessThan(3.5)), () => {
+    p.y.addAssign(sin(time.mul(a.z).add(b.x)).mul(a.w));
+  }).ElseIf(a.x.greaterThan(3.5), () => {
+    const t = fract(time.mul(a.z).add(b.x));
+    p.assign(p.mul(t.mul(0.9).add(0.5)).add(vec3(0, t.mul(0.9), 0)));
+  });
+  lift.assign(sin(time.mul(3).add(b.z)).mul(b.y));
+  return lift;
+}
+
+// The BatchedMesh fallback (devices without indirect-first-instance; gpu-batch.js is the GPU-driven path). The batch
+// node has already applied the batching matrix to positionLocal, so this rebuilds it. Normals are not re-rotated.
 export function animateBatch(material, mesh, uniforms) {
   const time = uniform(0), data = texture(uniforms.cosmeticData.value), matrices = texture(mesh._matricesTexture);
   material.positionNode = Fn(() => {
@@ -75,22 +99,7 @@ export function animateBatch(material, mesh, uniforms) {
     const batching = mat4(textureLoad(matrices, ivec2(x, y)), textureLoad(matrices, ivec2(x.add(1), y)),
       textureLoad(matrices, ivec2(x.add(2), y)), textureLoad(matrices, ivec2(x.add(3), y)));
     const p = vec3(positionGeometry).toVar(), lift = float(0).toVar();
-    If(animated, () => {
-      // Declared before the branches: a node first used inside one If branch is not defined in its siblings.
-      const angle = select(a.x.lessThan(1.5), time.mul(a.z), sin(time.mul(a.z).add(b.x)).mul(a.w)).toVar();
-      const c = cos(angle).toVar(), s = sin(angle).toVar();
-      If(a.x.greaterThan(0.5).and(a.x.lessThan(2.5)), () => {
-        If(a.y.lessThan(0.5), () => { p.assign(vec3(p.x, c.mul(p.y).sub(s.mul(p.z)), s.mul(p.y).add(c.mul(p.z)))); })
-          .ElseIf(a.y.lessThan(1.5), () => { p.assign(vec3(c.mul(p.x).add(s.mul(p.z)), p.y, s.negate().mul(p.x).add(c.mul(p.z)))); })
-          .Else(() => { p.assign(vec3(c.mul(p.x).sub(s.mul(p.y)), s.mul(p.x).add(c.mul(p.y)), p.z)); });
-      }).ElseIf(a.x.greaterThan(2.5).and(a.x.lessThan(3.5)), () => {
-        p.y.addAssign(sin(time.mul(a.z).add(b.x)).mul(a.w));
-      }).ElseIf(a.x.greaterThan(3.5), () => {
-        const t = fract(time.mul(a.z).add(b.x));
-        p.assign(p.mul(t.mul(0.9).add(0.5)).add(vec3(0, t.mul(0.9), 0)));
-      });
-      lift.assign(sin(time.mul(3).add(b.z)).mul(b.y));
-    });
+    If(animated, () => { lift.assign(cosmeticParts(a, b, time, p)); });
     return select(animated, batching.mul(vec4(p, 1)).xyz.add(vec3(0, lift, 0)), positionLocal);
   })();
   return {

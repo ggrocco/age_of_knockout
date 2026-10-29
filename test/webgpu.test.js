@@ -56,3 +56,40 @@ test('cosmetic nodes follow replaced data and matrix textures', () => {
   assert.equal(animation.matrices.value, mesh._matricesTexture);
   mesh.dispose();
 });
+
+test('GPU-driven batch: one indirect draw per geometry in use, packed slices, growth keeps every instance', async () => {
+  const { createGpuBatch } = await import('../src/render/gpu-batch.js');
+  const computed = [], renderer = { compute: node => computed.push(node) };
+  const source = new THREE.MeshStandardMaterial(), batch = createGpuBatch(source, renderer, { instances: 2, vertices: 64, geometries: 1 });
+  const shape = (n, kind) => {
+    const g = new THREE.BoxGeometry(n, n, n).toNonIndexed(), count = g.attributes.position.count;
+    g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(count * 3).fill(1), 3));
+    g.setAttribute('surface', new THREE.Float32BufferAttribute(new Float32Array(count).fill(kind), 1));
+    return g;
+  };
+  const box = shape(1, 0), wide = shape(2, 1), camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
+  camera.position.set(0, 20, 0); camera.lookAt(0, 0, 0); camera.updateMatrixWorld(true);
+  const sun = new THREE.DirectionalLight(); sun.position.set(-5, 10, 5); sun.updateMatrixWorld(true); sun.target.updateMatrixWorld(true);
+  const unit = (geometry, x, cosmetic) => {
+    const g = new THREE.Group(), part = new THREE.Mesh(geometry, source); if (cosmetic) part.userData.cosmetic = cosmetic;
+    g.add(part); g.position.x = x; g.updateMatrixWorld(true); batch.add(g); batch.update(g); return g;
+  };
+  const groups = [unit(box, 0), unit(wide, 1), unit(box, 2, { mode: 1, axis: 2, speed: 1 }), unit(box, 3), unit(wide, 4)];
+  batch.flush(0); batch.cull(camera, sun);
+  const mesh = () => batch.mesh.children[0], args = () => mesh().geometry.indirect.array;
+  assert.equal(batch.mesh.children.length, 1, 'retired meshes leave the scene');
+  assert.equal(batch.instanceCount, 5);
+  assert.equal(batch.drawCount, 2, 'one draw per geometry, not per instance');
+  const vertices = box.attributes.position.count;
+  assert.deepEqual([...args().slice(0, 8)], [vertices, 0, 0, 0, vertices, 0, vertices, 3], 'box: 3 instances from slot 0; wide: 2 from slot 3');
+  assert.equal(computed.length, 1, 'one cull pass per frame');
+  batch.remove(groups[0]); batch.remove(groups[2]); batch.remove(groups[3]); batch.cull(camera, sun);
+  assert.equal(batch.drawCount, 1, 'a geometry with no live instances is not drawn');
+  assert.deepEqual([...args().slice(4, 8)], [vertices, 0, vertices, 0]);
+  const again = unit(box, 5); batch.cull(camera, sun);
+  assert.equal(batch.instanceCount, 3, 'removed slots are reused');
+  again.visible = false; batch.update(again); batch.flush(1); batch.cull(camera, sun);
+  assert.equal(batch.drawCount, 2, 'hidden instances keep their slice (the cull pass skips them)');
+  assert.equal(computed.length, 4);
+  batch.dispose();
+});

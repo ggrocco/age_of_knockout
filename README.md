@@ -289,6 +289,9 @@ performance guarantees on those devices. Use `&quality=balanced|high|ultra` to o
 node materials but has no ambient occlusion yet, so compare it with WebGL on the Balanced preset. To compare frame
 times on your own GPU, run `npm start` and open `/test/tools/render-audit.html` and
 `/test/tools/render-audit.html?renderer=webgpu`.
+Under WebGPU a compute pass culls every model part against the camera and the sun's shadow view each frame and
+draws the survivors with one indirect draw per kind of part, so the number of draws follows how many kinds of
+models are on the map, not how many units; add `&indirect=0` to compare with drawing each part separately.
 
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Grass clumps |
 | --- | --- | --- | --- | --- |
@@ -323,6 +326,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused or on the result card, with immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Graphics preset |
 | `&renderer=webgpu` | Experimental WebGPU renderer (falls back to WebGL with a notice where WebGPU is missing); no ambient occlusion yet |
+| `&indirect=0` | With `&renderer=webgpu`: draw models through three.js's BatchedMesh (one draw per model part) instead of GPU culling and indirect draws, for comparison |
 
 `window.__app` exposes the live game for debugging. Try `?round=1&seed=1` for the starting village,
 `?round=2&seed=3&autoplay=1&speed=8` to watch two bots race through the eras, and `?round=3&seed=1&touch=1` for the

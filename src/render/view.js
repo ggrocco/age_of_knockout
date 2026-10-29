@@ -39,11 +39,20 @@ function disposeObject(root) {
 // The renderer a page asked for: `?renderer=webgpu` opts into the WebGPU spike (webgpu.js), anything else is WebGL.
 export const requestedRenderer = search => new URLSearchParams(search).get('renderer') === 'webgpu' ? 'webgpu' : 'webgl';
 
-// Resolves to the WebGPU backend, or null (WebGL) when it was not requested or cannot start.
+// Resolves to the WebGPU backend, or null (WebGL) when it was not requested or cannot start. Its models are drawn by
+// the GPU-driven batch (gpu-batch.js) where the device can start indirect draws at an instance offset; `&indirect=0`
+// keeps three.js's BatchedMesh (one draw per instance) for comparison.
 export async function loadRenderBackend(search = location.search, options) {
   if (requestedRenderer(search) !== 'webgpu') return null;
-  try { return await (await import('./webgpu.js')).createWebGPUBackend(options); }
-  catch (error) { console.warn(`WebGPU unavailable (${error.message}); using WebGL.`); return null; }
+  try {
+    const [{ createWebGPUBackend }, { createGpuBatch }] = await Promise.all([import('./webgpu.js'), import('./gpu-batch.js')]);
+    const backend = await createWebGPUBackend(options);
+    if (new URLSearchParams(search).get('indirect') !== '0' && backend.renderer.hasFeature('indirect-first-instance')) {
+      const small = new URLSearchParams(search).get('batchCapacity') === 'small'; // exercises buffer growth in tests
+      backend.createBatch = material => createGpuBatch(material, backend.renderer, small ? { instances: 16, vertices: 1024, geometries: 4 } : {});
+    }
+    return backend;
+  } catch (error) { console.warn(`WebGPU unavailable (${error.message}); using WebGL.`); return null; }
 }
 
 // `backend` comes from loadRenderBackend. Its renderer outlives the view: WebGPU starts asynchronously,
@@ -86,7 +95,8 @@ export function createView(container, game, backend = null) {
   const N = game.map.size;
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 250);
   const view = { renderer, backend: backend ? 'webgpu' : 'webgl', scene, camera, gpu, softwareGpu, quality: qualityName, zoom: 14, focus: new THREE.Vector3(N / 2, 0, N / 2), groups: new Map(), pickables: [], dom: renderer.domElement };
-  const batch = createModelBatch(MODEL_MATERIAL, backend); scene.add(batch.mesh);
+  const batch = backend?.createBatch ? backend.createBatch(MODEL_MATERIAL) : createModelBatch(MODEL_MATERIAL, backend);
+  scene.add(batch.mesh); view.batch = batch;
   let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
   view.revision = 0; view.invalidate = () => { view.revision++; };
   const DIR = new THREE.Vector3(1, 1.05, 1).normalize();
@@ -263,7 +273,7 @@ export function createView(container, game, backend = null) {
     fog.visible = view.fogEnabled;
     scene.updateMatrixWorld();
     for (const g of dirtyGroups) { batch.update(g); shadows.update(g); }
-    batch.flush(t);
+    batch.flush(t); batch.cull?.(camera, sun);
     renderer.info.reset(); effects.render();
   };
   // placement ghost

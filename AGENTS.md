@@ -44,6 +44,7 @@ docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockou
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused/results, immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
 | `&renderer=webgpu` | WebGPU spike (`src/render/webgpu.js`); WebGL when unavailable |
+| `&indirect=0` | WebGPU: BatchedMesh (draw per instance) instead of `gpu-batch.js`; `&batchCapacity=small` starts `gpu-batch.js` tiny to exercise buffer growth |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
 | `ages.html?team=1` | Age Ladder page, red team models |
 
@@ -112,6 +113,11 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     `onBeforeCompile` patches (model surfaces, cosmetics, grass, water) as TSL node materials, because
     WebGPURenderer ignores them. The terrain bake runs in a private WebGL canvas, and there is no SSAO. A change to
     one of those shaders needs the same change in both places.
+    Under WebGPU, `render/gpu-batch.js` replaces the BatchedMesh (three.js's WebGPU backend draws that one instance
+    at a time): all part geometries share one vertex buffer, instance matrices and cosmetics live in storage
+    buffers, and `cull()` (called by `view.frame` before rendering) runs a compute pass that tests each instance's
+    bounding sphere against the camera and sun-shadow frustums and fills one `drawIndirect` per geometry in use. It
+    needs `indirect-first-instance`; without it the BatchedMesh path stays.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and
