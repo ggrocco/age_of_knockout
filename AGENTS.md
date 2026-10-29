@@ -22,6 +22,10 @@ docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
 ```
 
+`node test/tools/fingerprint.js > before.json` hashes the whole sim state through 21 bot-vs-bot matches and every
+model in its animation poses (`sim` or `models` runs one half). Run it before and after a refactor and diff the two:
+any difference is a behaviour change.
+
 `node test/tools/hash-buildings.js > test/fixtures/kept-buildings.json` regenerates the fixture that pins the
 "kept" building looks byte for byte. Only regenerate it when you mean to change one of those looks; a failing
 `arch.test.js` hash is otherwise a regression.
