@@ -1,85 +1,97 @@
 // Hand-drawn 24x24 glyphs for the command tiles. DOM-free: each icon is an SVG string.
-// Line work uses currentColor; D = soft duotone fill, S = solid accent. The tile CSS sets `color` and glow.
-const D = 'fill="currentColor" fill-opacity=".3"', S = 'fill="currentColor" stroke="none"';
-const svg = body => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+// Line work uses currentColor; DUOTONE is a soft see-through fill, SOLID a solid accent. The tile CSS sets `color` and glow.
+const DUOTONE = 'fill="currentColor" fill-opacity=".3"';
+const SOLID = 'fill="currentColor" stroke="none"';
+const SVG_OPEN = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"'
+  + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">';
+const svg = body => `${SVG_OPEN}${body}</svg>`;
 
-const horse = extra => svg(`<path d="M5 20.5c.2-3 1.4-5 3.4-7.4L5.2 14 3.6 12.3 8.8 6.5 8.4 3.6l2.6 1.7c4.6-.9 9.4 2 9.9 8.2l.3 7z" ${D}/><circle cx="10.6" cy="8.9" r=".9" ${S}/>${extra || ''}`);
+// A horse head in profile; the cavalry icons draw their weapon on top of it.
+const horse = weapon => svg(`<path d="M5 20.5c.2-3 1.4-5 3.4-7.4L5.2 14 3.6 12.3 8.8 6.5 8.4 3.6l2.6 1.7c4.6-.9 9.4 2 9.9 8.2l.3 7z" ${DUOTONE}/>`
+  + `<circle cx="10.6" cy="8.9" r=".9" ${SOLID}/>${weapon || ''}`);
 
 export const ICONS = {
   // buildings
-  town_center: svg(`<path d="M9.5 20V7.5h5V20" ${D}/><path d="M3.5 20v-6h6M20.5 20v-6h-6"/><path d="M12 7.5v-4"/><path d="M12 3.5l3.6 1.4L12 6.3z" ${S}/><path d="M10.6 20v-3a1.4 1.4 0 0 1 2.8 0v3"/><path d="M2.5 20h19"/>`),
-  house: svg(`<path d="M5.5 10.5 12 5l6.5 5.5V20h-13z" ${D}/><path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M10 20v-5h4v5"/>`),
-  granary: svg(`<path d="M12 21V8.6"/><path d="M12 8.2c-1.6-1.3-1.6-3.9 0-5.4 1.6 1.5 1.6 4.1 0 5.4z" ${D}/><path d="M12 12.6c-2.8 0-4-2.1-4-4.3 2.4 0 4 1.7 4 4.3zM12 12.6c2.8 0 4-2.1 4-4.3-2.4 0-4 1.7-4 4.3z" ${D}/><path d="M12 17c-2.8 0-4-2.1-4-4.3 2.4 0 4 1.7 4 4.3zM12 17c2.8 0 4-2.1 4-4.3-2.4 0-4 1.7-4 4.3z" ${D}/>`),
-  storage_pit: svg(`<path d="M4 11v-.6a8 5.4 0 0 1 16 0v.6z" ${D}/><rect x="4" y="11" width="16" height="8.5" rx="1"/><rect x="10.6" y="9.8" width="2.8" height="4" rx=".8" ${S}/>`),
-  farm: svg(`<path d="M3 20.5 6 12.8h12l3 7.7z" ${D}/><path d="M12 12.8v7.7M8.6 12.8 6.6 20.5M15.4 12.8l2 7.7"/><path d="M12 12.8V8.4"/><path d="M12 9.6c0-2.2 1.6-3.6 4.2-3.6 0 2.2-1.6 3.6-4.2 3.6zM12 10.8c0-1.7-1.2-3-3.3-3 0 1.7 1.2 3 3.3 3z" ${D}/>`),
-  barracks: svg(`<path d="M4.5 3.5 15 14M19.5 3.5 9 14" stroke-width="2"/><path d="M12.9 16.1l4.2-4.2M11.1 16.1 6.9 11.9" stroke-width="2.2"/><path d="M15 14l4 4M9 14l-4 4"/><circle cx="20.2" cy="19" r="1.1" ${S}/><circle cx="3.8" cy="19" r="1.1" ${S}/>`),
-  archery_range: svg(`<circle cx="11" cy="13" r="7.6" ${D}/><circle cx="11" cy="13" r="3.9"/><circle cx="11" cy="13" r="1" ${S}/><path d="M11.6 12.4 20.5 3.5M20.5 3.5l-3 .2M20.5 3.5l-.2 3"/>`),
-  stable: svg(`<path d="M4 21V11.5a8 8 0 0 1 16 0V21h-4.5V11.5a3.5 3.5 0 0 0-7 0V21z" ${D}/><circle cx="6.1" cy="12.4" r=".85" ${S}/><circle cx="6.1" cy="16.2" r=".85" ${S}/><circle cx="17.9" cy="12.4" r=".85" ${S}/><circle cx="17.9" cy="16.2" r=".85" ${S}/>`),
-  market: svg(`<path d="M5 5h14l1.5 5h-17z" ${D}/><path d="M3.5 10a2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0"/><path d="M8.6 5l-.85 5M12 5v5M15.4 5l.85 5"/><path d="M5.5 12.6V20M18.5 12.6V20M4 20h16"/><circle cx="12" cy="16" r="2"/>`),
-  government_center: svg(`<path d="M3.5 9 12 4l8.5 5z" ${D}/><path d="M6.5 10.5v7M10 10.5v7M14 10.5v7M17.5 10.5v7"/><path d="M4.5 18.6h15M3.5 21h17"/>`),
-  wonder: svg(`<path d="M5 20.5 12 7l7 13.5z" ${D}/><path d="M8.4 14h7.2M10.2 10.4h3.6"/><path d="M2.5 20.5h19"/><path d="M12 1.4v3.2M10.4 3h3.2"/>`),
-  castle: svg(`<path d="M4 21V7.5h2.5v2h2v-2h2.5v2h2v-2h2.5v2h2v-2H20V21z" ${D}/><path d="M9.6 21v-4.2a2.4 2.4 0 0 1 4.8 0V21"/><path d="M2.5 21h19"/><path d="M12 9.5V3"/><path d="M12 3l3.4 1.3L12 5.6z" ${S}/>`),
-  factory: svg(`<path d="M3 21v-9l4.5-3v3l4.5-3v3l4.5-3v12z" ${D}/><path d="M17.2 21V5.5h2.6V21"/><path d="M2 21h20"/><path d="M18.4 3.6c-.4-1.5 1.2-2.1 2.4-1.2"/><path d="M5.6 16.4h2M10.1 16.4h2M14.6 16.4h2"/>`),
-  temple: svg(`<path d="M3.5 21v-3.5h3V14h3v-3.5h5V14h3v3.5h3V21z" ${D}/><path d="M12 9.4c-1.5-1.1-1.5-3.1 0-4.8 1.5 1.7 1.5 3.7 0 4.8z" ${S}/><path d="M10.8 21v-2.4h2.4V21M2.5 21h19"/>`),
-  academy: svg(`<path d="M12 6.5c-2.4-1.6-5.5-1.8-8.5-1v13c3-.8 6.1-.6 8.5 1 2.4-1.6 5.5-1.8 8.5-1v-13c-3-.8-6.1-.6-8.5 1z" ${D}/><path d="M12 6.5v13"/><path d="M6 9.4h3.6M6 12.4h3.6M14.4 9.4H18M14.4 12.4H18"/>`),
-  siege_workshop: svg(`<circle cx="8" cy="15.6" r="4.6" ${D}/><path d="M8 11v9.2M3.4 15.6h9.2M4.8 12.4l6.4 6.4M11.2 12.4l-6.4 6.4"/><circle cx="8" cy="15.6" r="1.1" ${S}/><path d="M13.4 12.6 19 7" stroke-width="2"/><path d="M16.6 3.4l4 4-2.2 2.2-4-4z" ${S}/>`),
-  university: svg(`<path d="M2.5 9 12 4.5 21.5 9 12 13.5z" ${D}/><path d="M6.5 11v4.6c3 2.4 8 2.4 11 0V11"/><path d="M21.5 9v5.2"/><circle cx="21.5" cy="15.2" r="1" ${S}/>`),
-  arsenal: svg(`<path d="M3 7c0-1.4 2-2.5 5-2.5s5 1.1 5 2.5v10c0 1.4-2 2.5-5 2.5s-5-1.1-5-2.5z" ${D}/><path d="M3 10.2h10M3 13.8h10"/><circle cx="16.6" cy="19.2" r="1.9" ${S}/><circle cx="20.4" cy="19.2" r="1.9" ${S}/><circle cx="18.5" cy="15.9" r="1.9" ${S}/>`),
-  trading_company: svg(`<path d="M2.8 15.4h18.4l-2.6 4.6H5.4z" ${D}/><path d="M12 15.4V2.8"/><path d="M12 4.6c3.6 2.2 5 5.8 4.8 9.2H12z" ${D}/><path d="M12 6.4c-2.4 1.8-3.4 4.4-3.2 7.4H12"/><path d="M12 2.8l3 1-3 1z" ${S}/>`),
-  railway_station: svg(`<rect x="13" y="6.6" width="6.6" height="10.6" rx=".8" ${D}/><rect x="3" y="10.8" width="10" height="6.4" rx="1" ${D}/><path d="M5.4 10.8V7.4h2.6v3.4M14.8 9h3"/><circle cx="6" cy="19.2" r="1.8"/><circle cx="11" cy="19.2" r="1.8"/><circle cx="16.8" cy="19.2" r="1.8"/><path d="M6.4 5.4c-.4-1.6 1.2-2.4 2.6-1.4"/>`),
-  power_plant: svg(`<path d="M3.5 21c1.4-3.6 1.4-8.6 0-13h9c-1.4 4.4-1.4 9.4 0 13z" ${D}/><path d="M2.5 21h12"/><path d="M6 5.6c-.3-1.5 1.2-2.4 2.5-1.6M9.4 5.2c-.2-1.3 1.1-2 2.2-1.3"/><path d="M19.4 3 16.4 10.4h3l-2 7.2 4.6-9h-3.2L21.4 3z" ${S}/>`),
-  airfield: svg(`<path d="M12 2.5c.9 0 1.4 1 1.4 2.4v4.7l7.6 4.4v1.9l-7.6-2.2v4.4l2.3 1.7v1.6L12 20.4l-3.7 1v-1.6l2.3-1.7v-4.4L3 15.9V14l7.6-4.4V4.9c0-1.4.5-2.4 1.4-2.4z" ${D}/>`),
-  mine: svg(`<path d="M3 20.5l5-8.6 4 3 4-5 5 10.6z" ${D}/><path d="M14.2 4.2 5.2 13.2"/><path d="M11.2 3.6c2.8-.4 5.4.8 6.6 3.4-.6-1.2-2.8-1.6-4.4-1.4z" ${D}/><circle cx="17" cy="16.2" r="2.8"/><circle cx="17" cy="16.2" r=".8" ${S}/><path d="M17 13.4v5.6M14.2 16.2h5.6"/><path d="M2 20.5h20"/>`),
-  tower: svg(`<path d="M8.5 21V10.5H7V4.5h2.4v2H11v-2h2v2h1.6v-2H17v6h-1.5V21z" ${D}/><rect x="11.3" y="12.4" width="1.4" height="3.2" rx=".5" ${S}/><path d="M10.8 21v-2.6a1.2 1.2 0 0 1 2.4 0V21"/><path d="M5.5 21h13"/>`),
-  wall: svg(`<path d="M2.6 20.5V6.5h3.2v2.4h2v-2.4H11v2.4h2V6.5h3.2v2.4h2V6.5h3.2v14z" ${D}/><path d="M2.6 12.7h18.8M2.6 16.6h18.8M9.4 8.9v3.8M15.6 8.9v3.8M6 12.7v3.9M12.4 12.7v3.9M18.6 12.7v3.9M9.4 16.6v3.9M15.6 16.6v3.9"/><path d="M1.5 20.5h21"/>`),
-  dock: svg(`<path d="M2.5 13.5h12v3h-12z" ${D}/><path d="M4.5 16.5v4M8.5 16.5v4M12.5 16.5v4"/><path d="M16.5 20.5V5.5l4 3h-4M16.5 9.5l-5 3"/><path d="M1.5 20.5c1.6 1 3 1 4.6 0s3 -1 4.6 0 3 1 4.6 0"/>`),
+  town_center: svg(`<path d="M9.5 20V7.5h5V20" ${DUOTONE}/><path d="M3.5 20v-6h6M20.5 20v-6h-6"/><path d="M12 7.5v-4"/><path d="M12 3.5l3.6 1.4L12 6.3z" ${SOLID}/><path d="M10.6 20v-3a1.4 1.4 0 0 1 2.8 0v3"/><path d="M2.5 20h19"/>`),
+  house: svg(`<path d="M5.5 10.5 12 5l6.5 5.5V20h-13z" ${DUOTONE}/><path d="M3.5 11.5 12 4l8.5 7.5"/><path d="M10 20v-5h4v5"/>`),
+  granary: svg(`<path d="M12 21V8.6"/><path d="M12 8.2c-1.6-1.3-1.6-3.9 0-5.4 1.6 1.5 1.6 4.1 0 5.4z" ${DUOTONE}/><path d="M12 12.6c-2.8 0-4-2.1-4-4.3 2.4 0 4 1.7 4 4.3zM12 12.6c2.8 0 4-2.1 4-4.3-2.4 0-4 1.7-4 4.3z" ${DUOTONE}/><path d="M12 17c-2.8 0-4-2.1-4-4.3 2.4 0 4 1.7 4 4.3zM12 17c2.8 0 4-2.1 4-4.3-2.4 0-4 1.7-4 4.3z" ${DUOTONE}/>`),
+  storage_pit: svg(`<path d="M4 11v-.6a8 5.4 0 0 1 16 0v.6z" ${DUOTONE}/><rect x="4" y="11" width="16" height="8.5" rx="1"/><rect x="10.6" y="9.8" width="2.8" height="4" rx=".8" ${SOLID}/>`),
+  farm: svg(`<path d="M3 20.5 6 12.8h12l3 7.7z" ${DUOTONE}/><path d="M12 12.8v7.7M8.6 12.8 6.6 20.5M15.4 12.8l2 7.7"/><path d="M12 12.8V8.4"/><path d="M12 9.6c0-2.2 1.6-3.6 4.2-3.6 0 2.2-1.6 3.6-4.2 3.6zM12 10.8c0-1.7-1.2-3-3.3-3 0 1.7 1.2 3 3.3 3z" ${DUOTONE}/>`),
+  barracks: svg(`<path d="M4.5 3.5 15 14M19.5 3.5 9 14" stroke-width="2"/><path d="M12.9 16.1l4.2-4.2M11.1 16.1 6.9 11.9" stroke-width="2.2"/><path d="M15 14l4 4M9 14l-4 4"/><circle cx="20.2" cy="19" r="1.1" ${SOLID}/><circle cx="3.8" cy="19" r="1.1" ${SOLID}/>`),
+  archery_range: svg(`<circle cx="11" cy="13" r="7.6" ${DUOTONE}/><circle cx="11" cy="13" r="3.9"/><circle cx="11" cy="13" r="1" ${SOLID}/><path d="M11.6 12.4 20.5 3.5M20.5 3.5l-3 .2M20.5 3.5l-.2 3"/>`),
+  stable: svg(`<path d="M4 21V11.5a8 8 0 0 1 16 0V21h-4.5V11.5a3.5 3.5 0 0 0-7 0V21z" ${DUOTONE}/><circle cx="6.1" cy="12.4" r=".85" ${SOLID}/><circle cx="6.1" cy="16.2" r=".85" ${SOLID}/><circle cx="17.9" cy="12.4" r=".85" ${SOLID}/><circle cx="17.9" cy="16.2" r=".85" ${SOLID}/>`),
+  market: svg(`<path d="M5 5h14l1.5 5h-17z" ${DUOTONE}/><path d="M3.5 10a2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0 2.125 2.125 0 0 0 4.25 0"/><path d="M8.6 5l-.85 5M12 5v5M15.4 5l.85 5"/><path d="M5.5 12.6V20M18.5 12.6V20M4 20h16"/><circle cx="12" cy="16" r="2"/>`),
+  government_center: svg(`<path d="M3.5 9 12 4l8.5 5z" ${DUOTONE}/><path d="M6.5 10.5v7M10 10.5v7M14 10.5v7M17.5 10.5v7"/><path d="M4.5 18.6h15M3.5 21h17"/>`),
+  wonder: svg(`<path d="M5 20.5 12 7l7 13.5z" ${DUOTONE}/><path d="M8.4 14h7.2M10.2 10.4h3.6"/><path d="M2.5 20.5h19"/><path d="M12 1.4v3.2M10.4 3h3.2"/>`),
+  castle: svg(`<path d="M4 21V7.5h2.5v2h2v-2h2.5v2h2v-2h2.5v2h2v-2H20V21z" ${DUOTONE}/><path d="M9.6 21v-4.2a2.4 2.4 0 0 1 4.8 0V21"/><path d="M2.5 21h19"/><path d="M12 9.5V3"/><path d="M12 3l3.4 1.3L12 5.6z" ${SOLID}/>`),
+  factory: svg(`<path d="M3 21v-9l4.5-3v3l4.5-3v3l4.5-3v12z" ${DUOTONE}/><path d="M17.2 21V5.5h2.6V21"/><path d="M2 21h20"/><path d="M18.4 3.6c-.4-1.5 1.2-2.1 2.4-1.2"/><path d="M5.6 16.4h2M10.1 16.4h2M14.6 16.4h2"/>`),
+  temple: svg(`<path d="M3.5 21v-3.5h3V14h3v-3.5h5V14h3v3.5h3V21z" ${DUOTONE}/><path d="M12 9.4c-1.5-1.1-1.5-3.1 0-4.8 1.5 1.7 1.5 3.7 0 4.8z" ${SOLID}/><path d="M10.8 21v-2.4h2.4V21M2.5 21h19"/>`),
+  academy: svg(`<path d="M12 6.5c-2.4-1.6-5.5-1.8-8.5-1v13c3-.8 6.1-.6 8.5 1 2.4-1.6 5.5-1.8 8.5-1v-13c-3-.8-6.1-.6-8.5 1z" ${DUOTONE}/><path d="M12 6.5v13"/><path d="M6 9.4h3.6M6 12.4h3.6M14.4 9.4H18M14.4 12.4H18"/>`),
+  siege_workshop: svg(`<circle cx="8" cy="15.6" r="4.6" ${DUOTONE}/><path d="M8 11v9.2M3.4 15.6h9.2M4.8 12.4l6.4 6.4M11.2 12.4l-6.4 6.4"/><circle cx="8" cy="15.6" r="1.1" ${SOLID}/><path d="M13.4 12.6 19 7" stroke-width="2"/><path d="M16.6 3.4l4 4-2.2 2.2-4-4z" ${SOLID}/>`),
+  university: svg(`<path d="M2.5 9 12 4.5 21.5 9 12 13.5z" ${DUOTONE}/><path d="M6.5 11v4.6c3 2.4 8 2.4 11 0V11"/><path d="M21.5 9v5.2"/><circle cx="21.5" cy="15.2" r="1" ${SOLID}/>`),
+  arsenal: svg(`<path d="M3 7c0-1.4 2-2.5 5-2.5s5 1.1 5 2.5v10c0 1.4-2 2.5-5 2.5s-5-1.1-5-2.5z" ${DUOTONE}/><path d="M3 10.2h10M3 13.8h10"/><circle cx="16.6" cy="19.2" r="1.9" ${SOLID}/><circle cx="20.4" cy="19.2" r="1.9" ${SOLID}/><circle cx="18.5" cy="15.9" r="1.9" ${SOLID}/>`),
+  trading_company: svg(`<path d="M2.8 15.4h18.4l-2.6 4.6H5.4z" ${DUOTONE}/><path d="M12 15.4V2.8"/><path d="M12 4.6c3.6 2.2 5 5.8 4.8 9.2H12z" ${DUOTONE}/><path d="M12 6.4c-2.4 1.8-3.4 4.4-3.2 7.4H12"/><path d="M12 2.8l3 1-3 1z" ${SOLID}/>`),
+  railway_station: svg(`<rect x="13" y="6.6" width="6.6" height="10.6" rx=".8" ${DUOTONE}/><rect x="3" y="10.8" width="10" height="6.4" rx="1" ${DUOTONE}/><path d="M5.4 10.8V7.4h2.6v3.4M14.8 9h3"/><circle cx="6" cy="19.2" r="1.8"/><circle cx="11" cy="19.2" r="1.8"/><circle cx="16.8" cy="19.2" r="1.8"/><path d="M6.4 5.4c-.4-1.6 1.2-2.4 2.6-1.4"/>`),
+  power_plant: svg(`<path d="M3.5 21c1.4-3.6 1.4-8.6 0-13h9c-1.4 4.4-1.4 9.4 0 13z" ${DUOTONE}/><path d="M2.5 21h12"/><path d="M6 5.6c-.3-1.5 1.2-2.4 2.5-1.6M9.4 5.2c-.2-1.3 1.1-2 2.2-1.3"/><path d="M19.4 3 16.4 10.4h3l-2 7.2 4.6-9h-3.2L21.4 3z" ${SOLID}/>`),
+  airfield: svg(`<path d="M12 2.5c.9 0 1.4 1 1.4 2.4v4.7l7.6 4.4v1.9l-7.6-2.2v4.4l2.3 1.7v1.6L12 20.4l-3.7 1v-1.6l2.3-1.7v-4.4L3 15.9V14l7.6-4.4V4.9c0-1.4.5-2.4 1.4-2.4z" ${DUOTONE}/>`),
+  mine: svg(`<path d="M3 20.5l5-8.6 4 3 4-5 5 10.6z" ${DUOTONE}/><path d="M14.2 4.2 5.2 13.2"/><path d="M11.2 3.6c2.8-.4 5.4.8 6.6 3.4-.6-1.2-2.8-1.6-4.4-1.4z" ${DUOTONE}/><circle cx="17" cy="16.2" r="2.8"/><circle cx="17" cy="16.2" r=".8" ${SOLID}/><path d="M17 13.4v5.6M14.2 16.2h5.6"/><path d="M2 20.5h20"/>`),
+  tower: svg(`<path d="M8.5 21V10.5H7V4.5h2.4v2H11v-2h2v2h1.6v-2H17v6h-1.5V21z" ${DUOTONE}/><rect x="11.3" y="12.4" width="1.4" height="3.2" rx=".5" ${SOLID}/><path d="M10.8 21v-2.6a1.2 1.2 0 0 1 2.4 0V21"/><path d="M5.5 21h13"/>`),
+  wall: svg(`<path d="M2.6 20.5V6.5h3.2v2.4h2v-2.4H11v2.4h2V6.5h3.2v2.4h2V6.5h3.2v14z" ${DUOTONE}/><path d="M2.6 12.7h18.8M2.6 16.6h18.8M9.4 8.9v3.8M15.6 8.9v3.8M6 12.7v3.9M12.4 12.7v3.9M18.6 12.7v3.9M9.4 16.6v3.9M15.6 16.6v3.9"/><path d="M1.5 20.5h21"/>`),
+  dock: svg(`<path d="M2.5 13.5h12v3h-12z" ${DUOTONE}/><path d="M4.5 16.5v4M8.5 16.5v4M12.5 16.5v4"/><path d="M16.5 20.5V5.5l4 3h-4M16.5 9.5l-5 3"/><path d="M1.5 20.5c1.6 1 3 1 4.6 0s3 -1 4.6 0 3 1 4.6 0"/>`),
   // units
-  villager: svg(`<circle cx="12" cy="9.3" r="3" ${D}/><path d="M8 8.4a4 4 0 0 1 8 0zM6.6 8.6h10.8"/><path d="M5.5 20.5c0-3.9 2.9-6.2 6.5-6.2s6.5 2.3 6.5 6.2z" ${D}/>`),
-  clubman: svg(`<path d="M11.8 12.2c-1-2.8.6-6.6 4.2-8.4 3.2-.4 4.6 2.4 3.8 5.2-.8 2.8-4.4 4.6-8 3.2z" ${D}/><path d="M11.6 12.4 4.6 19.4"/><circle cx="15.6" cy="7.4" r=".75" ${S}/><circle cx="17.8" cy="10" r=".75" ${S}/><circle cx="18.2" cy="6" r=".75" ${S}/>`),
-  axeman: svg(`<path d="M5.2 20.3 15.6 8.9"/><path d="M13.6 4.6c3-1.5 6.4-.9 7.9 2-1.2 2.5-3.7 3.9-6.3 3.7z" ${D}/>`),
-  slinger: svg(`<path d="M14.2 3.8 18.6 4.6 20.6 8.4 18.8 12.4 14.6 13 12.4 9.2z" ${D}/><path d="M12.4 9.2l3.2.6 3-1.4"/><path d="M10.6 14.6 4 20M8.8 11.4 3.4 14.6M14.4 17.6 9.4 21.2"/>`),
-  bowman: svg(`<path d="M7.5 3.5c6.2 3.2 6.2 13.8 0 17" ${D}/><path d="M7.5 3.5v17"/><path d="M3.5 12h17M17.6 9.4 20.5 12l-2.9 2.6M3.5 12l-1.2-1.6M3.5 12l-1.2 1.6"/>`),
-  spearman: svg(`<path d="M4.4 20 14.3 9.9"/><path d="M14.3 9.9 15.4 6.1l5.1-2.6-2.6 5.2z" ${D}/>`),
-  hoplite: svg(`<path d="M5.2 20.2v-7.4a6.8 6.8 0 0 1 13.6 0v7.4h-4.2l-.9-3.8H10.3l-.9 3.8z" ${D}/><path d="M8.6 12.4h6.8M12 12.4v4"/><path d="M12 6V3.4M7.4 4.4c3-1.9 6.2-1.9 9.2 0" stroke-width="2"/>`),
-  swordsman: svg(`<path d="M20 4 9.4 14.6" stroke-width="2.3"/><path d="M7.2 11.6 12.4 16.8"/><path d="M10.4 15.6 5.6 20.4"/><circle cx="4.6" cy="21" r="1.1" ${S}/>`),
-  scout: svg(`<g transform="rotate(-30 12 12)"><rect x="2.5" y="9.6" width="7.5" height="4.8" rx="1.2" ${D}/><rect x="10" y="10.5" width="6" height="3" rx=".8"/><rect x="16" y="11.2" width="5" height="1.6" rx=".6" ${D}/></g><path d="M8.5 17.5 6.6 21M12 16l1.4 5"/>`),
+  villager: svg(`<circle cx="12" cy="9.3" r="3" ${DUOTONE}/><path d="M8 8.4a4 4 0 0 1 8 0zM6.6 8.6h10.8"/><path d="M5.5 20.5c0-3.9 2.9-6.2 6.5-6.2s6.5 2.3 6.5 6.2z" ${DUOTONE}/>`),
+  clubman: svg(`<path d="M11.8 12.2c-1-2.8.6-6.6 4.2-8.4 3.2-.4 4.6 2.4 3.8 5.2-.8 2.8-4.4 4.6-8 3.2z" ${DUOTONE}/><path d="M11.6 12.4 4.6 19.4"/><circle cx="15.6" cy="7.4" r=".75" ${SOLID}/><circle cx="17.8" cy="10" r=".75" ${SOLID}/><circle cx="18.2" cy="6" r=".75" ${SOLID}/>`),
+  axeman: svg(`<path d="M5.2 20.3 15.6 8.9"/><path d="M13.6 4.6c3-1.5 6.4-.9 7.9 2-1.2 2.5-3.7 3.9-6.3 3.7z" ${DUOTONE}/>`),
+  slinger: svg(`<path d="M14.2 3.8 18.6 4.6 20.6 8.4 18.8 12.4 14.6 13 12.4 9.2z" ${DUOTONE}/><path d="M12.4 9.2l3.2.6 3-1.4"/><path d="M10.6 14.6 4 20M8.8 11.4 3.4 14.6M14.4 17.6 9.4 21.2"/>`),
+  bowman: svg(`<path d="M7.5 3.5c6.2 3.2 6.2 13.8 0 17" ${DUOTONE}/><path d="M7.5 3.5v17"/><path d="M3.5 12h17M17.6 9.4 20.5 12l-2.9 2.6M3.5 12l-1.2-1.6M3.5 12l-1.2 1.6"/>`),
+  spearman: svg(`<path d="M4.4 20 14.3 9.9"/><path d="M14.3 9.9 15.4 6.1l5.1-2.6-2.6 5.2z" ${DUOTONE}/>`),
+  hoplite: svg(`<path d="M5.2 20.2v-7.4a6.8 6.8 0 0 1 13.6 0v7.4h-4.2l-.9-3.8H10.3l-.9 3.8z" ${DUOTONE}/><path d="M8.6 12.4h6.8M12 12.4v4"/><path d="M12 6V3.4M7.4 4.4c3-1.9 6.2-1.9 9.2 0" stroke-width="2"/>`),
+  swordsman: svg(`<path d="M20 4 9.4 14.6" stroke-width="2.3"/><path d="M7.2 11.6 12.4 16.8"/><path d="M10.4 15.6 5.6 20.4"/><circle cx="4.6" cy="21" r="1.1" ${SOLID}/>`),
+  scout: svg(`<g transform="rotate(-30 12 12)"><rect x="2.5" y="9.6" width="7.5" height="4.8" rx="1.2" ${DUOTONE}/><rect x="10" y="10.5" width="6" height="3" rx=".8"/><rect x="16" y="11.2" width="5" height="1.6" rx=".6" ${DUOTONE}/></g><path d="M8.5 17.5 6.6 21M12 16l1.4 5"/>`),
   horse_archer: horse(`<path d="M13 13.5 21.5 5M21.5 5l-3 .2M21.5 5l-.3 3"/>`),
-  catapult: svg(`<path d="M3 18.2h15"/><path d="M8.6 18.2 11.6 11.4M6.4 15.6 17 6.6"/><path d="M15.2 8.6c.9-2 3.7-3 5.1-1.3" ${D}/><circle cx="19.2" cy="4.6" r="1.5" ${S}/><circle cx="6" cy="19.6" r="2" ${D}/><circle cx="15" cy="19.6" r="2" ${D}/>`),
-  knight: horse(`<path d="M10.5 15.5 20.8 2.6" stroke-width="2"/><path d="M20.8 2.6l.4 2.8-2.2-1.2z" ${S}/><path d="M18.4 5.6l-3.4-.4 1.6 2.6z" ${D}/>`),
-  crossbowman: svg(`<rect x="10.6" y="8" width="2.8" height="12.5" rx="1" ${D}/><path d="M3.5 10.2c3-3.6 14-3.6 17 0"/><path d="M3.5 10.2 12 13.2l8.5-3"/><path d="M12 13.2V2.8M10.6 4.4 12 2.8l1.4 1.6"/>`),
-  trebuchet: svg(`<path d="M4 20.5h16"/><path d="M7.5 20.5 12 11l4.5 9.5" ${D}/><path d="M20.5 4.5 7 15.8"/><rect x="5" y="14.4" width="4" height="4" rx=".8" ${S}/><path d="M20.5 4.5v4.2"/><circle cx="20.5" cy="9.6" r="1.1" ${S}/>`),
-  musketeer: svg(`<path d="M3 19.5 19.6 5.4" stroke-width="1.9"/><path d="M3 19.5l2.6 1.4 2.2-2.4-1.6-2.3z" ${D}/><path d="M19.6 5.4 21.4 3.6"/><path d="M13.5 15.5c2.6 1.6 5.6.8 6.6-1.8l-2.2-.9c-.6 1.4-2.2 1.9-3.6 1.1z" ${D}/>`),
-  cannon: svg(`<path d="M3.6 15.4 18.8 8.2a2 2 0 0 1 1.7 3.6L5.3 19z" ${D}/><circle cx="8.4" cy="17.4" r="3.3"/><circle cx="8.4" cy="17.4" r=".9" ${S}/><path d="M2.5 20.8h11"/>`),
-  rifleman: svg(`<path d="M2.8 16.4 6.4 13.2H18" stroke-width="1.8"/><path d="M2.8 16.4 2.4 19l4.2-.8 2-2.6z" ${D}/><path d="M18 12.2 22 13.2 18 14.2z" ${S}/><path d="M10.6 13.2v2.6M13.2 13.2l.6 2.4"/>`),
-  field_artillery: svg(`<path d="M9.5 9.6H21" stroke-width="2.2"/><path d="M5 6.5h5.4v8.4H5z" ${D}/><circle cx="8" cy="17.6" r="3"/><path d="M8 14.6v6M5 17.6h6"/><path d="M10.4 13.6 17.6 20.5"/>`),
-  machine_gunner: svg(`<path d="M4 9.6h12.8" stroke-width="2.4"/><path d="M16.8 9.6h4.4"/><rect x="7" y="10.6" width="3.6" height="3.4" rx=".6" ${D}/><path d="M12 10.4 7.4 20.5M12 10.4l4.6 10.1M12 10.4v10.1"/><path d="M5 6.4h3.6v3.2"/>`),
-  tank: svg(`<rect x="2.5" y="14.4" width="19" height="5.4" rx="2.7" ${D}/><circle cx="6.2" cy="17.1" r="1" ${S}/><circle cx="10.1" cy="17.1" r="1" ${S}/><circle cx="14" cy="17.1" r="1" ${S}/><circle cx="17.8" cy="17.1" r="1" ${S}/><path d="M5 14.4 6.6 11h10.8l1.6 3.4"/><path d="M8.6 11V8.6h5.6V11" ${D}/><path d="M14.2 9.6h7.4"/>`),
-  armored_train: svg(`<path d="M2.5 20.6h19"/><rect x="3" y="9.6" width="8.8" height="6.4" rx=".8" ${D}/><path d="M11.8 11.4h6.8a2.2 2.2 0 0 1 2.2 2.2V16h-9z" ${D}/><path d="M15.2 11.4V8.4h2v3"/><path d="M5.4 9.6V7.6h3.4v2M8.8 8.4h4"/><path d="M4.8 12.6h1.6M8.4 12.6H10"/><circle cx="5.6" cy="18.2" r="1.5" ${S}/><circle cx="9.8" cy="18.2" r="1.5" ${S}/><circle cx="14.6" cy="18.2" r="1.5" ${S}/><circle cx="18.8" cy="18.2" r="1.5" ${S}/>`),
-  drone: svg(`<rect x="9.4" y="9.8" width="5.2" height="4.4" rx="1.6" ${D}/><path d="M9.6 10.8 6.6 7.8M14.4 10.8l3-3M9.6 13.2l-3 3M14.4 13.2l3 3"/><circle cx="5.2" cy="6.4" r="2.4" ${D}/><circle cx="18.8" cy="6.4" r="2.4" ${D}/><circle cx="5.2" cy="17.6" r="2.4" ${D}/><circle cx="18.8" cy="17.6" r="2.4" ${D}/><circle cx="12" cy="12" r="1.1" ${S}/>`),
-  mech: svg(`<rect x="9" y="2.8" width="6" height="4.6" rx="1.2" ${D}/><path d="M10.4 5.2h3.2"/><rect x="7" y="8.6" width="10" height="6.2" rx="1.6" ${D}/><path d="M7 10.2H4.4v5.2M17 10.2h2.6v5.2"/><path d="M9.6 14.8 8.2 20.6H5.4M14.4 14.8l1.4 5.8h2.8"/>`),
-  railgun: svg(`<rect x="2.5" y="11.2" width="15" height="3.6" rx="1" ${D}/><path d="M4 13h13"/><path d="M8 14.8 6 20.4M12.6 14.8l2 5.6M4.4 20.4h12"/><path d="M21 8.2l-1.7 3.3h2.7L20.3 15"/>`),
-  fishing_ship: svg(`<path d="M3 14.5h18l-2.6 5h-12.8z" ${D}/><path d="M11 14.5V4.5l5.5 8h-5.5"/><path d="M11 6.5 4.5 13"/><circle cx="4.5" cy="14.8" r=".9" ${S}/>`),
-  transport_ship: svg(`<path d="M2.5 14.5h19l-3 5h-13z" ${D}/><path d="M5.5 14.5v-4h13v4"/><path d="M8 10.5V8h3v2.5M13 10.5V8h3v2.5"/><path d="M12 8V3.5l4 2-4 1.5"/>`),
-  unload: svg(`<path d="M2.5 15.5h11l-2 4h-7z" ${D}/><path d="M17 3.5v11M13.5 11l3.5 3.5 3.5-3.5"/><path d="M15 20.5h7"/>`),
-  war_galley: svg(`<path d="M2.5 13.5h19l-3 5h-13z" ${D}/><path d="M12 13.5V3.5M7.5 5.5h9l-1 6h-7z"/><path d="M5 18.5 3 21.5M9 18.5l-1.4 3M15 18.5l1.4 3M19 18.5l2 3"/>`),
-  frigate: svg(`<path d="M2.5 14.5h19l-2.4 5.5H4.9z" ${D}/><path d="M8 14.5V3.5M16 14.5V5.5M5 5.5h6v3.5H5zM13 7.5h6v3h-6zM5 11h6M13 12.5h6"/><circle cx="7" cy="17" r=".9" ${S}/><circle cx="12" cy="17" r=".9" ${S}/><circle cx="17" cy="17" r=".9" ${S}/>`),
-  destroyer: svg(`<path d="M1.5 15.5h21l-3.6 4.5H4.2z" ${D}/><path d="M7.5 15.5v-3.5h7v3.5M10 12V8.5h3V12M11.5 8.5V4.5"/><path d="M14.5 13.5h5M4 14.5l3.5-1"/>`),
-  king: svg(`<path d="M4.2 18.6 3.6 8.2l4.9 4.3L12 5.8l3.5 6.7 4.9-4.3-.6 10.4z" ${D}/><path d="M4.4 20.8h15.2"/><circle cx="3.6" cy="7.6" r="1.1" ${S}/><circle cx="12" cy="5" r="1.1" ${S}/><circle cx="20.4" cy="7.6" r="1.1" ${S}/>`),
+  catapult: svg(`<path d="M3 18.2h15"/><path d="M8.6 18.2 11.6 11.4M6.4 15.6 17 6.6"/><path d="M15.2 8.6c.9-2 3.7-3 5.1-1.3" ${DUOTONE}/><circle cx="19.2" cy="4.6" r="1.5" ${SOLID}/><circle cx="6" cy="19.6" r="2" ${DUOTONE}/><circle cx="15" cy="19.6" r="2" ${DUOTONE}/>`),
+  knight: horse(`<path d="M10.5 15.5 20.8 2.6" stroke-width="2"/><path d="M20.8 2.6l.4 2.8-2.2-1.2z" ${SOLID}/><path d="M18.4 5.6l-3.4-.4 1.6 2.6z" ${DUOTONE}/>`),
+  crossbowman: svg(`<rect x="10.6" y="8" width="2.8" height="12.5" rx="1" ${DUOTONE}/><path d="M3.5 10.2c3-3.6 14-3.6 17 0"/><path d="M3.5 10.2 12 13.2l8.5-3"/><path d="M12 13.2V2.8M10.6 4.4 12 2.8l1.4 1.6"/>`),
+  trebuchet: svg(`<path d="M4 20.5h16"/><path d="M7.5 20.5 12 11l4.5 9.5" ${DUOTONE}/><path d="M20.5 4.5 7 15.8"/><rect x="5" y="14.4" width="4" height="4" rx=".8" ${SOLID}/><path d="M20.5 4.5v4.2"/><circle cx="20.5" cy="9.6" r="1.1" ${SOLID}/>`),
+  musketeer: svg(`<path d="M3 19.5 19.6 5.4" stroke-width="1.9"/><path d="M3 19.5l2.6 1.4 2.2-2.4-1.6-2.3z" ${DUOTONE}/><path d="M19.6 5.4 21.4 3.6"/><path d="M13.5 15.5c2.6 1.6 5.6.8 6.6-1.8l-2.2-.9c-.6 1.4-2.2 1.9-3.6 1.1z" ${DUOTONE}/>`),
+  cannon: svg(`<path d="M3.6 15.4 18.8 8.2a2 2 0 0 1 1.7 3.6L5.3 19z" ${DUOTONE}/><circle cx="8.4" cy="17.4" r="3.3"/><circle cx="8.4" cy="17.4" r=".9" ${SOLID}/><path d="M2.5 20.8h11"/>`),
+  rifleman: svg(`<path d="M2.8 16.4 6.4 13.2H18" stroke-width="1.8"/><path d="M2.8 16.4 2.4 19l4.2-.8 2-2.6z" ${DUOTONE}/><path d="M18 12.2 22 13.2 18 14.2z" ${SOLID}/><path d="M10.6 13.2v2.6M13.2 13.2l.6 2.4"/>`),
+  field_artillery: svg(`<path d="M9.5 9.6H21" stroke-width="2.2"/><path d="M5 6.5h5.4v8.4H5z" ${DUOTONE}/><circle cx="8" cy="17.6" r="3"/><path d="M8 14.6v6M5 17.6h6"/><path d="M10.4 13.6 17.6 20.5"/>`),
+  machine_gunner: svg(`<path d="M4 9.6h12.8" stroke-width="2.4"/><path d="M16.8 9.6h4.4"/><rect x="7" y="10.6" width="3.6" height="3.4" rx=".6" ${DUOTONE}/><path d="M12 10.4 7.4 20.5M12 10.4l4.6 10.1M12 10.4v10.1"/><path d="M5 6.4h3.6v3.2"/>`),
+  tank: svg(`<rect x="2.5" y="14.4" width="19" height="5.4" rx="2.7" ${DUOTONE}/><circle cx="6.2" cy="17.1" r="1" ${SOLID}/><circle cx="10.1" cy="17.1" r="1" ${SOLID}/><circle cx="14" cy="17.1" r="1" ${SOLID}/><circle cx="17.8" cy="17.1" r="1" ${SOLID}/><path d="M5 14.4 6.6 11h10.8l1.6 3.4"/><path d="M8.6 11V8.6h5.6V11" ${DUOTONE}/><path d="M14.2 9.6h7.4"/>`),
+  armored_train: svg(`<path d="M2.5 20.6h19"/><rect x="3" y="9.6" width="8.8" height="6.4" rx=".8" ${DUOTONE}/><path d="M11.8 11.4h6.8a2.2 2.2 0 0 1 2.2 2.2V16h-9z" ${DUOTONE}/><path d="M15.2 11.4V8.4h2v3"/><path d="M5.4 9.6V7.6h3.4v2M8.8 8.4h4"/><path d="M4.8 12.6h1.6M8.4 12.6H10"/><circle cx="5.6" cy="18.2" r="1.5" ${SOLID}/><circle cx="9.8" cy="18.2" r="1.5" ${SOLID}/><circle cx="14.6" cy="18.2" r="1.5" ${SOLID}/><circle cx="18.8" cy="18.2" r="1.5" ${SOLID}/>`),
+  drone: svg(`<rect x="9.4" y="9.8" width="5.2" height="4.4" rx="1.6" ${DUOTONE}/><path d="M9.6 10.8 6.6 7.8M14.4 10.8l3-3M9.6 13.2l-3 3M14.4 13.2l3 3"/><circle cx="5.2" cy="6.4" r="2.4" ${DUOTONE}/><circle cx="18.8" cy="6.4" r="2.4" ${DUOTONE}/><circle cx="5.2" cy="17.6" r="2.4" ${DUOTONE}/><circle cx="18.8" cy="17.6" r="2.4" ${DUOTONE}/><circle cx="12" cy="12" r="1.1" ${SOLID}/>`),
+  mech: svg(`<rect x="9" y="2.8" width="6" height="4.6" rx="1.2" ${DUOTONE}/><path d="M10.4 5.2h3.2"/><rect x="7" y="8.6" width="10" height="6.2" rx="1.6" ${DUOTONE}/><path d="M7 10.2H4.4v5.2M17 10.2h2.6v5.2"/><path d="M9.6 14.8 8.2 20.6H5.4M14.4 14.8l1.4 5.8h2.8"/>`),
+  railgun: svg(`<rect x="2.5" y="11.2" width="15" height="3.6" rx="1" ${DUOTONE}/><path d="M4 13h13"/><path d="M8 14.8 6 20.4M12.6 14.8l2 5.6M4.4 20.4h12"/><path d="M21 8.2l-1.7 3.3h2.7L20.3 15"/>`),
+  fishing_ship: svg(`<path d="M3 14.5h18l-2.6 5h-12.8z" ${DUOTONE}/><path d="M11 14.5V4.5l5.5 8h-5.5"/><path d="M11 6.5 4.5 13"/><circle cx="4.5" cy="14.8" r=".9" ${SOLID}/>`),
+  transport_ship: svg(`<path d="M2.5 14.5h19l-3 5h-13z" ${DUOTONE}/><path d="M5.5 14.5v-4h13v4"/><path d="M8 10.5V8h3v2.5M13 10.5V8h3v2.5"/><path d="M12 8V3.5l4 2-4 1.5"/>`),
+  unload: svg(`<path d="M2.5 15.5h11l-2 4h-7z" ${DUOTONE}/><path d="M17 3.5v11M13.5 11l3.5 3.5 3.5-3.5"/><path d="M15 20.5h7"/>`),
+  war_galley: svg(`<path d="M2.5 13.5h19l-3 5h-13z" ${DUOTONE}/><path d="M12 13.5V3.5M7.5 5.5h9l-1 6h-7z"/><path d="M5 18.5 3 21.5M9 18.5l-1.4 3M15 18.5l1.4 3M19 18.5l2 3"/>`),
+  frigate: svg(`<path d="M2.5 14.5h19l-2.4 5.5H4.9z" ${DUOTONE}/><path d="M8 14.5V3.5M16 14.5V5.5M5 5.5h6v3.5H5zM13 7.5h6v3h-6zM5 11h6M13 12.5h6"/><circle cx="7" cy="17" r=".9" ${SOLID}/><circle cx="12" cy="17" r=".9" ${SOLID}/><circle cx="17" cy="17" r=".9" ${SOLID}/>`),
+  destroyer: svg(`<path d="M1.5 15.5h21l-3.6 4.5H4.2z" ${DUOTONE}/><path d="M7.5 15.5v-3.5h7v3.5M10 12V8.5h3V12M11.5 8.5V4.5"/><path d="M14.5 13.5h5M4 14.5l3.5-1"/>`),
+  king: svg(`<path d="M4.2 18.6 3.6 8.2l4.9 4.3L12 5.8l3.5 6.7 4.9-4.3-.6 10.4z" ${DUOTONE}/><path d="M4.4 20.8h15.2"/><circle cx="3.6" cy="7.6" r="1.1" ${SOLID}/><circle cx="12" cy="5" r="1.1" ${SOLID}/><circle cx="20.4" cy="7.6" r="1.1" ${SOLID}/>`),
   // ui
-  age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${D}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
-  lock: svg(`<path d="M7.6 11V8.4a4.4 4.4 0 0 1 8.8 0V11"/><rect x="5.5" y="11" width="13" height="9.5" rx="2" ${D}/><circle cx="12" cy="15.2" r="1.3" ${S}/>`),
-  delete: svg(`<path d="M6.3 7.2l1 13.3h9.4l1-13.3z" ${D}/><path d="M4 7.2h16"/><path d="M9.4 7.2V4.4a.9.9 0 0 1 .9-.9h3.4a.9.9 0 0 1 .9.9v2.8"/><path d="M10 10.6v6.6M14 10.6v6.6"/>`),
-  unknown: svg(`<circle cx="12" cy="12" r="8.2" ${D}/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r=".9" ${S}/>`),
+  age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${DUOTONE}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
+  lock: svg(`<path d="M7.6 11V8.4a4.4 4.4 0 0 1 8.8 0V11"/><rect x="5.5" y="11" width="13" height="9.5" rx="2" ${DUOTONE}/><circle cx="12" cy="15.2" r="1.3" ${SOLID}/>`),
+  delete: svg(`<path d="M6.3 7.2l1 13.3h9.4l1-13.3z" ${DUOTONE}/><path d="M4 7.2h16"/><path d="M9.4 7.2V4.4a.9.9 0 0 1 .9-.9h3.4a.9.9 0 0 1 .9.9v2.8"/><path d="M10 10.6v6.6M14 10.6v6.6"/>`),
+  unknown: svg(`<circle cx="12" cy="12" r="8.2" ${DUOTONE}/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r=".9" ${SOLID}/>`),
 };
 // Class fallbacks so a future unit never renders a blank tile.
-const BY_CLASS = { civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer, siege: ICONS.catapult, armor: ICONS.tank, ship: ICONS.war_galley, transport: ICONS.transport_ship };
+const BY_CLASS = {
+  civ: ICONS.villager, inf: ICONS.swordsman, archer: ICONS.bowman, cav: ICONS.horse_archer,
+  siege: ICONS.catapult, armor: ICONS.tank, ship: ICONS.war_galley, transport: ICONS.transport_ship,
+};
 // Tech tiles reuse a representative existing icon (weapon/shield/arrow/economy) instead of the "?" glyph.
 const TECH_ICON = {
-  hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite, iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight,
-  steel_weapons: ICONS.swordsman, plate_armor: ICONS.hoplite, paper_cartridges: ICONS.musketeer, rifled_barrels: ICONS.rifleman,
-  composite_armor: ICONS.tank, nanoweave_plating: ICONS.mech, ballistics: ICONS.bowman, woodworking: ICONS.storage_pit, gold_mining: ICONS.market,
-  sacred_harvest: ICONS.farm, phalanx_drill: ICONS.hoplite, torsion_engines: ICONS.catapult, masonry: ICONS.mine, bayonets: ICONS.musketeer,
-  colonial_trade: ICONS.trading_company, railways: ICONS.railway_station, electrification: ICONS.power_plant, air_support: ICONS.airfield,
+  hide_armor: ICONS.clubman, bronze_weapons: ICONS.swordsman, bronze_shields: ICONS.hoplite,
+  iron_weapons: ICONS.swordsman, scale_barding: ICONS.knight, steel_weapons: ICONS.swordsman,
+  plate_armor: ICONS.hoplite, paper_cartridges: ICONS.musketeer, rifled_barrels: ICONS.rifleman,
+  composite_armor: ICONS.tank, nanoweave_plating: ICONS.mech, ballistics: ICONS.bowman,
+  woodworking: ICONS.storage_pit, gold_mining: ICONS.market, sacred_harvest: ICONS.farm,
+  phalanx_drill: ICONS.hoplite, torsion_engines: ICONS.catapult, masonry: ICONS.mine,
+  bayonets: ICONS.musketeer, colonial_trade: ICONS.trading_company, railways: ICONS.railway_station,
+  electrification: ICONS.power_plant, air_support: ICONS.airfield,
 };
 
-export const icon = (id, cls) => ICONS[id] || TECH_ICON[id] || BY_CLASS[cls] || ICONS.unknown;
+// The icon for a building, unit, tech or UI id; `unitClass` picks the fallback for a unit without its own glyph.
+export const icon = (id, unitClass) => ICONS[id] || TECH_ICON[id] || BY_CLASS[unitClass] || ICONS.unknown;
