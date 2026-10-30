@@ -10,7 +10,16 @@ Ruling deviations from the spec's content list (recorded in `progress.md`):
 - Farm added (food economy needs a renewable source).
 - Wonder requires Bronze Age (spec's round setup starts players rich; original needs Iron).
 - Catapult trains at the Government Center (no Siege Workshop in the subset).
-- King exists only for Regicide (not trainable).
+- Kings are scenario-only and not trainable. Regicide retains its original 120 HP / 2 melee armor. Standalone
+  **Kingdom Conquest** overrides kings to 250 HP and villager armor (0/0): ten times a villager's base durability.
+  This mode's automatic castle shelter, empire inheritance, merged ages/technology, and eight-step building territory
+  are invented rules. Completed buildings (including Farms, Mines, walls and coastal Docks) claim dry land; water and
+  shallows stop expansion, and equal-distance opposing claims are neutral. The last civilization wins, or territory
+  then existing score decides the deadline; exact ties draw. These rules do not change tournament Regicide.
+  Captured assets retain health/food fractions and paid queue progress, completed research is unioned once, and
+  inherited population may exceed the normal cap without permitting new training above that cap.
+  Four-player maps and replenishment have quarter-turn symmetry; live ore caps double, and each new patch receives
+  one sixth of an exhausted patch's initial reserve, keeping the quartet's total at the existing two-thirds decay.
 - Human match deadlines are a game setting: 0–120 whole minutes (default 25 in every mode/difficulty); 0 disables
   the score deadline. This replaces the fixed 20/25/40-minute human caps and is not an AoE1-derived rule. Off-screen
   bracket matches retain those finite caps; Wonder and relic countdowns keep their normal durations.

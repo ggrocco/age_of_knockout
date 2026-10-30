@@ -1,4 +1,5 @@
 import { BUILDINGS } from '../data/buildings.js';
+import { setupKingdoms, checkKingdoms } from '../sim/kingdoms.js';
 // Round rules. check(game) returns null or {winner, reason}. Every round has capTicks and a score tiebreak.
 export const WONDER_TICKS = 3600, RELIC_TICKS = 3600;
 
@@ -149,4 +150,9 @@ export const ROUNDS = [
     },
     check: checkRelics },
 ];
-export const roundById = id => ROUNDS.find(round => round.id === id);
+export const KINGDOMS = {
+  id: 'kingdoms', name: 'Kingdom Conquest', playerCount: 4, capTicks: 30000,
+  desc: 'Face three civilizations. Slay a king to inherit their empire. Conquer everyone or hold the most territory when time expires.',
+  setup: setupKingdoms, check: game => checkKingdoms(game, scoreOf),
+};
+export const roundById = id => id === KINGDOMS.id ? KINGDOMS : ROUNDS.find(round => round.id === id);

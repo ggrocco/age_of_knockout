@@ -6,8 +6,10 @@ import { popLimit } from '../data/ages.js';
 
 // opts.mapType: 'rivers' (default) or 'islands'; opts.limit: stop after this many ticks; opts.keepGame: return the game too.
 export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts = {}) {
-  const rules = roundById(roundId), game = createGame({ seed, rules, mapType: opts.mapType, ...matchOptions(diffs) });
-  const bots = [createBot(game, 0, diffs[0]), createBot(game, 1, diffs[1])];
+  const rules = roundById(roundId);
+  diffs = Array.from({ length: rules.playerCount ?? 2 }, (_, pid) => diffs[pid] ?? diffs[diffs.length - 1]);
+  const game = createGame({ seed, rules, mapType: opts.mapType, ...matchOptions(diffs, { timeLimit: opts.timeLimit }) });
+  const bots = game.players.map(p => createBot(game, p.id, diffs[p.id]));
   const out = { ended: false, winner: null, reason: null, ticks: 0, errors: [], maxRejects: 0, cap: game.capTicks };
   try {
     play(game, bots, diffs, opts.limit || game.capTicks + 50, out.errors);
@@ -30,7 +32,7 @@ export function simulateMatch(roundId, seed, diffs = ['medium', 'medium'], opts 
 function play(game, bots, diffs, limit, errors) {
   while (!game.result && game.time < limit) {
     game.tick();
-    for (let i = 0; i < 2; i++) if (game.time % thinkEvery[diffs[i]] === (i * 3) % thinkEvery[diffs[i]]) bots[i].think();
+    for (let i = 0; i < bots.length; i++) if (game.time % thinkEvery[diffs[i]] === (i * 3) % thinkEvery[diffs[i]]) bots[i].think();
     if (game.time % 20 === 0) checkInvariants(game, errors);
     if (errors.length > 5) break;
   }
@@ -42,7 +44,7 @@ function checkInvariants(game, errors) {
       if (!Number.isFinite(amount)) errors.push(`NaN resource ${kind} at ${game.time}`);
       else if (amount < -1e-6) errors.push(`negative ${kind}=${amount} at ${game.time}`);
     }
-    if (player.pop > popLimit(player.age)) errors.push(`pop ${player.pop} > ${popLimit(player.age)} at ${game.time}`);
+    if (game.rules.id !== 'kingdoms' && player.pop > popLimit(player.age)) errors.push(`pop ${player.pop} > ${popLimit(player.age)} at ${game.time}`);
   }
   for (const unit of game.units.values()) {
     if (Number.isFinite(unit.x) && Number.isFinite(unit.y) && Number.isFinite(unit.hp)) continue;

@@ -375,7 +375,8 @@ export function createView(container, game) {
   function syncEntity(e, force) {
     let group = view.groups.get(e.id), turned = null;
     // On an age-up, buildings and units from earlier eras are rebuilt in the new era's look (units keep their facing).
-    if (group && (e.kind === 'building' || e.kind === 'unit') && group.userData.age !== lookAge(e)) {
+    if (group && (e.kind === 'building' || e.kind === 'unit')
+      && (group.userData.age !== lookAge(e) || group.userData.owner !== e.owner)) {
       turned = group.rotation.y;
       removeGroup(group);
       view.groups.delete(e.id);
@@ -400,7 +401,9 @@ export function createView(container, game) {
     syncStamp = game.time;
     fog.update();
     seen.clear();
-    const list = [...game.visibleEntities(0), ...game.knownResources(0)];
+    const list = view.spectating
+      ? [...game.entities.values()].filter(e => !e.aboard && !e.garrisonedIn)
+      : [...game.visibleEntities(0), ...game.knownResources(0)];
     for (const e of list) {
       seen.add(e.id);
       syncEntity(e, force);

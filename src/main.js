@@ -1,6 +1,8 @@
 import { createGame } from './sim/game.js';
 import { createBot, matchOptions, THINK_EVERY } from './ai/bot.js';
-import { ROUNDS, roundById, scoreOf } from './rounds/index.js';
+import { ROUNDS, KINGDOMS, roundById, scoreOf } from './rounds/index.js';
+import { TEAMS } from './data/teams.js';
+import { kingdomStandingsHtml } from './ui/kingdoms.js';
 import { createTournament, LEVELS, LEVEL_NAME } from './tournament/bracket.js';
 import { createAsyncSimulator } from './tournament/async-sim.js';
 import { createView } from './render/view.js';
@@ -86,6 +88,7 @@ const ui = app.ui = {
   sel: new Set(), inspect: null, placing: null, speed: +(params.get('speed') || 1), paused: false,
   // Every player command goes through here: a refusal is toasted, and the HUD and view refresh at once.
   cmd(command) {
+    if (ui.spectating) return { ok: false, reason: 'defeated' };
     const result = ui.game.command(0, command);
     if (!result.ok) hud.toast(reasonText(result.reason));
     hud.invalidate();
@@ -94,7 +97,7 @@ const ui = app.ui = {
     return result;
   },
   setSpeed(speed) { ui.speed = speed; },
-  togglePause() { ui.paused = !ui.paused; },
+  togglePause() { if (!ui.defeatOpen) ui.paused = !ui.paused; },
   startPlacing(type) {
     ui.placing = type;
     ui.wallStart = ui.wallEnd = null;
@@ -174,9 +177,10 @@ function runTicks(match, dt) {
   for (let i = 0; i < steps && !game.result; i++) {
     game.tick();
     for (const bot of match.bots) {
-      const pid = bot === match.bots[match.bots.length - 1] ? 1 : 0, every = THINK_EVERY[match.diffs[pid]];
+      const pid = bot.pid, every = THINK_EVERY[match.diffs[pid]];
       if (game.time % every === (pid * 3) % every) bot.think();
     }
+    if (game.rules.id === 'kingdoms' && game.players[0].defeated && !match.defeatShown && !match.autoplay) break;
   }
 }
 
@@ -205,6 +209,11 @@ function frame(match, now) {
   match.last = now;
   match.frames++;
   if (!ui.paused && !game.result) runTicks(match, dt);
+  if (game.rules.id === 'kingdoms' && game.players[0].defeated && !match.defeatShown) {
+    match.defeatShown = true;
+    if (match.autoplay) enableSpectating(match);
+    else if (!game.result) showConquered(match);
+  }
   if (!ui.paused) match.animT += dt; // the animation clock stops with the match, so working villagers freeze mid-swing
   input.update(dt);
   match.view.sync();
@@ -232,6 +241,8 @@ function resetUiFor(game, view) {
   ui.placing = null;
   ui.wallStart = ui.wallEnd = null;
   ui.paused = false;
+  ui.spectating = false;
+  ui.defeatOpen = false;
   ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
 }
 
@@ -240,7 +251,9 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   document.body.classList.add('ingame');
   // botDiff: the bot that drives player 0 in autoplay/test modes
   const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO;
-  const rules = roundById(roundId), options = matchOptions([autoplay ? botDiff : null, oppDiff], { timeLimit: minutes });
+  const rules = roundById(roundId), count = rules.playerCount ?? 2;
+  const difficulties = Array.from({ length: count }, (_, pid) => pid === 0 ? (autoplay ? botDiff : null) : oppDiff);
+  const options = matchOptions(difficulties, { timeLimit: minutes });
   const game = createGame({ seed, rules, mapType: map, ...options });
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const viewportEl = document.getElementById('viewport');
@@ -252,12 +265,11 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
     hud.toast('Hardware acceleration looks off: enable it in your browser settings. Graphics set to Balanced.');
   }
   resetUiFor(game, view);
-  const bots = [createBot(game, 1, oppDiff)];
-  if (autoplay) bots.unshift(createBot(game, 0, botDiff));
-  const diffs = { 0: botDiff, 1: oppDiff };
+  const bots = difficulties.flatMap((diff, pid) => diff ? [Object.assign(createBot(game, pid, diff), { pid })] : []);
+  const diffs = difficulties;
   centreOnHome(game, view);
   const match = app.match = {
-    game, view, bots, diffs, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd,
+    game, view, bots, diffs, autoplay, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd,
   };
   app.onResize = () => { view.resize(); };
   window.addEventListener('resize', app.onResize);
@@ -285,6 +297,7 @@ function resultStats(game) {
     + ` &middot; score ${scoreOf(game, 0).toFixed(0)} vs ${scoreOf(game, 1).toFixed(0)}`;
 }
 function showResult(match) {
+  if (match.game.rules.id === 'kingdoms') return showKingdomResult(match);
   const result = match.game.result, won = result.winner === 0;
   const reason = (REASON[result.reason] || (() => result.reason))(won);
   show(`<div class="card"><h1 class="${won ? 'win' : 'lose'}">${won ? 'Victory' : 'Defeat'}</h1><p>${reason}</p>`
@@ -295,6 +308,42 @@ function showResult(match) {
     if (match.onEnd) match.onEnd(won);
     else menu();
   };
+}
+
+function enableSpectating(match) {
+  ui.spectating = true;
+  ui.defeatOpen = false;
+  ui.sel.clear(); ui.inspect = null; ui.stopPlacing();
+  ui.paused = false;
+  match.view.spectating = true;
+  match.view.fogEnabled = false;
+  match.view.sync(true); match.view.invalidate(); hud.invalidate();
+  hide();
+}
+
+function showConquered(match) {
+  hud.cancelDelete(); hud.closeMenu();
+  ui.defeatOpen = true;
+  ui.paused = true;
+  ui.sel.clear(); ui.stopPlacing();
+  const captor = match.game.players[0].defeatedBy;
+  show(`<div class="card"><h1 class="lose">Your civilization fell</h1><p>${captor == null ? 'You have been eliminated.'
+    : `${TEAMS[captor].name} killed your king and inherited your empire.`}</p>`
+    + '<button class="btn" id="spectate">Spectate</button><button class="btn" id="leave-kingdoms">Back to menu</button></div>');
+  document.getElementById('spectate').onclick = () => enableSpectating(match);
+  document.getElementById('leave-kingdoms').onclick = () => { endMatch(); menu(); };
+  document.getElementById('spectate').focus();
+}
+
+function showKingdomResult(match) {
+  const { game } = match, { winner, reason } = game.result;
+  const title = winner === null ? 'Draw' : winner === 0 ? 'Victory' : `${TEAMS[winner].name} wins`;
+  const verdict = reason === 'territory' ? 'Time expired: territory decides, with game score breaking territory ties.'
+    : winner === null ? 'Every civilization fell.' : 'One civilization remains.';
+  show(`<div class="card"><h1 class="${winner === 0 ? 'win' : 'lose'}">${title}</h1><p>${verdict}</p>`
+    + `<div class="kingdom-final">${kingdomStandingsHtml(game, true)}</div>`
+    + '<button class="btn" data-auto id="kingdom-back">Back to menu</button></div>');
+  document.getElementById('kingdom-back').onclick = () => { endMatch(); menu(); };
 }
 
 // ---- tournament flow
@@ -434,6 +483,8 @@ const menuHtml = () => `<div class="card"><h1>Age of Knockout</h1><h2>A five-rou
   </div>
   <p id="time-limit-help"><small>Minutes of game time. Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</small></p>
   <button class="btn" data-auto id="start">Begin Tournament</button><br>
+  <button class="btn kingdoms-start" id="start-kingdoms" data-tip="round:kingdoms">Kingdom Conquest · 4 teams</button>
+  <p><small>Slay kings to capture their civilizations. Conquer all three opponents or hold the most territory.</small></p>
   ${quickButtonsHtml()}
   <footer class="project"><a class="repo" href="${REPO_URL}" target="_blank" rel="noopener">${GITHUB_ICON}<span>View on GitHub</span></a>
   <h3>Contributing</h3>
@@ -449,6 +500,8 @@ function refreshQuickLabels() {
 }
 function wireMenu() {
   document.getElementById('start').onclick = startTournament;
+  document.getElementById('start-kingdoms').onclick = () => startMatch({ roundId: KINGDOMS.id, seed: pickSeed(),
+    oppDiff: params.get('opp') || ({ relaxed: 'relaxed', normal: 'medium', hard: 'hard' })[level] });
   document.getElementById('time-limit').oninput = e => {
     setTimeLimit(e.target.value);
     document.getElementById('time-limit-value').textContent = timeLimitLabel();
@@ -479,6 +532,9 @@ function menu() {
   wireMenu();
 }
 
-if (params.get('round')) {
+if (params.get('mode') === 'kingdoms') {
+  startMatch({ roundId: KINGDOMS.id, seed: pickSeed(),
+    oppDiff: params.get('opp') || ({ relaxed: 'relaxed', normal: 'medium', hard: 'hard' })[level] });
+} else if (params.get('round')) {
   startMatch({ roundId: ROUNDS[+params.get('round') - 1].id, seed: pickSeed(), oppDiff: params.get('opp') || 'medium' });
 } else menu();

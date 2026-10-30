@@ -17,6 +17,7 @@ node --test test/econ.test.js               # single test file
 node --test --test-name-pattern="<name>" test/*.test.js   # single test
 node test/bot-sim.js 12                     # bot-vs-bot termination check (12 seeds x 5 rounds)
 node test/bot-sim.js 12 medium,medium islands   # the same on island maps (transports and ferries)
+node test/kingdom-sim.js 12                 # four bots, both map types (optional third arg: rivers or islands)
 node test/era-reach.js 12 deathmatch        # measurement, not a test: how far bots climb the eras
 docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
@@ -34,6 +35,7 @@ any difference is a behaviour change.
 
 | Param | Effect |
 | --- | --- |
+| `?mode=kingdoms` | Standalone four-team Kingdom Conquest; `opp` sets all three opponents |
 | `?round=1..5` | Skip the menus, start that round as a quick match |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent bot for `?round=` (default `medium`) |
 | `&seed=N` | Replay a map; omitted = random map and start position |
@@ -82,6 +84,11 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   plus a score tiebreak (`scoreOf`). The menu's time-limit slider sets human matches to 0–120 minutes (default 25),
   with 0 setting `capTicks: Infinity`; off-screen bracket matches keep finite mode/difficulty caps so resolution
   always terminates. `src/time-limit.js` reads the saved/URL preference and preserves the former checkbox choice.
+  Kingdom Conquest (`KINGDOMS`) is registered separately from the five-entry `ROUNDS` tournament array. It requests
+  four players; `src/sim/kingdoms.js` owns inheritance, sheltering and territory. Its result may have `winner: null`
+  for a draw. `createGame` and `generateMap` still default to two players; the four-player map branch is in
+  `src/sim/map-four.js`. `node test/kingdom-sim.js 12` exercises four bots on both maps. Captured population may
+  exceed the age ceiling; do not delete captured units or treat that overflow as a sim invariant failure.
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never

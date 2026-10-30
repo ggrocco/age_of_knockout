@@ -3,14 +3,16 @@ import { AGES, AGE_COST } from '../data/ages.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { UNITS } from '../data/units.js';
 import { farmStats } from '../data/farms.js';
+import { buildFourMap } from './map-four.js';
 // 180-degree rotationally symmetric map so both players get identical terrain and resources.
 // type: 'rivers' (a river with land crossings between the players) or 'islands' (no way across but by ship).
 // Every random number comes from the seeded rng, in a fixed order: changing that order changes every map.
 export const MAP_TYPES = ['rivers', 'islands'];
-export function generateMap(seed, size = 112, type = 'rivers') {
+export function generateMap(seed, size = 112, type = 'rivers', playerCount = 2) {
+  if (![2, 4].includes(playerCount)) throw new Error('Expected two or four players');
   if (!MAP_TYPES.includes(type)) type = 'rivers';
   for (let attempt = 0; attempt < 20; attempt++) {
-    const map = build(seed + attempt * 1000, size, type);
+    const map = playerCount === 4 ? buildFourMap(seed + attempt * 1000, size, type) : build(seed + attempt * 1000, size, type);
     if (type === 'islands' ? apart(map) : connected(map)) return map;
   }
   throw new Error('map generation failed for seed ' + seed);
@@ -43,7 +45,7 @@ const tileIndex = (map, point) => Math.floor(point.y) * map.size + Math.floor(po
 // 4-neighbour flood fill: with no corner cutting, A* reaches exactly these tiles.
 function connected(map) {
   const seen = walk(map, tileIndex(map, map.starts[0]), true);
-  return [map.starts[1], ...map.relicSpots].every(point => seen[tileIndex(map, point)]);
+  return [...map.starts.slice(1), ...map.relicSpots].every(point => seen[tileIndex(map, point)]);
 }
 // Islands: no ground at all joins a start to the other start or to the central island, the relic spots share the
 // central island (resources block there, so none is walled off), and each home island can pay to climb CLIMB_AGES Ages
@@ -51,8 +53,9 @@ function connected(map) {
 function apart(map) {
   const home = walk(map, tileIndex(map, map.starts[0]), false);
   const centre = walk(map, tileIndex(map, map.relicSpots[0]), true);
-  if (home[tileIndex(map, map.starts[1])] || home[tileIndex(map, map.relicSpots[0])]) return false;
-  return map.relicSpots.every(point => centre[tileIndex(map, point)]) && homeBudget(map, 0).ok;
+  if (map.starts.slice(1).some(point => home[tileIndex(map, point)]) || home[tileIndex(map, map.relicSpots[0])]) return false;
+  return map.relicSpots.every(point => centre[tileIndex(map, point)])
+    && (map.starts.length === 2 ? homeBudget(map, 0).ok : map.starts.every((_, pid) => homeBudget(map, pid).ok));
 }
 
 // A home island must hold enough to climb CLIMB_AGES Ages (Stone to Medieval) without leaving it, with half again to

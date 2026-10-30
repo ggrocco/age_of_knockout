@@ -4,6 +4,8 @@ A browser RTS in the spirit of Age of Empires I (1997), played as a 32-player kn
 against AI. Five rounds, each a different game type: Standard (conquest), Death Match, Regicide, Wonder Race,
 Capture the Relics. Lose once and you're out.
 
+Or play **Kingdom Conquest**, a standalone round against three AI civilizations: kill kings to capture entire empires.
+
 **Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
 ![A Bronze Age base in Wonder Race: mud-brick houses, towers, a Temple and a Wonder under construction, with a Dock, War Galleys and a Transport Ship in the home bay](docs/screenshots/wonder.jpg)
@@ -17,9 +19,12 @@ npm test                        # simulation, rounds, bot, bracket, data and ren
 npm run lint                    # ESLint
 node test/bot-sim.js 12         # bot-vs-bot termination check, 12 seeds x 5 rounds
 node test/bot-sim.js 12 medium,medium islands   # the same on island maps
+node test/kingdom-sim.js 12     # four civilizations, both map settings
 ```
 
 No build step: plain ES modules, with three.js loaded through the import map in `index.html`.
+The development server listens on `127.0.0.1:8000` by default. Set `PORT` (or pass a port to `serve.js`) to change the
+port; set `HOST` only when your preview proxy requires a different listening interface.
 For hardware render measurements, start the dev server and open `http://localhost:8000/test/tools/render-audit.html?quality=high`. The diagnostic reports CPU and asynchronous GPU timings, restores your saved graphics preference, and is excluded from the nginx image.
 
 ## How a tournament works
@@ -74,6 +79,36 @@ clock for a card with the mode's goal, time limit and scoring.
 At **0**, the clock shows `elapsed / ∞`, and normal victory conditions, Wonder/relic countdowns and resigning still
 end a match. A saved choice from the former No time limit checkbox becomes 0. Off-screen AI bracket matches keep
 their finite mode/difficulty limits so the bracket always resolves.
+
+## Kingdom Conquest
+
+Press **Kingdom Conquest · 4 teams**, or open `?mode=kingdoms`. You play Blue against Red, Green and Yellow,
+starting in Stone Age. The existing Rivers / Islands and time-limit settings apply. Difficulty selects three
+relaxed, medium (Normal), or hard opponents; `&opp=easy` also works. The five-round tournament keeps its original rules.
+
+Kill a civilization's king to inherit its surviving units, buildings, resources, explored land, territory, and production
+queues, including civilizations it already conquered. The higher completed age and both sides' researched upgrades
+are kept, without stacking duplicate bonuses. Damaged assets retain their health fraction. Existing armies survive
+above the population limit, but new training must wait until there is room.
+
+Your king has **250 HP**, ten times a villager, and automatically walks into the nearest reachable, completed friendly
+castle. While sheltered he cannot act or take damage. Destroying or deleting the castle releases him alive with his
+remaining health; he can then shelter in another castle. Inaccessible castles provide no protection, and a king aboard
+a sunken transport dies, awarding his empire to the team that sank it.
+
+Every completed building claims dry land within **eight orthogonal ground steps** of its footprint. Claims stop at
+water, including shallows; the nearest building wins overlaps and equally distant opposing claims remain neutral.
+The standings show territory tiles, percentage of all dry land, and each king's health/protection. Territory colors
+appear on the minimap within explored land and follow fog shading.
+
+The last surviving civilization wins. At the deadline, most territory wins; the existing game score breaks territory
+ties, and an exact remaining tie is a draw. Choose **0** on the time slider for unlimited conquest. If your king falls,
+choose **Spectate** to watch the remaining teams with full visibility, or **Back to menu**. Spectators cannot issue
+commands. Resigning eliminates your civilization without awarding its assets to an opponent.
+
+Four-player maps use quarter-turn symmetry and equivalent starting resources. Rivers connects all four starts by
+land crossings; Islands has four home islands and a contested central island. Resource replenishment also uses
+four-way groups. Blue, Red, Green and Yellow can be previewed in both the building/unit gallery and the Age Ladder.
 
 ## Playing
 
@@ -310,6 +345,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 
 | Param | Effect |
 | --- | --- |
+| `?mode=kingdoms` | Start standalone four-team Kingdom Conquest; `opp` sets all three opponents |
 | `?round=1..5` | Start that round as a quick match, skipping the menus |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent for `?round=` (default `medium`) |
 | `&seed=N` | Replay a map; without it every match gets a fresh map and start position |
@@ -329,6 +365,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 phone layout.
 
 For a custom deadline, use `?round=1&timeLimit=60` for a one-hour quick match or `?round=1&timeLimit=0` for no limit.
+For four-team play, try `?mode=kingdoms&seed=3`, or add `&map=islands&autoplay=1` to watch four bots.
 
 ## Deploy (Docker)
 

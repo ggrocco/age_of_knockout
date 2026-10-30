@@ -111,7 +111,9 @@ export function createInput(ui) {
     if (kind === 'unit' && target.owner === 0 && target.cargo && walkerIds.length) {
       return { type: 'board', ids: walkerIds, transportId: target.id };
     }
-    if ((kind === 'unit' || kind === 'building') && target.owner === 1) return { type: 'attack', ids, targetId: target.id };
+    if ((kind === 'unit' || kind === 'building') && target.owner != null && target.owner !== 0) {
+      return { type: 'attack', ids, targetId: target.id };
+    }
     if (kind === 'resource') return { type: 'gather', ids: ids.filter(gathers), resourceId: target.id };
     const ownBuilding = kind === 'building' && target.owner === 0;
     if (ownBuilding && target.gatherType && target.constructed) {

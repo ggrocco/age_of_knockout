@@ -15,7 +15,7 @@ export function updateVision(game) {
   const n = game.map.size;
   for (const player of game.players) player.visible.fill(0);
   for (const list of [game.units, game.buildings]) for (const entity of list.values()) {
-    if (entity.aboard) continue; // a transport's hold sees nothing; the ship has its own sight
+    if (entity.aboard || entity.garrisonedIn) continue;
     revealAround(game, entity, n);
   }
   for (const player of game.players) markExplored(player.visible, player.explored);

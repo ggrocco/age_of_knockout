@@ -20,6 +20,21 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
   body:not(.touch) #topbar .grow { display:none; }
 }
 #topbar .obj { color:#f5e6b8; }
+#kingdoms-standings { position:absolute; top:52px; left:12px; z-index:4; width:240px; padding:10px 12px; background:#21190fed; border:1px solid #c8a05277; border-radius:6px; pointer-events:none; box-shadow:0 3px 14px #0006; font-size:12px; }
+.kingdom-heading { color:var(--bronze); font-weight:bold; margin-bottom:6px; }
+.kingdom-row { display:grid; grid-template-columns:1fr auto; gap:2px 8px; padding:5px 0; border-top:1px solid #c8a05233; font-variant-numeric:tabular-nums; }
+.kingdom-row > small { grid-column:1 / -1; color:#e1d2ae; }
+.kingdom-row i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; border:1px solid #fff6; }
+.kingdom-row.fallen { opacity:.5; }
+.kingdom-final { max-width:420px; margin:18px auto; text-align:left; }
+.kingdoms-start { margin-top:12px; padding:10px 18px; border-color:#e3ba37; }
+body:not(.ingame) #kingdoms-standings { visibility:hidden; }
+body.touch #kingdoms-standings { top:calc(72px + var(--sat)); left:calc(8px + var(--sal)); width:174px; padding:6px 8px; font-size:10px; }
+body.touch #kingdoms-standings .kingdom-row { padding:3px 0; gap:1px 3px; }
+body.touch #kingdoms-standings .kingdom-heading { margin-bottom:3px; }
+@media (orientation:landscape) and (max-height:500px) {
+  body.touch #kingdoms-standings { width:166px; top:calc(65px + var(--sat)); left:calc(68px + var(--sal)); }
+}
 #topbar .match-clock { white-space:nowrap; }
 #topbar button, .btn { background:linear-gradient(#5a4327,#3a2a16); color:var(--parch); border:1px solid var(--bronze); border-radius:3px; padding:4px 10px; font:inherit; cursor:pointer; }
 #topbar button:hover, .btn:hover { background:linear-gradient(#7a5a33,#4a3620); }

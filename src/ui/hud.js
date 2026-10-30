@@ -3,13 +3,16 @@ import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
 import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
-import { ROUNDS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
+import { ROUNDS, KINGDOMS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
+import { kingdomStandingsHtml } from './kingdoms.js';
+import { TEAMS } from '../data/teams.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';
 
 const REASONS = {
+  defeated: 'Your civilization has been conquered',
   'needs a fishing ship': 'Only Fishing Ships can fish',
   'transport full': 'The Transport Ship is full (8 aboard)',
   'bad transport': 'Not one of your Transport Ships',
@@ -56,6 +59,7 @@ const hpBar = entity => `<div class="bar"><i style="width:${Math.max(0, entity.h
 function objectiveText(game) {
   const round = game.rules, state = game.roundState;
   if (!round) return '';
+  if (round.id === 'kingdoms') return 'Slay kings to capture empires; most territory wins at the time limit.';
   if (round.id === 'wonder') {
     return `Wonder countdown - you ${fmtTime(state.hold[0])}/${fmtTime(WONDER_TICKS)}`
       + ` | enemy ${fmtTime(state.hold[1])}/${fmtTime(WONDER_TICKS)}`;
@@ -79,11 +83,12 @@ function unitDetails(unit) {
 
 // Building line of the info panel: construction progress, the training queue, or what is left to gather.
 function buildingDetails(building) {
+  const king = building.king ? '<br>♛ King sheltered inside · destroy the castle to expose him.' : '';
   if (!building.constructed) return `<br>Under construction ${Math.floor(building.progress * 100)}%`;
   if (building.queue.length) {
-    return `<br>Training: ${queueText(building.queue)} (${secondsLeft(building.queue[0].remaining, building)}s)`;
+    return king + `<br>Training: ${queueText(building.queue)} (${secondsLeft(building.queue[0].remaining, building)}s)`;
   }
-  if (!building.gatherType) return '';
+  if (!building.gatherType) return king;
   return `<br>${capitalize(building.gatherType)} left ${Math.floor(building.amount)}`
     + (building.maxAmount ? ' / ' + building.maxAmount : '');
 }
@@ -105,7 +110,7 @@ const needsRepair = (entity) => entity.kind === 'building' && entity.owner === 0
 
 // The info panel for one entity, selected or inspected.
 function describe(entity, player, touch) {
-  const enemyTag = entity.owner === 1 ? ' <small class="lose">(enemy)</small>' : '';
+  const enemyTag = entity.owner != null && entity.owner !== 0 ? ` <small class="lose">(${TEAMS[entity.owner].name})</small>` : '';
   let html = `<h3>${nameOf(entity)}${enemyTag}</h3>` + hpBar(entity) + `HP ${Math.ceil(entity.hp)}/${entity.maxHp}`;
   if (entity.kind === 'unit') html += unitDetails(entity);
   if (entity.kind === 'building') html += buildingDetails(entity);
@@ -146,7 +151,7 @@ export function createHud(ui) {
   // tile set, its target building or a lock state changes (then the panel is rebuilt); otherwise `off` and `small`
   // (cost line) are patched in place so hover/glow animations and focus survive resource ticks.
   const tips = new Map();
-  const roundTips = new Map(ROUNDS.map(round => [`round:${round.id}`, round]));
+  const roundTips = new Map([...ROUNDS, KINGDOMS].map(round => [`round:${round.id}`, round]));
   const tile = (attrs, spec) => {
     const { kind, id, name, cost, tint, cls, ok, lockedAge, short = [], notes = [], next, age } = spec;
     const { extra = '', extraClass = '' } = spec;
@@ -261,7 +266,7 @@ export function createHud(ui) {
   // The pause modal: shown for a player pause, not while the settings menu or delete dialog (which also pause) is up.
   const updatePauseModal = game => {
     const pauseEl = $('pausemodal');
-    const showPause = ui.paused && !game.result && !ui.deleteConfirmOpen && menuHidden();
+    const showPause = ui.paused && !game.result && !ui.defeatOpen && !ui.deleteConfirmOpen && menuHidden();
     if (showPause !== pauseEl.classList.contains('hidden')) return;
     pauseEl.classList.toggle('hidden', !showPause);
     if (!showPause) return;
@@ -281,6 +286,12 @@ export function createHud(ui) {
     const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
     const clockLabel = round ? (game.capTicks === Infinity ? ' / no time limit' : ' / time limit') : '';
     const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}"></span>`;
+    if (ui.spectating) {
+      return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
+        + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}">${speed}x</button>`).join('')
+          + `<button data-pause="1">${ui.paused ? 'Resume' : 'Pause'}</button>`)
+        + '<button data-menu="open" aria-label="Game settings">Menu</button>';
+    }
     const popTitle = `title="Population (${ageTitle(player.age)} limit ${popLimit(player.age)})"`;
     if (ui.touch) {
       return resourcesHtml + `<span class="res" ${popTitle}>&#9823;${player.pop}/${player.popCap}</span>`
@@ -494,6 +505,14 @@ export function createHud(ui) {
     const selected = [...ui.sel].map(id => game.entities.get(id)).filter(Boolean);
     updateInfo(game, player, selected);
     updateCommands(player, selected);
+    const standings = $('kingdoms-standings');
+    if (standings) {
+      standings.classList.toggle('hidden', round?.id !== 'kingdoms');
+      if (round?.id === 'kingdoms') {
+        const standingsHtml = kingdomStandingsHtml(game);
+        if (standings.innerHTML !== standingsHtml) standings.innerHTML = standingsHtml;
+      }
+    }
     document.body.classList.toggle('has-cmds', cmds.children.length > 0);
   };
 

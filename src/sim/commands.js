@@ -4,6 +4,7 @@ import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { secs, RES_KIND, WATER, passable } from './util.js';
 import { formationSlots, nearestOpen, landingNear } from './formation.js';
+import { isKingdoms, sheltered, eliminateKingdom, updateTerritory } from './kingdoms.js';
 
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
@@ -17,7 +18,7 @@ const pay = (player, cost) => { for (const kind of RES) player.res[kind] -= cost
 // The player's own live units among `ids`; passengers take no orders.
 const ownUnits = (game, playerId, ids) => (ids || [])
   .map(id => game.entities.get(id))
-  .filter(entity => entity && entity.kind === 'unit' && entity.owner === playerId && !entity.dead && !entity.aboard);
+  .filter(entity => entity && entity.kind === 'unit' && entity.owner === playerId && !entity.dead && !entity.aboard && !sheltered(entity));
 const ownVillagers = (game, playerId, ids) => ownUnits(game, playerId, ids).filter(unit => unit.type === 'villager');
 // A fresh order: the unit plans a new path to it.
 function giveOrder(unit, order) {
@@ -116,6 +117,7 @@ function finishedGates(game, pid, age) {
 export function execute(game, pid, cmd) {
   const player = game.players[pid];
   if (!player || game.result) return fail('no game');
+  if (player.defeated) return fail('defeated');
   switch (cmd.type) {
     case 'move': return moveUnits(game, pid, cmd);
     case 'gather': return gather(game, pid, cmd);
@@ -224,10 +226,12 @@ function deleteBuilding(game, pid, cmd) {
   if (!building || building.dead || building.kind !== 'building' || building.owner !== pid) return fail('bad target');
   game.remove(building);
   game.recount();
+  if (isKingdoms(game)) updateTerritory(game);
   return OK;
 }
 
 function resign(game, pid) {
+  if (isKingdoms(game)) { eliminateKingdom(game, pid); return OK; }
   game.result = { winner: 1 - pid, reason: 'resigned' };
   return OK;
 }

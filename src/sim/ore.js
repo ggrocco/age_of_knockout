@@ -1,6 +1,7 @@
 import { makeRng } from './rng.js';
 import { secs } from './util.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { rotations } from './map-four.js';
 // Ore patches (map tiles 2 gold vein, 3 quarry): Mines stand on them and share each patch's reserve. An emptied patch
 // reverts to land and a fresh mirrored pair of its kind appears elsewhere, each new patch holding a third of the drained
 // one's starting reserve (so the pair holds 2/3 and the map thins out). No respawn below RESPAWN_MIN, and never past the
@@ -61,7 +62,7 @@ export function exhaustPatch(game, patch) {
   }
   game.terrainVersion++;
   game.patches.delete(patch.id);
-  const next = Math.floor(patch.startReserve / 3);
+  const next = Math.floor(patch.startReserve / (game.players.length === 4 ? 6 : 3));
   if (next >= RESPAWN_MIN) spawnPatchPair(game, patch.kind, next);
 }
 
@@ -104,6 +105,7 @@ function openLand(game) {
 
 // A mirrored pair of fresh 4x3 patches on dry, empty land well away from both starts. False at the kind's cap or with no room.
 export function spawnPatchPair(game, kind, reserve) {
+  if (game.players.length === 4) return spawnPatchQuartet(game, kind, reserve);
   let live = 0;
   for (const patch of game.patches.values()) if (patch.kind === kind) live++;
   if (live + 2 > PATCH_CAP[kind]) return false;
@@ -119,6 +121,40 @@ export function spawnPatchPair(game, kind, reserve) {
   game.nextPatchId = id + 2;
   addPatch(game, patch);
   addPatch(game, twin);
+  game.terrainVersion++;
+  return true;
+}
+
+function rotatedTiles(n, x, y, w, h) {
+  const groups = [[], [], [], []];
+  for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+    rotations(n, x + dx, y + dy).forEach((p, k) => groups[k].push(p.y * n + p.x));
+  }
+  return groups;
+}
+
+function rotatedSpot(game, w, h, accept, whole = null) {
+  const n = game.map.size;
+  for (let tries = 0; tries < 200; tries++) {
+    const x = 1 + game.oreRng.int(n - w - 1), y = 1 + game.oreRng.int(n - h - 1);
+    const groups = rotatedTiles(n, x, y, w, h), all = groups.flat();
+    if (new Set(all).size !== all.length || !all.every(i => accept(i % n, Math.floor(i / n)))) continue;
+    if (whole && !groups.every(g => whole(Math.min(...g.map(i => i % n)), Math.min(...g.map(i => Math.floor(i / n)))))) continue;
+    return { x, y, groups };
+  }
+  return null;
+}
+
+function spawnPatchQuartet(game, kind, reserve) {
+  const live = [...game.patches.values()].filter(p => p.kind === kind).length;
+  if (live + 4 > PATCH_CAP[kind] * 2) return false;
+  const spot = rotatedSpot(game, 4, 3, openLand(game));
+  if (!spot) return false;
+  const first = game.nextPatchId;
+  spot.groups.forEach((tiles, turn) => addPatch(game, {
+    id: first + turn, kind, tiles, reserve, startReserve: reserve, twin: first + (turn + 2) % 4,
+  }));
+  game.nextPatchId += 4;
   game.terrainVersion++;
   return true;
 }
@@ -196,7 +232,8 @@ export function updateRespawn(game) {
   for (const kind of KINDS) {
     if (pileSum(game, kind) >= LOW_PILES * game.pileStart[kind] || game.time - game.lastRespawn[kind] < PILE_COOLDOWN) continue;
     seen ??= walkable(game);
-    const spot = mirroredSpot(game, 2, 2, openLand(game), reachedSide(game, seen, 2, 2));
+    const finder = game.players.length === 4 ? rotatedSpot : mirroredSpot;
+    const spot = finder(game, 2, 2, openLand(game), reachedSide(game, seen, 2, 2));
     if (!spot) continue;
     addPileBlock(game, kind, spot);
     game.lastRespawn[kind] = game.time;
@@ -206,6 +243,12 @@ export function updateRespawn(game) {
 // A 2x2 block of fresh piles at `spot`, each placed with its mirror pile.
 function addPileBlock(game, kind, spot) {
   const n = game.map.size, amount = PILE_AMOUNT[kind];
+  if (game.players.length === 4) {
+    for (const group of spot.groups) for (const i of group) {
+      game.addResource({ type: kind, x: i % n + 0.5, y: Math.floor(i / n) + 0.5, amount });
+    }
+    return;
+  }
   for (let y = spot.y; y < spot.y + 2; y++) for (let x = spot.x; x < spot.x + 2; x++) {
     game.addResource({ type: kind, x: x + 0.5, y: y + 0.5, amount });
     game.addResource({ type: kind, x: n - 1 - x + 0.5, y: n - 1 - y + 0.5, amount });
