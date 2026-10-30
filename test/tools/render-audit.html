@@ -59,11 +59,14 @@ async function measure(name,count=150,live=false){
  report.scenes.push(sample);return sample;
 }
 await measure('high-natural');
+// The same scene without bloom, in the same run, so its cost is not confused with other changes or thermal drift.
+view.setBloom?.(false);await measure('high-natural-no-bloom');view.setBloom?.(true);
 const batch=view.scene.children.find(o=>o.isBatchedMesh);batch.sortObjects=false;
 await measure('high-natural-sort-off');batch.sortObjects=true;
 view.setQuality('balanced');await measure('balanced-natural');
 view.setQuality('high');for(const p of game.players)p.explored.fill(1);game.time++;view.sync();
 await measure('high-explored-map');
+view.setBloom?.(false);await measure('high-explored-no-bloom');view.setBloom?.(true);
 batch.sortObjects=false;await measure('high-explored-sort-off');batch.sortObjects=true;
 // Compare the matrix values only outside all timed samples.
 let writes=0,unchanged=0;const setMatrix=batch.setMatrixAt;

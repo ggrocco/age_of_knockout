@@ -141,6 +141,8 @@ export function createLightingEffects(renderer, scene, camera, preset, cosmetics
   composer.addPass(beauty); composer.addPass(ao); if (bloom) composer.addPass(bloom); composer.addPass(output);
   return {
     enabled: true, bloom: !!bloom, invalidate() { ao.excluded = null; },
+    // For measurements (render audit): skip the bloom pass and its glow, keeping everything else.
+    setBloom(on) { if (!bloom) return; bloom.enabled = on; output.uniforms.glowStrength.value = on ? BLOOM.strength : 0; },
     resize(width, height) {
       const ratio = renderer.getPixelRatio();
       composer.setPixelRatio(ratio); composer.setSize(width, height);

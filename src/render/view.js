@@ -234,6 +234,8 @@ export function createView(container, game) {
     effects.resize(width, height);
     view.invalidate();
   };
+  // Measurement hook (test/tools/render-audit.html): bloom off while keeping this preset's other effects.
+  view.setBloom = on => { effects.setBloom?.(on); setGlowBloom(on && effects.bloom); view.invalidate(); };
   view.setQuality = name => {
     if (!validQuality(name)) return;
     sessionQuality = name; saveQuality(name, storage);
