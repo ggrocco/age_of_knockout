@@ -335,8 +335,8 @@ performance guarantees on those devices. Use `&quality=balanced|high|ultra` to o
 
 Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
 own light, so they stay bright in shadow. On Ultra a bloom pass adds a halo around them (sun glints on gold and
-chrome can sparkle a little too); it costs about 3 ms a frame on an M2 Max, so Balanced and High keep the lights a
-little brighter without the halo.
+chrome can sparkle a little too). On an M2 Max it costs about 7 ms a frame at Ultra (16.5 ms instead of 9.5) and
+would cost about 3 ms at High, so Balanced and High keep the lights a little brighter without the halo.
 
 Battles leave marks: a building below half health burns, with more fire and black smoke the more it is damaged; a
 destroyed building goes up in fire, smoke and flying debris; a killed soldier leaves a puff of dust; and cavalry and
