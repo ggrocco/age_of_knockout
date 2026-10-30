@@ -118,7 +118,11 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     uniform and weapon finish (a colour remap on the arm parts, via `new B(map)`); cavalry ride horses, then motorbikes
     (Modern) and hoverbikes (AI Future); the Catapult and Trebuchet become a mortar and a rocket battery from the Age of
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers use civilian workwear per era; ships use era-ships.js for later-era hulls and equipment. Only the King keeps one look.
-  - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
+  - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`. Light-source colours (fire, embers, lamp
+    lenses, muzzle-flash cores, AI Future neon; the `GLOW` set in `render/materials.js`) are surface kind 5 and emit.
+    On High/Ultra `render/lighting.js` adds a bloom pass after SSAO that picks pixels by their brightest HDR channel;
+    `setGlowBloom` makes lights emit harder only when that pass runs. A new light-coloured part only needs one of
+    those colours.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid and the unit × era view (`?view=units`) from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and

@@ -1,8 +1,8 @@
 // Explicit preferences, not device-model guesses: browsers do not reliably expose the GPU.
 export const QUALITY = Object.freeze({
-  balanced: Object.freeze({ label: 'Balanced', pixelRatio: 1.5, maxPixels: 2000000, shadows: 1024, grass: 2500, ao: 0, samples: 8 }),
-  high: Object.freeze({ label: 'High', pixelRatio: 2, maxPixels: 4000000, shadows: 2048, grass: 8000, ao: 0.5, samples: 12 }),
-  ultra: Object.freeze({ label: 'Ultra', pixelRatio: 2.5, maxPixels: 8000000, shadows: 4096, grass: 14000, ao: 0.75, samples: 24 }),
+  balanced: Object.freeze({ label: 'Balanced', pixelRatio: 1.5, maxPixels: 2000000, shadows: 1024, grass: 2500, ao: 0, samples: 8, bloom: 0 }),
+  high: Object.freeze({ label: 'High', pixelRatio: 2, maxPixels: 4000000, shadows: 2048, grass: 8000, ao: 0.5, samples: 12, bloom: 0.5 }),
+  ultra: Object.freeze({ label: 'Ultra', pixelRatio: 2.5, maxPixels: 8000000, shadows: 4096, grass: 14000, ao: 0.75, samples: 24, bloom: 0.75 }),
 });
 const KEY = 'age-of-knockout.graphics';
 export const validQuality = value => Object.hasOwn(QUALITY, value);

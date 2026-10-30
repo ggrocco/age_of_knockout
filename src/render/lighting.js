@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // Sky above the horizon, ground below it (top to bottom of the equirectangular image).
 const SKY_STOPS = [[0, '#769fc0'], [0.35, '#c0d4dc'], [0.5, '#f1e4c2'], [0.54, '#78845b'], [1, '#393426']];
@@ -54,10 +55,21 @@ class WorldAO extends SSAOPass {
   }
 }
 
+// A pixel blooms when its brightest linear HDR channel passes `threshold`: lit white walls reach about 1.2, glow
+// surfaces 2 and more. Sun glints on gold and chrome can pass it too and get a faint sparkle; separating them would
+// need a glow-only render pass. The brightest channel, not luminance, so red fire and magenta neon bloom like cyan.
+const BLOOM = Object.freeze({ strength: 0.55, radius: 0.25, threshold: 1.8 });
+function brightestChannelBloom(bloom) {
+  const shader = bloom.materialHighPassFilter, luma = 'float v = luminance( texel.xyz );';
+  if (!shader.fragmentShader.includes(luma)) throw new Error('UnrealBloomPass high-pass shader changed');
+  shader.fragmentShader = shader.fragmentShader.replace(luma, 'float v = max( texel.r, max( texel.g, texel.b ) );');
+  return bloom;
+}
+
 export function createLightingEffects(renderer, scene, camera, preset, cosmetics) {
   // Float render targets are required by SSAOPass; direct rendering is the fallback.
   if (!preset.ao || !renderer.extensions.has('EXT_color_buffer_float')) {
-    return { enabled: false, invalidate() {}, resize() {}, render() { renderer.render(scene, camera); }, dispose() {} };
+    return { enabled: false, bloom: false, invalidate() {}, resize() {}, render() { renderer.render(scene, camera); }, dispose() {} };
   }
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: preset.samples > 12 ? 4 : 2 });
   const composer = new EffectComposer(renderer, target), beauty = new RenderPass(scene, camera);
@@ -66,16 +78,20 @@ export function createLightingEffects(renderer, scene, camera, preset, cosmetics
   ao.ssaoMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.depthRenderMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.kernelRadius = 0.65; ao.minDistance = 0.00015; ao.maxDistance = 0.018;
-  composer.addPass(beauty); composer.addPass(ao); composer.addPass(output);
+  // Bloom haloes only what is brighter than lit white walls, which in practice means the glow surfaces (materials.js).
+  const bloom = preset.bloom ? brightestChannelBloom(new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, BLOOM.threshold)) : null;
+  composer.addPass(beauty); composer.addPass(ao); if (bloom) composer.addPass(bloom); composer.addPass(output);
   return {
-    enabled: true, invalidate() { ao.excluded = null; },
+    enabled: true, bloom: !!bloom, invalidate() { ao.excluded = null; },
     resize(width, height) {
       const ratio = renderer.getPixelRatio();
       composer.setPixelRatio(ratio); composer.setSize(width, height);
       // AO runs at a fraction (preset.ao) of the drawing-buffer resolution.
       ao.setSize(Math.max(1, Math.round(width * ratio * preset.ao)), Math.max(1, Math.round(height * ratio * preset.ao)));
+      // Bloom is blurry by design, so it also runs at a fraction (preset.bloom) of the resolution.
+      bloom?.setSize(Math.max(1, Math.round(width * ratio * preset.bloom)), Math.max(1, Math.round(height * ratio * preset.bloom)));
     },
     render() { composer.render(); },
-    dispose() { ao.dispose(); output.dispose(); beauty.dispose(); composer.dispose(); },
+    dispose() { ao.dispose(); bloom?.dispose(); output.dispose(); beauty.dispose(); composer.dispose(); },
   };
 }

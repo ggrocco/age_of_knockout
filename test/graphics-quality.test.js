@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QUALITY, readQuality, saveQuality, renderPixelRatio } from '../src/render/quality.js';
+import * as THREE from 'three';
 import { createLightingEffects } from '../src/render/lighting.js';
+import { surfaceKind, createModelMaterial, setGlowBloom } from '../src/render/materials.js';
 
 test('graphics defaults to High and accepts only supported URL presets', () => {
   assert.equal(readQuality(), 'high');
@@ -45,4 +47,25 @@ test('Balanced and browsers without float render targets use the direct-render f
     effects.resize(402, 874); effects.render(); effects.dispose();
   }
   assert.equal(renders, 3);
+});
+
+test('bloom only runs on presets that already render through the composer', () => {
+  assert.equal(QUALITY.balanced.bloom, 0);
+  for (const preset of [QUALITY.high, QUALITY.ultra]) assert.ok(preset.bloom > 0 && preset.ao > 0, preset.label);
+  const renderer = { extensions: { has: () => false }, render() {} };
+  assert.equal(createLightingEffects(renderer, {}, {}, QUALITY.high).bloom, false, 'no float targets: no bloom pass');
+});
+
+test('light-source colours become glow surfaces, which emit harder when bloom is on', () => {
+  for (const light of [0xff8a2a, 0xffc04a, 0xfff3c2, 0x39f3ff, 0xff3df2]) assert.equal(surfaceKind(light), 5);
+  assert.equal(surfaceKind(0xf2c230), 4, 'gold metal stays metal');
+  assert.equal(surfaceKind(0xf4f6f7), 0, 'white panels do not glow');
+  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+  createModelMaterial().onBeforeCompile(shader);
+  assert.match(shader.fragmentShader, /totalEmissiveRadiance \+= glowColor \* glowEmit/);
+  assert.match(shader.fragmentShader, /vSurface > 3\.5 && vSurface < 4\.5\) metalnessFactor/, 'glow surfaces are not metal');
+  setGlowBloom(true);
+  assert.ok(shader.uniforms.glowEmit.value > 1 && shader.uniforms.glowLit.value < 1);
+  setGlowBloom(false);
+  assert.ok(shader.uniforms.glowEmit.value < 1 && shader.uniforms.glowLit.value === 1);
 });
