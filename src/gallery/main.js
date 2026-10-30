@@ -145,6 +145,11 @@ function startDetailLoop() {
   };
   raf = requestAnimationFrame(loop);
 }
+// The units with a work preview: what the action is called and the job (and load carried) it shows.
+const WORK = {
+  villager: { label: 'Chop wood', kind: 'wood', carry: 0 },
+  fishing_ship: { label: 'Fish', kind: 'food', carry: 10 },
+};
 function openDetail(type, age) {
   ensureDetailStage();
   detail = { type, age, t: 0 };
@@ -152,7 +157,9 @@ function openDetail(type, age) {
   buildBox.closest('label').hidden = isUnits();
   actionBox.closest('label').hidden = !isUnits();
   actionBox.value = 'idle';
-  actionBox.querySelector('[value="work"]').disabled = type !== 'villager';
+  const work = actionBox.querySelector('[value="work"]');
+  work.disabled = !WORK[type];
+  work.textContent = WORK[type]?.label ?? 'Work';
   actionBox.querySelector('[value="attack"]').disabled = !UNITS[type]?.atk;
   if (!dialog.open) dialog.showModal();
   refreshDetail(true);
@@ -162,7 +169,9 @@ function refreshDetail(reframe) {
   if (!detail) return;
   detail.e = galleryEntity(detail.type, state.team, !buildBox.checked);
   if (isUnits()) {
-    detail.e.order = actionBox.value === 'work' ? { type: 'gather', kind: 'wood', phase: 'work' } : { type: actionBox.value };
+    const work = actionBox.value === 'work' && WORK[detail.type];
+    detail.e.order = work ? { type: 'gather', kind: work.kind, phase: 'work' } : { type: actionBox.value };
+    if (work) detail.e.carry = { type: work.kind, amount: work.carry };
   }
   detail.group = modelGroup(detail.e, detail.age, detail.t);
   stage.show(detail.group);

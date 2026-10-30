@@ -7,6 +7,7 @@ import { ROUNDS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { QUALITY } from '../render/quality.js';
+import { isIdleWorker } from './input.js';
 
 const REASONS = {
   'needs a fishing ship': 'Only Fishing Ships can fish',
@@ -299,7 +300,7 @@ export function createHud(ui) {
   const updateIdleBadge = game => {
     let idleCount = 0;
     for (const unit of game.units.values()) {
-      if (unit.owner === 0 && unit.type === 'villager' && unit.order.type === 'idle' && !unit.aboard) idleCount++;
+      if (isIdleWorker(unit)) idleCount++;
     }
     const badge = document.querySelector(ui.touch ? '#touchbar [data-act=idle] .badge' : '#idlebtn .badge');
     const badgeText = idleCount ? String(idleCount) : '';

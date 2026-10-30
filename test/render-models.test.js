@@ -185,3 +185,22 @@ test('transports keep their animated passenger slots after every age-up', () => 
     assert.ok(m.anim.crew.every(p => !p.visible), age);
   }
 });
+
+test('a Fishing Ship casts its net while it fishes and shows its catch on deck, in every era', () => {
+  for (const age of AGES) {
+    const e = { ...unitOf('fishing_ship'), order: { type: 'idle' }, carry: { type: null, amount: 0 } };
+    const m = buildModel(e, age), g = new THREE.Group(), a = m.anim;
+    g.userData.anim = a; g.add(m.root);
+    animate(g, e, 1, false);
+    assert.equal(a.net.scale.y, 1, age);
+    assert.ok(!a.splash.visible && !a.heap.visible, age);
+    e.order = { type: 'gather', kind: 'food', phase: 'work' }; e.carry = { type: 'food', amount: 3 };
+    animate(g, e, 2, false);
+    assert.ok(a.net.scale.y > 1.5 && a.splash.visible && a.heap.visible, age);
+    const part = a.heap.scale.x;
+    e.carry.amount = 15; animate(g, e, 3, false);
+    assert.ok(a.heap.scale.x > part, age);
+    e.order = { type: 'gather', kind: 'food', phase: 'drop' }; animate(g, e, 4, true);
+    assert.ok(a.net.scale.y === 1 && !a.splash.visible && a.heap.visible, age);
+  }
+});

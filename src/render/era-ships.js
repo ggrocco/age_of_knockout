@@ -2,6 +2,24 @@
 import { B, C, TEAM, unit } from './builder.js';
 import { ageIndex } from '../data/ages.js';
 
+// The Fishing Ship's moving gear. The net hangs from the boom's low end (its pivot, NET_AT) and is cast into the water
+// while fishing; the splash rings it there; the catch is a heap of fish on the fish box that grows with the load.
+export const NET_AT = [0.27, 0.36, 0.12], CATCH_AT = [0, 0.36, -0.23];
+function fishingGear(netColor) {
+  const net = new B(), splash = new B(), heap = new B();
+  for (const x of [-0.1, -0.035, 0.035, 0.1]) net.box(0.014, 0.28, 0.014, netColor, x, -0.28, 0);
+  for (const y of [-0.28, -0.18, -0.08, 0.01]) net.box(0.22, 0.014, 0.014, netColor, 0, y, 0);
+  for (let i = 0; i < 10; i++) { // a ring of foam with spray thrown up inside it
+    const a = i * Math.PI / 5;
+    splash.sph(0.05, 0xf2fbff, Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2, 1.3, 0.45, 1);
+    if (i % 3 === 0) splash.sph(0.03, 0xf2fbff, Math.cos(a) * 0.08, 0.1 + i * 0.012, Math.sin(a) * 0.08);
+  }
+  for (const [x, y, z, turn] of [[-0.05, 0, -0.06, 0.4], [0.05, 0, 0.04, -0.3], [0, 0.04, 0, 1.2], [-0.03, 0.07, 0.07, 2]]) {
+    heap.add(unit.sph, 0xc9d6de, x, y, z, 0.022, 0.02, 0.06, 0, turn, 0).add(unit.sph, 0x52677a, x, y + 0.012, z, 0.014, 0.012, 0.045, 0, turn, 0);
+  }
+  return { net: net.geometry(), splash: splash.geometry(), heap: heap.geometry() };
+}
+
 export function eraShipParts(type, team, era) {
   const t = TEAM[team], fishing = type === 'fishing_ship', transport = type === 'transport_ship';
   const i = ageIndex(era), powered = i >= ageIndex('industrial'), future = era === 'future';
@@ -37,11 +55,10 @@ export function eraShipParts(type, team, era) {
     else b.cyl(0.018, 0.5, finish, 0, 0.56, -len * 0.25).box(0.3, 0.04, 0.07, trim, 0, 1.04, -len * 0.25);
     if (future) for (const x of [-w * 0.65, w * 0.65]) b.box(0.16, 0.18, len * 0.8, finish, x, 0.02, 0).box(0.17, 0.035, len * 0.7, trim, x, 0.04, 0);
   }
-  if (fishing) { // net boom, visible net and fish boxes in every era
+  if (fishing) { // net boom and fish boxes in every era; the net, its splash and the catch are parts that move
     b.add(unit.cyl, powered ? C.iron : C.woodD, 0, 0.5, 0.12, 0.018, 0.65, 0.018, 0, 0, 1.0);
-    for (const x of [0.2, 0.27, 0.34]) b.box(0.012, 0.26, 0.012, future ? trim : C.hay, x, 0.1, 0.12);
-    for (const y of [0.1, 0.22, 0.35]) b.box(0.16, 0.012, 0.012, future ? trim : C.hay, 0.27, y, 0.12);
     b.box(0.2, 0.12, 0.25, deck, 0, 0.24, -0.23).sph(0.04, 0xb8c4cc, 0, 0.37, -0.23, 1.7, 0.5, 0.7);
+    return { body: b.geometry(), ...fishingGear(future ? trim : C.hay) };
   }
   if (transport) {
     b.box(0.42, 0.035, 0.3, trim, 0, 0.24, len * 0.38, -0.35);

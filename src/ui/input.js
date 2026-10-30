@@ -3,6 +3,11 @@ import { UNITS } from '../data/units.js';
 import { canPlace, canAfford } from '../sim/commands.js';
 import { lineTiles } from '../sim/util.js';
 
+// A worker of the player's with nothing to do: a villager or Fishing Ship standing idle (not riding a transport).
+// The idle button counts and cycles through these.
+export const isIdleWorker = unit => unit.owner === 0 && (unit.type === 'villager' || unit.type === 'fishing_ship')
+  && unit.order.type === 'idle' && !unit.aboard;
+
 // The ghost line for a wall: ok[i] is canPlace for tiles[i], the per-tile check the wall command uses; a repeated tile is listed
 // (and counted) once. Placement only: stone is not checked here, the command's 'resources' toast covers that. DOM-free.
 export function wallPlan(game, pid, tiles) {
@@ -182,16 +187,15 @@ export function createInput(ui) {
       ui.wallEnd = null;
     } else ui.wallEnd = tile;
   }
-  const idleVillagers = () => game().visibleEntities(0)
-    .filter(unit => unit.owner === 0 && unit.type === 'villager' && unit.order.type === 'idle');
+  const idleWorkers = () => game().visibleEntities(0).filter(isIdleWorker);
   ui.actions = {
-    idle() { // cycles through the idle villagers, one per press
-      const idle = idleVillagers();
-      if (!idle.length) return ui.toast?.('No idle villagers');
+    idle() { // cycles through the idle villagers and Fishing Ships, one per press
+      const idle = idleWorkers();
+      if (!idle.length) return ui.toast?.('No idle villagers or fishing ships');
       ui.idleIdx = (ui.idleIdx || 0) % idle.length;
-      const villager = idle[ui.idleIdx++];
-      setSelection([villager.id]);
-      ui.view.centerOn(villager.x, villager.y);
+      const worker = idle[ui.idleIdx++];
+      setSelection([worker.id]);
+      ui.view.centerOn(worker.x, worker.y);
     },
     home() {
       const townCenter = [...game().buildings.values()].find(building => building.owner === 0 && building.type === 'town_center');
