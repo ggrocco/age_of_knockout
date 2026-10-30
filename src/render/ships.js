@@ -1,10 +1,11 @@
 // Ships (the Dock's units), bow to +z like every unit, hull resting on the water at y = 0. Each follows its owner's
 // era while retaining its role. Parts that move: the War Galley's two banks of oars, the
 // Frigate's and Destroyer's guns (recoil on a shot), the Transport Ship's passengers (one figure on deck for each one
-// aboard); the whole hull bobs and rolls (CPU, or the GPU's bob in a match).
+// aboard), the Fishing Ship's net (cast into a splashing sea while it fishes) and catch (grows with its load); the whole
+// hull bobs and rolls (CPU, or the GPU's bob in a match).
 import * as THREE from 'three';
 import { UNITS } from '../data/units.js';
-import { eraShipParts } from './era-ships.js';
+import { CATCH_AT, NET_AT, eraShipParts } from './era-ships.js';
 import { B, C, TEAM, TEAM_DARK, cached, mesh, pivot, unit } from './builder.js';
 
 const GREY = 0x7d868c, GREY_D = 0x5b6369, DECK = 0x9c8a6a, HULL = 0x4e3320, OCHRE = 0xc79a3a, SAIL = 0xe9e1cc, BLACK = 0x1c1c1c;
@@ -122,6 +123,15 @@ function addGuns(body, shipParts, anim) {
   }
 }
 
+// The Fishing Ship's net on the boom, the splash on the water under it (hidden until it fishes) and the catch on deck.
+function addFishingGear(body, shipParts, anim) {
+  anim.net = pivot(...NET_AT, shipParts.net);
+  anim.splash = pivot(NET_AT[0], 0.02, NET_AT[2], shipParts.splash);
+  anim.heap = pivot(...CATCH_AT, shipParts.heap);
+  anim.splash.visible = anim.heap.visible = false;
+  body.add(anim.net, anim.splash, anim.heap);
+}
+
 // A ship's model: { root, anim, shadow } like models.js's units. anim.body bobs; oars, guns and turrets are pivots.
 export function shipModel(e, era = UNITS[e.type].age) {
   const root = new THREE.Group(), shipParts = cached(`ship:${e.type}:${e.owner}:${era}`,
@@ -133,6 +143,7 @@ export function shipModel(e, era = UNITS[e.type].age) {
   if (shipParts.person) anim.crew = addCrew(body, shipParts.person);
   if (shipParts.oar) anim.oars = addOars(body, shipParts.oar);
   addGuns(body, shipParts, anim);
+  if (shipParts.net) addFishingGear(body, shipParts, anim);
   root.scale.setScalar(e.type === 'fishing_ship' ? 1 : 1.15);
   return { root, anim, shadow: e.type === 'fishing_ship' ? 0.4 : 0.6 };
 }
@@ -143,8 +154,22 @@ export function animateShip(g, a, e, t, moving) {
   if (!g.userData.gpuCosmetics) a.body.position.y = Math.sin(t * 3 + e.id) * 0.025; // the GPU's bob: sin(time * 3 + phase)
   a.body.rotation.z = Math.sin(t * 1.3 + e.id * 0.7) * 0.035;
   if (a.oars) for (const oar of a.oars) oar.rotation.y = moving ? Math.sin(t * 6 + e.id) * 0.45 : 0;
+  if (a.net) animateFishing(a, e, t);
   if (a.crew) a.crew.forEach((figure, i) => { figure.visible = i < (e.cargo?.length ?? 0); });
   const kick = e.order?.type === 'attack' && e.cooldown ? Math.max(0, (e.cd - e.cooldown + 8) / 8) : 0;
   if (a.gun && a.aft) a.gun.position.z = 0.55 - kick * 0.06;
   else if (a.gun) a.gun.scale.x = 1 - kick * 0.12; // the Frigate's broadside runs in on both sides
+}
+
+// While it fishes, the net hangs down into the water and sways in a ring of splashes; otherwise it is hauled up. The
+// catch on deck shows from the first fish and grows to a full heap at the ship's capacity.
+function animateFishing(a, e, t) {
+  const fishing = e.order?.type === 'gather' && e.order.phase === 'work';
+  a.net.scale.y = fishing ? 1.9 + Math.sin(t * 2.2 + e.id) * 0.12 : 1;
+  a.net.rotation.x = fishing ? Math.sin(t * 1.7 + e.id) * 0.12 : 0;
+  a.splash.visible = fishing;
+  if (fishing) a.splash.scale.setScalar(0.8 + (t * 1.5 + e.id * 0.37) % 1 * 0.5);
+  const load = Math.min(1, (e.carry?.amount ?? 0) / (UNITS[e.type].capacity ?? 10));
+  a.heap.visible = load > 0.03;
+  a.heap.scale.setScalar(0.5 + load * 0.7);
 }

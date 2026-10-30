@@ -167,7 +167,7 @@ map the opponent ferries its attack waves to your island and sends squads to fet
 ### Controls (desktop)
 
 Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic ·
-WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager, `H` Town Center · hold Space and drag
+WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager or Fishing Ship, `H` Town Center · hold Space and drag
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
 
@@ -199,7 +199,7 @@ Tap your unit or building to select it; with a selection, tap a target to order 
 tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
-Round buttons: next idle villager (badge = count), Town Center, box-select mode, deselect. Building placement: tap
+Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode, deselect. Building placement: tap
 or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit.
 
 The **Delete** tile opens the same **Cancel / Delete building** confirmation as desktop, including for unfinished
