@@ -27,7 +27,9 @@ const backend=await loadRenderBackend(location.search,{trackTimestamp:true});
 const started=performance.now(),view=createView(document.querySelector('#viewport'),game,backend),initMs=performance.now()-started;
 const gl=backend?null:view.renderer.getContext(),ext=gl?.getExtension('EXT_disjoint_timer_query_webgl2');
 const gpuTimestamps=!!backend&&view.renderer.backend.trackTimestamp;
-const report={renderer:view.backend,gpu:view.gpu,softwareGpu:view.softwareGpu,ua:navigator.userAgent,viewport:[innerWidth,innerHeight,devicePixelRatio],multiDraw:gl?!!gl.getExtension('WEBGL_multi_draw'):null,gpuTimer:!!ext||gpuTimestamps,webgpu:!!navigator.gpu,initMs:+initMs.toFixed(2),sim:{seed:1,round:'deathmatch',ticks:game.time,units:game.units.size,buildings:game.buildings.size,resources:game.resources.size,ages:game.players.map(p=>p.age),tick:stats(tick),think:stats(think)},scenes:[]};
+// Which model path ran: the GPU-culling batch needs indirect-first-instance and no &indirect=0 (view.js loadRenderBackend).
+const report={url:location.search,renderer:view.backend,modelPath:view.batch.mesh.isGpuBatch?'gpu-culling':'batchedmesh',indirectFirstInstance:backend?backend.renderer.hasFeature('indirect-first-instance'):null,rendererLabel:view.rendererLabel,gpu:view.gpu,softwareGpu:view.softwareGpu,ua:navigator.userAgent,viewport:[innerWidth,innerHeight,devicePixelRatio],multiDraw:gl?!!gl.getExtension('WEBGL_multi_draw'):null,gpuTimer:!!ext||gpuTimestamps,webgpu:!!navigator.gpu,initMs:+initMs.toFixed(2),sim:{seed:1,round:'deathmatch',ticks:game.time,units:game.units.size,buildings:game.buildings.size,resources:game.resources.size,ages:game.players.map(p=>p.age),tick:stats(tick),think:stats(think)},scenes:[]};
+window.__auditReport=report; // filled in as scenes complete
 view.centerOn(game.map.starts[0].x,game.map.starts[0].y);view.setZoom(13);view.sync();
 let frameRecord=null;
 const originalMatrix=view.scene.updateMatrixWorld.bind(view.scene);
