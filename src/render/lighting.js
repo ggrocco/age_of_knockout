@@ -59,11 +59,52 @@ class WorldAO extends SSAOPass {
 // surfaces 2 and more. Sun glints on gold and chrome can pass it too and get a faint sparkle; separating them would
 // need a glow-only render pass. The brightest channel, not luminance, so red fire and magenta neon bloom like cyan.
 const BLOOM = Object.freeze({ strength: 0.55, radius: 0.25, threshold: 1.8 });
-function brightestChannelBloom(bloom) {
-  const shader = bloom.materialHighPassFilter, luma = 'float v = luminance( texel.xyz );';
-  if (!shader.fragmentShader.includes(luma)) throw new Error('UnrealBloomPass high-pass shader changed');
-  shader.fragmentShader = shader.fragmentShader.replace(luma, 'float v = max( texel.r, max( texel.g, texel.b ) );');
-  return bloom;
+
+// UnrealBloomPass without its last step, which adds the bloom back into the full-resolution multisampled scene
+// target: on a tile-based GPU that writes the whole target out and reads it back, 3-3.5 ms a frame at High on an M2
+// Max. The bloom stays in its small composite target (`glow`) and the output pass adds it (withBloom).
+class GlowPass extends UnrealBloomPass {
+  constructor(...args) {
+    super(...args);
+    const shader = this.materialHighPassFilter, luma = 'float v = luminance( texel.xyz );';
+    if (!shader.fragmentShader.includes(luma) || !this._fsQuad) throw new Error('UnrealBloomPass internals changed');
+    shader.fragmentShader = shader.fragmentShader.replace(luma, 'float v = max( texel.r, max( texel.g, texel.b ) );');
+  }
+  get glow() { return this.renderTargetsHorizontal[0].texture; }
+  // UnrealBloomPass.render up to its composite (three r186), all at half resolution and below.
+  render(renderer, writeBuffer, readBuffer) {
+    const autoClear = renderer.autoClear, quad = this._fsQuad;
+    renderer.getClearColor(this._oldClearColor); this._oldClearAlpha = renderer.getClearAlpha();
+    renderer.autoClear = false; renderer.setClearColor(this.clearColor, 0);
+    const draw = (material, target) => { quad.material = material; renderer.setRenderTarget(target); renderer.clear(); quad.render(renderer); };
+    this.highPassUniforms.tDiffuse.value = readBuffer.texture;
+    this.highPassUniforms.luminosityThreshold.value = this.threshold;
+    draw(this.materialHighPassFilter, this.renderTargetBright);
+    let input = this.renderTargetBright;
+    for (let i = 0; i < this.nMips; i++) {
+      const blur = this.separableBlurMaterials[i];
+      blur.uniforms.colorTexture.value = input.texture; blur.uniforms.direction.value = UnrealBloomPass.BlurDirectionX;
+      draw(blur, this.renderTargetsHorizontal[i]);
+      blur.uniforms.colorTexture.value = this.renderTargetsHorizontal[i].texture; blur.uniforms.direction.value = UnrealBloomPass.BlurDirectionY;
+      draw(blur, this.renderTargetsVertical[i]);
+      input = this.renderTargetsVertical[i];
+    }
+    this.compositeMaterial.uniforms.bloomStrength.value = this.strength;
+    this.compositeMaterial.uniforms.bloomRadius.value = this.radius;
+    this.compositeMaterial.uniforms.bloomTintColors.value = this.bloomTintColors;
+    draw(this.compositeMaterial, this.renderTargetsHorizontal[0]);
+    renderer.setClearColor(this._oldClearColor, this._oldClearAlpha); renderer.autoClear = autoClear;
+  }
+}
+
+// The output pass (tone mapping, sRGB) adds the glow texture before tone mapping, as UnrealBloomPass's blend would have.
+function withBloom(output, glowPass) {
+  const read = 'gl_FragColor = texture2D( tDiffuse, vUv );', material = output.material;
+  if (!material.fragmentShader.includes(read)) throw new Error('OutputPass shader changed');
+  output.uniforms.tGlow = { value: glowPass.glow };
+  material.fragmentShader = material.fragmentShader.replace('uniform sampler2D tDiffuse;', 'uniform sampler2D tDiffuse;\nuniform sampler2D tGlow;')
+    .replace(read, `${read}\ngl_FragColor.rgb += texture2D( tGlow, vUv ).rgb;`);
+  return output;
 }
 
 export function createLightingEffects(renderer, scene, camera, preset, cosmetics) {
@@ -79,7 +120,8 @@ export function createLightingEffects(renderer, scene, camera, preset, cosmetics
   ao.depthRenderMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.kernelRadius = 0.65; ao.minDistance = 0.00015; ao.maxDistance = 0.018;
   // Bloom haloes only what is brighter than lit white walls, which in practice means the glow surfaces (materials.js).
-  const bloom = preset.bloom ? brightestChannelBloom(new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, BLOOM.threshold)) : null;
+  const bloom = preset.bloom ? new GlowPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, BLOOM.threshold) : null;
+  if (bloom) withBloom(output, bloom);
   composer.addPass(beauty); composer.addPass(ao); if (bloom) composer.addPass(bloom); composer.addPass(output);
   return {
     enabled: true, bloom: !!bloom, invalidate() { ao.excluded = null; },
