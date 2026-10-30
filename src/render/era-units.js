@@ -1,7 +1,7 @@
 // Era looks for units trained in an earlier era than their owner's current one. A unit keeps what tells it apart (its
 // weapon family, shield, scale, mount or chassis role) but takes the owner's era uniform, weapon finish, mount and
-// siege chassis: a Scout in the AI Future rides a hoverbike, a Catapult in the Age of Sail is a mortar. Villagers,
-// the King and ships keep one look. unitEra and eraSpec are pure data; the geometry builders share models.js's toolkit.
+// siege chassis: a Scout in the AI Future rides a hoverbike, a Catapult in the Age of Sail is a mortar. Villagers and
+// ships follow their owner; only the King keeps one look. unitEra and eraSpec are pure data; geometry uses builder.js.
 import { UNITS } from '../data/units.js';
 import { AGES, ageIndex } from '../data/ages.js';
 import { B, C, TEAM, unit } from './builder.js';
@@ -14,7 +14,7 @@ const remap = pairs => new Map(pairs);
 // The era a unit is drawn in: its owner's era once that is past the unit's own, else the unit's own era.
 export function unitEra(type, age) {
   const spec = UNITS[type], native = spec?.age ?? 'stone';
-  if (!spec || spec.cls === 'civ' || spec.naval || !AGES.includes(age)) return native;
+  if (!spec || type === 'king' || !AGES.includes(age)) return native;
   return ageIndex(age) > ageIndex(native) ? age : native;
 }
 
@@ -61,10 +61,23 @@ function armForEra(look, era) {
   look.remap = ARMS[era] ?? null;
 }
 
+// Civilian workwear stays distinct from soldiers: aprons, caps, then safety gear and a utility suit.
+const WORKWEAR = {
+  tool: { tunic: 0xb39970, pants: 0x705238, hat: 'straw' },
+  bronze: { tunic: 0xe1c89b, pants: 0x89633f, hat: 'straw', belt: C.bronze },
+  iron: { tunic: 0xb1a28a, pants: 0x554b42, hat: 'straw', belt: C.iron },
+  medieval: { tunic: 0x94734e, pants: 0x443a30, helmet: 'leather', hat: null },
+  sail: { tunic: 0xe3d7b9, pants: 0x374b64, helmet: 'tricorn', hat: null },
+  industrial: { tunic: 0x53677e, pants: 0x303d50, helmet: 'kepi', hat: null, apron: C.leather },
+  modern: { tunic: 0xe39728, pants: 0x30475e, helmet: 'hardhat', hat: null, apron: 0xe9ce41 },
+  future: { tunic: DARK, pants: DARK, helmet: 'visor', hat: null, apron: CHROME, remap: ARMS.future },
+};
+
 // A humanoid spec (models.js HUMAN, or a rider) in the given era: helmet, uniform, then weapon and shield updates.
 export function eraSpec(type, base, era) {
   const native = UNITS[type]?.age ?? 'stone';
   if (era === native || !AGES.includes(era)) return base;
+  if (type === 'villager') return { ...base, ...WORKWEAR[era] };
   const look = { ...base };
   dressForEra(look, base, era);
   armForEra(look, era);

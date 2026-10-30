@@ -281,11 +281,11 @@ none checked against the openage data (deviations from AoE1 listed where there i
   but not ships.
 - **Fish**: mirrored shoals of 300 food on open deep water (all eight neighbours wet, 3 tiles apart): 4 in each home
   bay, 3 in each estuary, up to 3 along each half of the river. AoE1 fish hold 250 (shore) to 400 (deep).
-- **Dock** (`buildings.js`): Bronze Age (AoE1: Stone), 100 wood, 3x3, 35 s, 600 HP, sight 6, `extra: true` (never counts
+- **Dock** (`buildings.js`): Stone Age (as in AoE1), 100 wood, 3x3, 35 s, 600 HP, sight 6, `extra: true` (never counts
   toward an age-up), `naval: true`. It stands wholly on deep water with free ground and free water along its sides
   (`atShore` in `commands.js`). It trains every ship and takes only the Fishing Ships' food; villagers never drop there.
 - **Ships** (`units.js`, `naval: true`): War Galley (Bronze, 135 wood 30 gold, 200 HP, 8 pierce, range 6, armour 0/3,
-  speed 2.0; modelled on AoE1's War Galley), Fishing Ship (Medieval, 75 wood, 75 HP, no attack, carries 15 a trip; AoE1's
+  speed 2.0; modelled on AoE1's War Galley), Fishing Ship (Stone, 75 wood, 75 HP, no attack, carries 15 a trip; AoE1's
   Fishing Boat is Stone Age, 50 wood), Frigate (Age of Sail, 200 wood 100 gold, 360 HP, 20 melee splash 0.8, range 7) and
   Destroyer (Modern, 150 wood 200 gold, 520 HP, 30 melee splash 1, range 8, speed 2.4). Warships are class `ship`
   ("Warship"); the Fishing Ship is `civ`. Cannon-armed ships use melee attacks, like the siege guns, so they hurt
@@ -311,7 +311,7 @@ none checked against the openage data (deviations from AoE1 listed where there i
   and Farms (wood, at Stone Age capacity) for the food the berries don't cover. Today that is 4400 food, 1690 wood,
   2150 gold, 200 stone; a home island holds at least 1200 food (berries), 7100 wood, 4700 gold and 1800 stone.
 - **Bot on islands**: before it has a Transport Ship it keeps only 6 soldiers (nobody can land before then), builds its
-  Dock as soon as it reaches the Bronze Age (ahead of the age-up reserve) and its transports (`transports`: relaxed and
+  Dock from the Stone Age (ahead of the age-up reserve) and its transports (`transports`: relaxed and
   easy 1, medium and hard 2) before any warship. Attack waves sail as one convoy to the shore nearest the enemy Town
   Center. In the relics round it sends a squad of up to 5 to the central island and ferries relic carriers home.
   On a river map none of this changes anything: everything is one land mass.
@@ -320,9 +320,11 @@ none checked against the openage data (deviations from AoE1 listed where there i
   can. Towers shoot ships like any unit. Ships never breach walls.
 - **Elimination** (`rounds/index.js`): ships don't keep a side in the game (AoE1's last-boat hunts); a Dock does, as a
   building that trains units.
-- **Bot**: from the Bronze Age, once it has six free villagers and the next age-up stays affordable, it builds one Dock in
+- **Bot**: from the Stone Age, once it has six free villagers and the next age-up stays affordable, it builds one Dock in
   its home bay (on its side, within 30 tiles, beside ground it can walk to), sending a villager to look if the bay is
   still unexplored. It trains the newest warship up to `fleet` (relaxed 1, easy 2, medium 3, hard 4; two more once it
-  sees enemy ships) and, from the Medieval Age, `fishers` Fishing Ships (2, 2, 3, 4). Warships attack the nearest target
+  sees enemy ships) and, from the Stone Age, `fishers` Fishing Ships (2, 2, 3, 4). Warships attack the nearest target
   they can reach, enemy ships first; while a land wave is on, idle ones sail between the enemy's bay and their own Dock.
   It never sends soldiers after ships. The Wonder round skips the navy.
+
+2026-10-30: Dock and Fishing Ship unlock in Stone, before Bronze transports and warships. Fishing Ship retains the invented 75 wood cost and existing stats. Era visuals now include civilian workwear and role-preserving ship designs; these do not change simulation stats.

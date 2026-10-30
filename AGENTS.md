@@ -109,7 +109,7 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     the view rebuilds units, like buildings, when the owner ages up. `eraSpec` gives humanoids the era's helmet,
     uniform and weapon finish (a colour remap on the arm parts, via `new B(map)`); cavalry ride horses, then motorbikes
     (Modern) and hoverbikes (AI Future); the Catapult and Trebuchet become a mortar and a rocket battery from the Age of
-    Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers and the King keep one look.
+    Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers use civilian workwear per era; ships use era-ships.js for later-era hulls and equipment. Only the King keeps one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from

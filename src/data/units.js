@@ -31,7 +31,7 @@ export const UNITS = {
   // Ships, trained at the Dock (invented; unverified approximations, see README.md). naval: they move on water and
   // shallows only. The War Galley is modelled on AoE1's; the Fishing Ship carries `capacity` fish a trip, the Transport Ship
   // `carries` soldiers or villagers (sim/orders.js doBoard / doUnload).
-  fishing_ship: { name: 'Fishing Ship', hp: 75, atk: 0, atkType: 'melee', marmor: 0, parmor: 2, range: 0.9, speed: 1.9, cost: c(0, 75), trainTime: 30, age: 'medieval', sight: 6, cls: 'civ', naval: true, capacity: 15 },
+  fishing_ship: { name: 'Fishing Ship', hp: 75, atk: 0, atkType: 'melee', marmor: 0, parmor: 2, range: 0.9, speed: 1.9, cost: c(0, 75), trainTime: 30, age: 'stone', sight: 6, cls: 'civ', naval: true, capacity: 15 },
   transport_ship: { name: 'Transport Ship', hp: 150, atk: 0, atkType: 'melee', marmor: 0, parmor: 4, range: 0.9, speed: 2.1, cost: c(0, 150), trainTime: 40, age: 'bronze', sight: 6, cls: 'transport', naval: true, carries: 8 },
   war_galley:   { name: 'War Galley', hp: 200, atk: 8, atkType: 'pierce', marmor: 0, parmor: 3, range: 6, speed: 2.0, cost: c(0, 135, 30), trainTime: 40, age: 'bronze', sight: 8, cls: 'ship', naval: true, cooldown: 40 },
   frigate:      { name: 'Frigate', hp: 360, atk: 20, atkType: 'melee', marmor: 2, parmor: 5, range: 7, speed: 1.8, cost: c(0, 200, 100), trainTime: 50, age: 'sail', sight: 9, cls: 'ship', naval: true, cooldown: 50, splash: 0.8 },

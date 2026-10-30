@@ -1,8 +1,10 @@
-// Ships (the Dock's units), bow to +z like every unit, hull resting on the water at y = 0. Each keeps one look in every
-// era (era-units.js unitEra leaves them in their own). Parts that move: the War Galley's two banks of oars, the
+// Ships (the Dock's units), bow to +z like every unit, hull resting on the water at y = 0. Each follows its owner's
+// era while retaining its role. Parts that move: the War Galley's two banks of oars, the
 // Frigate's and Destroyer's guns (recoil on a shot), the Transport Ship's passengers (one figure on deck for each one
 // aboard); the whole hull bobs and rolls (CPU, or the GPU's bob in a match).
 import * as THREE from 'three';
+import { UNITS } from '../data/units.js';
+import { eraShipParts } from './era-ships.js';
 import { B, C, TEAM, TEAM_DARK, cached, mesh, pivot, unit } from './builder.js';
 
 const GREY = 0x7d868c, GREY_D = 0x5b6369, DECK = 0x9c8a6a, HULL = 0x4e3320, OCHRE = 0xc79a3a, SAIL = 0xe9e1cc, BLACK = 0x1c1c1c;
@@ -34,15 +36,7 @@ function frigateRigging(b) {
 }
 
 const parts = {
-  fishing_ship(team) { // a small sailing smack: one mast with a lateen sail, a net boom over the stern and a fish crate
-    const t = TEAM[team], b = hull(new B(), 0.44, 1.1, 0.2, C.wood, t);
-    b.box(0.36, 0.02, 0.7, DECK, 0, 0.17, -0.12).box(0.24, 0.16, 0.22, C.woodD, 0, 0.18, -0.36)
-      .box(0.26, 0.03, 0.24, t, 0, 0.34, -0.36);
-    b.cyl(0.022, 0.95, C.woodD, 0, 0.18, 0.12).add(unit.box, SAIL, 0.02, 0.62, 0.22, 0.02, 0.55, 0.42, 0.18, 0, 0);
-    b.add(unit.cyl, C.woodD, 0, 0.42, -0.5, 0.015, 0.6, 0.015, 1.1, 0, 0).box(0.2, 0.2, 0.02, C.hay, 0, 0.12, -0.78);
-    b.box(0.16, 0.08, 0.14, C.woodD, 0.08, 0.19, 0.12).sph(0.035, 0xb8c4cc, 0.08, 0.3, 0.12, 1.4, 0.5, 0.6);
-    return { body: b.geometry() };
-  },
+  fishing_ship(team) { return eraShipParts('fishing_ship', team, 'stone'); },
   transport_ship(team) { // a broad, deep-bellied cargo cog: a hold amidships, a square team sail, a ramp at the bow
     const t = TEAM[team], b = hull(new B(), 0.66, 1.6, 0.3, C.wood, t), person = new B();
     b.box(0.58, 0.02, 1.1, DECK, 0, 0.28, -0.12).box(0.62, 0.22, 0.3, C.woodD, 0, 0.28, -0.62)
@@ -129,8 +123,9 @@ function addGuns(body, shipParts, anim) {
 }
 
 // A ship's model: { root, anim, shadow } like models.js's units. anim.body bobs; oars, guns and turrets are pivots.
-export function shipModel(e) {
-  const root = new THREE.Group(), shipParts = cached(`ship:${e.type}:${e.owner}`, () => parts[e.type](e.owner));
+export function shipModel(e, era = UNITS[e.type].age) {
+  const root = new THREE.Group(), shipParts = cached(`ship:${e.type}:${e.owner}:${era}`,
+    () => era !== UNITS[e.type].age ? eraShipParts(e.type, e.owner, era) : parts[e.type](e.owner));
   const body = new THREE.Group();
   body.add(mesh(shipParts.body));
   root.add(body);

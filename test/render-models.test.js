@@ -130,12 +130,12 @@ test('the Mine has finite geometry in every era and animates only while dug', ()
 
 const unitColors = model => { const out = []; model.root.traverse(o => { if (o.isMesh) out.push(...o.geometry.attributes.color.array); }); return out.join(); };
 const unitOf = (type, owner = 0) => ({ ...UNITS[type], kind: 'unit', type, owner, id: 5, carry: { amount: 0 }, cd: 39, cooldown: 40 });
-test('a unit is drawn in its owner era once that is past its own; villagers and the King keep one look', () => {
+test('a unit is drawn in its owner era once that is past its own; only the King keeps one look', () => {
   assert.equal(unitEra('scout', 'stone'), 'tool');
   assert.equal(unitEra('scout', 'tool'), 'tool');
   assert.equal(unitEra('scout', 'future'), 'future');
   assert.equal(unitEra('tank', 'iron'), 'modern');
-  assert.equal(unitEra('villager', 'future'), 'stone');
+  assert.equal(unitEra('villager', 'future'), 'future');
   assert.equal(unitEra('king', 'modern'), 'stone');
   assert.equal(unitEra('clubman', undefined), 'stone');
 });
@@ -152,8 +152,8 @@ test('every unit renders and animates in every era, for both teams', () => {
 test('a unit in its own era looks as it always did', () => {
   for (const type of Object.keys(UNITS)) assert.equal(unitColors(buildModel(unitOf(type), UNITS[type].age)), unitColors(buildModel(unitOf(type))), type);
 });
-test('fighters from earlier eras re-skin in every later era', () => {
-  for (const type of ['clubman', 'slinger', 'bowman', 'spearman', 'hoplite', 'swordsman', 'scout', 'horse_archer', 'knight', 'crossbowman', 'musketeer', 'catapult', 'trebuchet', 'cannon', 'armored_train']) {
+test('workers, ships and fighters re-skin in every later era', () => {
+  for (const type of ['villager', 'fishing_ship', 'transport_ship', 'war_galley', 'frigate', 'destroyer', 'clubman', 'slinger', 'bowman', 'spearman', 'hoplite', 'swordsman', 'scout', 'horse_archer', 'knight', 'crossbowman', 'musketeer', 'catapult', 'trebuchet', 'cannon', 'armored_train']) {
     // The Catapult stays a stone-thrower through the Medieval Age; it becomes a mortar from the Age of Sail.
     const chain = AGES.filter(a => ageIndex(a) >= ageIndex(UNITS[type].age) && !(type === 'catapult' && a === 'medieval'));
     for (let i = 1; i < chain.length; i++) assert.ok(unitColors(buildModel(unitOf(type), chain[i])) !== unitColors(buildModel(unitOf(type), chain[i - 1])), `${type} ${chain[i]}`);
@@ -172,4 +172,16 @@ test('late-era mounts and siege chassis replace horses and stone-throwers', () =
   const e = { ...unitOf('scout'), order: { type: 'idle' } }, [w] = bike.anim.wheels;
   animate(g, e, 1, false); const still = w.rotation.x; animate(g, e, 2, false); assert.equal(w.rotation.x, still);
   animate(g, e, 3, true); assert.notEqual(w.rotation.x, still);
+});
+
+test('transports keep their animated passenger slots after every age-up', () => {
+  for (const age of AGES.filter(a => ageIndex(a) >= ageIndex('bronze'))) {
+    const e = { ...unitOf('transport_ship'), cargo: [1, 2, 3] };
+    const m = buildModel(e, age), g = new THREE.Group();
+    g.userData.anim = m.anim; g.add(m.root);
+    animate(g, e, 1, false);
+    assert.equal(m.anim.crew.filter(p => p.visible).length, 3, age);
+    e.cargo = []; animate(g, e, 2, false);
+    assert.ok(m.anim.crew.every(p => !p.visible), age);
+  }
 });
