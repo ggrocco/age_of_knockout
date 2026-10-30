@@ -27,7 +27,6 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 .kingdom-row i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; border:1px solid #fff6; }
 .kingdom-row.fallen { opacity:.5; }
 .kingdom-final { max-width:420px; margin:18px auto; text-align:left; }
-.kingdoms-start { margin-top:12px; padding:10px 18px; border-color:#e3ba37; }
 body:not(.ingame) #kingdoms-standings { visibility:hidden; }
 body.touch #kingdoms-standings { top:calc(72px + var(--sat)); left:calc(8px + var(--sal)); width:174px; padding:6px 8px; font-size:10px; }
 body.touch #kingdoms-standings .kingdom-row { padding:3px 0; gap:1px 3px; }
@@ -127,14 +126,78 @@ body.touch #tip { display:none; }
 #delete-confirmation .btn { flex:1; min-height:44px; margin:0; padding:9px 12px; white-space:nowrap; }
 #delete-confirmation .danger { border-color:var(--red); background:linear-gradient(#79362c,#4b201a); }
 #delete-confirmation .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
-.card .level { margin-top:12px; } .card .level .btn { font-size:15px; padding:5px 14px; margin:4px 3px 0; }
-.card .level .btn.on { outline:2px solid var(--ok); background:linear-gradient(#7a5a33,#4a3620); } .card .level p { margin:.4em auto 0; font-size:14px; opacity:.85; }
-.time-option { width:100%; max-width:400px; margin:16px auto 0; text-align:left; }
-.time-option label, .time-scale { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+/* Main menu: a header, the Rules and Play panels side by side, the quick-match tiles, then controls and footer. */
+.card.menu { max-width:1080px; padding:30px 36px 22px; text-align:left; border:1px solid var(--bronze); border-radius:4px;
+  background:radial-gradient(ellipse 70% 40% at 50% 0, #6b4f2a40, transparent), linear-gradient(#2c2117f7,#17110af7); box-shadow:0 0 0 5px #120d08, 0 0 0 6px #c8a05259, 0 18px 60px #000; }
+.menu-head { text-align:center; margin-bottom:22px; }
+.menu-head .crest { display:block; width:64px; height:64px; margin:0 auto 4px; color:var(--bronze); filter:drop-shadow(0 2px 5px #000b); }
+.card.menu h1 { font-size:50px; letter-spacing:.12em; line-height:1.1; background:linear-gradient(#f6e2a8,#d2a957 55%,#9c7634); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 2px #000c); }
+.card.menu .tagline { display:flex; align-items:center; gap:16px; max-width:820px; margin:6px auto 0; font-size:17px; font-style:italic; color:#d9c28e; }
+.tagline::before, .tagline::after { content:''; flex:1 1 30px; min-width:16px; height:1px; background:linear-gradient(90deg,transparent,var(--bronze)); }
+.tagline::after { background:linear-gradient(90deg,var(--bronze),transparent); }
+.menu-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:18px; }
+.panel { padding:15px 18px 18px; border:1px solid #c8a05238; border-radius:6px; background:#00000030; }
+.panel-title { display:flex; align-items:center; gap:10px; margin:0 0 12px; font-size:13px; font-weight:normal; letter-spacing:.22em; text-transform:uppercase; color:var(--bronze); }
+.panel-title::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,#c8a05266,transparent); }
+.panel-title small { font-size:13px; font-style:italic; letter-spacing:.02em; text-transform:none; color:#a9997a; }
+.setting + .setting { margin-top:16px; }
+.setting-name { display:block; margin-bottom:6px; font-size:16px; color:var(--parch); }
+.card.menu .setting p { max-width:none; margin:6px 0 0; font-size:13.5px; line-height:1.45; color:#c2b28f; }
+.seg { display:flex; gap:3px; padding:3px; border:1px solid #c8a05266; border-radius:6px; background:#00000059; }
+.card.menu .seg .btn { flex:1; min-height:38px; margin:0; padding:6px 10px; font-size:15px; border:0; border-radius:4px; background:transparent; color:#cbb98f; }
+.card.menu .seg .btn:hover { background:#c8a0521f; color:var(--parch); }
+.card.menu .seg .btn.on { background:linear-gradient(#e6c679,#b38a3e); color:var(--ink); box-shadow:0 1px 4px #0009, inset 0 1px 0 #fff6; }
+.card.menu .btn:focus-visible, .controls summary:focus-visible { outline:2px solid var(--parch); outline-offset:2px; }
+.time-option label, .time-scale { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.time-option .setting-name { margin:0; }
 .time-option output { color:var(--bronze); font-variant-numeric:tabular-nums; }
-.time-option input { display:block; width:100%; height:44px; margin:0; accent-color:var(--bronze); cursor:pointer; }
+.time-option input { --fill:0%; display:block; width:100%; height:36px; margin:0; background:transparent; cursor:pointer; -webkit-appearance:none; appearance:none; }
+.time-option input::-webkit-slider-runnable-track { height:6px; border:1px solid #c8a05266; border-radius:4px; background:linear-gradient(90deg,var(--bronze) var(--fill),#00000080 var(--fill)); }
+.time-option input::-webkit-slider-thumb { width:20px; height:20px; margin-top:-8px; border:2px solid #17110a; border-radius:50%; background:radial-gradient(circle at 35% 35%,#f6e2a8,#b38a3e); box-shadow:0 0 0 1px var(--bronze), 0 2px 4px #000a; -webkit-appearance:none; appearance:none; }
+.time-option input::-moz-range-track { height:6px; border:1px solid #c8a05266; border-radius:4px; background:#00000080; }
+.time-option input::-moz-range-progress { height:6px; border-radius:4px; background:var(--bronze); }
+.time-option input::-moz-range-thumb { width:16px; height:16px; border:2px solid #17110a; border-radius:50%; background:radial-gradient(circle at 35% 35%,#f6e2a8,#b38a3e); box-shadow:0 0 0 1px var(--bronze), 0 2px 4px #000a; }
 .time-option input:focus-visible { outline:2px solid var(--bronze); outline-offset:3px; }
-.time-scale { font-size:12px; opacity:.75; }
+.time-scale { font-size:12px; color:#a9997a; }
+.mode { padding:14px 16px 16px; border:1px solid #c8a05238; border-radius:6px; background:#00000026; text-align:center; }
+.mode + .mode { margin-top:12px; }
+.mode.tournament { border-color:#e3ba3799; background:radial-gradient(ellipse at 50% 0,#e3ba3726,transparent 70%), #00000033; }
+.mode h4 { display:flex; align-items:center; justify-content:center; gap:10px; margin:0; font-size:21px; font-weight:normal; color:#f0dcaa; }
+.card.menu .mode p { max-width:460px; margin:6px auto 0; font-size:14.5px; line-height:1.45; color:#d0bf98; }
+.mode-tag { padding:2px 8px; border:1px solid #c8a05299; border-radius:10px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--bronze); }
+/* The tournament's field halving each round, down to the crown. */
+.ladder { display:flex; align-items:center; justify-content:center; margin:12px 0 2px; padding:0; list-style:none; }
+.ladder li { position:relative; display:grid; place-items:center; width:30px; height:30px; border:1px solid #c8a05299; border-radius:50%; background:#00000059; color:#d9c28e; font-size:12px; font-variant-numeric:tabular-nums; }
+.ladder li + li { margin-left:16px; }
+.ladder li + li::before { content:''; position:absolute; right:calc(100% + 1px); top:50%; width:16px; height:1px; background:#c8a05288; }
+.ladder .crown { border-color:#e3ba37; background:#e3ba3726; color:#f0cf62; font-size:17px; }
+.card.menu .btn.primary { display:block; width:100%; max-width:340px; margin:12px auto 0; padding:11px 24px; font-size:21px; letter-spacing:.04em; color:var(--ink); border:1px solid #f6e2a8; border-radius:4px;
+  background:linear-gradient(#ecd08a,#c39645 55%,#a47a33); box-shadow:0 3px 12px #0009, inset 0 1px 0 #fff8; }
+.card.menu .btn.primary:hover { background:linear-gradient(#f6dc9a,#d4a754 55%,#b3873a); box-shadow:0 0 20px #e3ba3759, 0 3px 12px #0009, inset 0 1px 0 #fff8; }
+.card.menu .kingdoms-start { margin:12px auto 0; padding:8px 22px; font-size:17px; border-radius:4px; }
+.quick-row { margin-top:18px; }
+.quick-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.card.menu .quick { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; margin:0; padding:10px 8px 11px; font-size:15px; line-height:1.2; border-color:#c8a05266; border-radius:6px; background:linear-gradient(#3e2f1d,#271d12); }
+.card.menu .quick:hover { border-color:var(--bronze); background:linear-gradient(#57422a,#33261a); transform:translateY(-1px); }
+.quick .num { display:grid; place-items:center; width:28px; height:28px; margin-bottom:4px; border:1px solid #c8a05299; border-radius:50%; color:var(--bronze); font-size:12px; letter-spacing:.04em; }
+.quick b { font-weight:normal; color:var(--parch); }
+.quick small { font-size:11.5px; color:#a9997a; }
+.card.menu .btn { transition:background .15s, box-shadow .15s, transform .15s, color .15s; }
+.controls { margin-top:16px; border-top:1px solid #c8a05233; }
+.controls summary { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; cursor:pointer; list-style:none; font-size:15px; letter-spacing:.06em; color:var(--bronze); }
+.controls summary::-webkit-details-marker { display:none; }
+.controls summary::before { content:'\25B8'; transition:transform .15s; }
+.controls[open] summary::before { transform:rotate(90deg); }
+.controls summary:hover { color:var(--parch); }
+.controls .keys { margin:2px auto 8px; }
+.card.menu .project { margin-top:4px; text-align:center; }
+@media (prefers-reduced-motion: reduce) { .card.menu .btn, .controls summary::before { transition:none; } .card.menu .quick:hover { transform:none; } }
+@media (max-width:760px) {
+  .menu-grid { grid-template-columns:minmax(0,1fr); }
+  .quick-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .quick-grid .quick:last-child { grid-column:1 / -1; }
+  .card.menu .tagline { display:block; text-align:center; } .tagline::before, .tagline::after { display:none; }
+}
 /* Main menu footer: repository link and contribution note. */
 .card .project { margin:20px auto 0; padding-top:14px; border-top:1px solid #6b5230; max-width:720px; }
 .card .project h3 { margin:12px 0 0; font-weight:normal; font-size:17px; color:var(--bronze); }
@@ -142,7 +205,6 @@ body.touch #tip { display:none; }
 .repo { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; color:var(--parch); text-decoration:none; border:1px solid var(--bronze); border-radius:3px; background:#0004; }
 .repo:hover { color:var(--bronze); background:#0008; }
 .repo:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
-.quick small { display:block; margin-top:3px; font-size:11px; opacity:.75; }
 [data-tip]:not(.tile) { cursor:help; }
 .btn[data-tip] { cursor:pointer; }
 [data-tip]:not(.tile):focus-visible { outline:2px solid var(--bronze); outline-offset:3px; }
@@ -152,7 +214,7 @@ body.touch #tip { display:none; }
 .bracket .m { border:1px solid #6b5230; margin-bottom:4px; padding:2px 6px; background:#0004; }
 .bracket .m span { display:block; color:#a89468; } .bracket .m span.w { color:#f5e6b8; font-weight:bold; } .bracket .m .you { color:var(--ok); }
 .bracket .m.cur { border-color:var(--ok); }
-.keys { display:grid; grid-template-columns:auto 1fr; gap:3px 14px; text-align:left; max-width:560px; margin:10px auto; font-size:14px; } .keys b { color:var(--bronze); }
+.keys { display:grid; grid-template-columns:auto 1fr; gap:3px 14px; text-align:left; max-width:600px; margin:10px auto; font-size:14px; } .keys b { color:var(--bronze); }
 .prog { width:340px; height:12px; border:1px solid var(--bronze); margin:14px auto; background:#000; } .prog i { display:block; height:100%; width:0; background:var(--bronze); }
 .card h1.win { color: var(--ok); } .card h1.lose { color: var(--red); }
 
@@ -211,10 +273,15 @@ body.touch #screen { align-items: flex-start; padding: calc(var(--sat) + 8px) ca
 body.touch .card { width: 100%; max-height: none; padding: 16px 14px; margin: auto; }
 body.touch .card h1 { font-size: 30px; } body.touch .card h2 { font-size: 17px; } body.touch .card p { font-size: 15px; }
 body.touch .card .btn { min-height: 48px; font-size: 17px; padding: 8px 18px; margin: 8px 4px 0; }
-body.touch .card .quick { min-height: 44px; font-size: 14px !important; }
 body.touch .bracket { justify-content: flex-start; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; font-size: 11.5px; }
 body.touch .bracket .col { min-width: 116px; }
 body.touch .keys { grid-template-columns: 1fr; gap: 1px; text-align: center; } body.touch .keys b { margin-top: 6px; }
+body.touch .card.menu { padding: 18px 14px 14px; }
+body.touch .card.menu h1 { font-size: 30px; letter-spacing: .08em; } body.touch .menu-head .crest { width: 46px; height: 46px; margin-bottom: 0; }
+body.touch .card.menu .tagline { font-size: 15px; gap: 10px; } body.touch .menu-head { margin-bottom: 16px; }
+body.touch .card.menu .seg .btn { min-height: 44px; } body.touch .panel { padding: 13px 12px 14px; } body.touch .mode { padding: 12px 10px 14px; }
+body.touch .card.menu .quick { min-height: 44px; } body.touch .ladder li { width: 26px; height: 26px; } body.touch .ladder li + li { margin-left: 10px; }
+body.touch .ladder li + li::before { width: 10px; }
 /* portrait: commands become a bottom strip, minimap moves top-right */
 @media (orientation: portrait) {
   body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(66px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
@@ -236,8 +303,10 @@ body.touch .keys { grid-template-columns: 1fr; gap: 1px; text-align: center; } b
   body.touch .card p { font-size: 13px; margin: 4px auto; }
   body.touch .keys { grid-template-columns: auto 1fr; gap: 2px 12px; text-align: left; font-size: 12px; margin: 6px auto; } body.touch .keys b { margin-top: 0; }
   body.touch .card .btn { min-height: 40px; font-size: 15px; margin: 6px 4px 0; padding: 4px 14px; }
-  body.touch .card .quick { min-height: 36px; font-size: 12px !important; padding: 2px 8px; }
   body.touch .bracket { margin: 6px 0; }
+  body.touch .card.menu h1 { font-size: 26px; } body.touch .menu-head .crest { width: 34px; height: 34px; margin-bottom: 0; }
+  body.touch .card.menu .tagline { font-size: 13px; } body.touch .menu-head { margin-bottom: 10px; }
+  body.touch .card.menu .seg .btn { min-height: 40px; }
 }
 body.touch.placing #info { display: none; }
 body.touch #placebar .btn { min-width: 116px; }

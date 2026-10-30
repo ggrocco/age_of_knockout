@@ -464,28 +464,56 @@ const DESKTOP_KEYS = '<div class="keys"><b>Left click / drag</b>'
   + '  <b>WASD / arrows, wheel</b><span>pan, zoom</span><b>. (period), H</b><span>next idle villager or fishing ship (or the round button above'
   + ' the minimap), jump to Town Center</span><b>Space + drag</b><span>pan the map with the mouse</span><b>Esc</b><span>pause /'
   + ' resume (cancels a placement first)</span></div>';
-const levelButtonsHtml = () => Object.keys(LEVELS)
-  .map(name => `<button class="btn${name === level ? ' on' : ''}" data-level="${name}">${LEVEL_NAME[name]}</button>`).join('');
-const mapButtonsHtml = () => MAP_TYPES
-  .map(type => `<button class="btn${type === mapType ? ' on' : ''}" data-map="${type}">${MAP_NAME[type]}</button>`).join('');
+// The menu's pickers are toggle buttons: aria-pressed marks the chosen one for screen readers and the styling.
+const toggleHtml = (attr, value, chosen, label) =>
+  `<button class="btn${value === chosen ? ' on' : ''}" data-${attr}="${value}" aria-pressed="${value === chosen}">${label}</button>`;
+const levelButtonsHtml = () => Object.keys(LEVELS).map(name => toggleHtml('level', name, level, LEVEL_NAME[name])).join('');
+const mapButtonsHtml = () => MAP_TYPES.map(type => toggleHtml('map', type, mapType, MAP_NAME[type])).join('');
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 const quickButtonsHtml = () => ROUNDS.map((round, i) => `<button class="btn quick" data-i="${i}" data-tip="round:${round.id}"`
-  + ` aria-describedby="tip" style="font-size:14px;padding:5px 12px">Quick: ${round.name}`
-  + `<small>${roundLimitText(round, ui.roundCaps[round.id])}</small></button>`).join('');
-const menuHtml = () => `<div class="card"><h1>Age of Knockout</h1><h2>A five-round elimination tournament in the spirit of Age of Empires (1997)</h2>
-  <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
-  ${TOUCH ? TOUCH_KEYS : DESKTOP_KEYS}
-  <div class="level">Difficulty: ${levelButtonsHtml()}<p id="leveldesc">${LEVEL_DESC[level]}</p></div>
-  <div class="level map-option">Map: ${mapButtonsHtml()}<p id="mapdesc">${MAP_DESC[mapType]}</p></div>
-  <div class="time-option">
-    <label for="time-limit">Time limit <output id="time-limit-value" for="time-limit">${timeLimitLabel()}</output></label>
-    <input type="range" id="time-limit" min="0" max="${MAX_TIME_LIMIT}" step="1" value="${timeLimit}" aria-valuetext="${timeLimitLabel()}" aria-describedby="time-limit-help">
-    <div class="time-scale"><span>0 &middot; No limit</span><span>2 hours</span></div>
+  + ` aria-describedby="tip" aria-label="Quick match: ${round.name}"><span class="num" aria-hidden="true">${ROMAN[i]}</span>`
+  + `<b>${round.name}</b><small>${roundLimitText(round, ui.roundCaps[round.id])}</small></button>`).join('');
+// Two swords crossed behind a shield, drawn in the menu's bronze above the title.
+const SWORD = '<path d="M50 8 56 6 54 12 21 45"/><path d="M15 39 25 49M20 44 11 53"/><circle cx="10" cy="54" r="2"/>';
+const CREST = '<svg class="crest" viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"'
+  + ` stroke-linecap="round" stroke-linejoin="round">${SWORD}<g transform="matrix(-1 0 0 1 64 0)">${SWORD}</g>`
+  + '<path d="M32 12 48 17v13c0 11-7 19-16 23-9-4-16-12-16-23V17Z" fill="#2a1f13"/>'
+  + '<path d="M32 18 43 21.5V30c0 8-5 13.5-11 16.5-6-3-11-8.5-11-16.5v-8.5Z" opacity=".5"/><path d="M27 33l5-6 5 6-5 6Z" fill="currentColor"/></svg>';
+const menuHtml = () => `<div class="card menu">
+  <header class="menu-head">${CREST}<h1>Age of Knockout</h1>
+  <p class="tagline"><span>A five-round elimination tournament in the spirit of Age of Empires (1997)</span></p></header>
+  <div class="menu-grid">
+  <section class="panel rules" aria-labelledby="rules-title"><h3 class="panel-title" id="rules-title">Rules</h3>
+    <div class="setting level"><span class="setting-name" id="level-label">Difficulty</span>
+      <div class="seg" role="group" aria-labelledby="level-label">${levelButtonsHtml()}</div>
+      <p id="leveldesc">${LEVEL_DESC[level]}</p></div>
+    <div class="setting map-option"><span class="setting-name" id="map-label">Map</span>
+      <div class="seg" role="group" aria-labelledby="map-label">${mapButtonsHtml()}</div>
+      <p id="mapdesc">${MAP_DESC[mapType]}</p></div>
+    <div class="setting time-option">
+      <label for="time-limit"><span class="setting-name">Time limit</span> <output id="time-limit-value" for="time-limit">${timeLimitLabel()}</output></label>
+      <input type="range" id="time-limit" min="0" max="${MAX_TIME_LIMIT}" step="1" value="${timeLimit}" style="--fill:${timeLimit / MAX_TIME_LIMIT * 100}%" aria-valuetext="${timeLimitLabel()}" aria-describedby="time-limit-help">
+      <div class="time-scale"><span>0 &middot; No limit</span><span>2 hours</span></div>
+      <p id="time-limit-help">Minutes of game time. Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</p>
+    </div>
+  </section>
+  <section class="panel play" aria-labelledby="play-title"><h3 class="panel-title" id="play-title">Play</h3>
+    <div class="mode tournament">
+      <h4>Knockout Tournament</h4>
+      <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
+      <ol class="ladder" aria-hidden="true"><li>32</li><li>16</li><li>8</li><li>4</li><li>2</li><li class="crown">&#9813;</li></ol>
+      <button class="btn primary" data-auto id="start">Begin Tournament</button>
+    </div>
+    <div class="mode kingdoms">
+      <h4>Kingdom Conquest <span class="mode-tag">4 teams</span></h4>
+      <p>Slay kings to capture their civilizations. Conquer all three opponents or hold the most territory.</p>
+      <button class="btn kingdoms-start" id="start-kingdoms" data-tip="round:kingdoms">Start Kingdom Conquest</button>
+    </div>
+  </section>
   </div>
-  <p id="time-limit-help"><small>Minutes of game time. Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</small></p>
-  <button class="btn" data-auto id="start">Begin Tournament</button><br>
-  <button class="btn kingdoms-start" id="start-kingdoms" data-tip="round:kingdoms">Kingdom Conquest · 4 teams</button>
-  <p><small>Slay kings to capture their civilizations. Conquer all three opponents or hold the most territory.</small></p>
-  ${quickButtonsHtml()}
+  <section class="quick-row" aria-labelledby="quick-title"><h3 class="panel-title" id="quick-title">Quick match <small>one game of a single round type</small></h3>
+    <div class="quick-grid">${quickButtonsHtml()}</div></section>
+  <details class="controls"><summary>Controls</summary>${TOUCH ? TOUCH_KEYS : DESKTOP_KEYS}</details>
   <footer class="project"><a class="repo" href="${REPO_URL}" target="_blank" rel="noopener">${GITHUB_ICON}<span>View on GitHub</span></a>
   <h3>Contributing</h3>
   <p>Issues, ideas and pull requests are welcome and much appreciated! Age of Knockout is a one-person project made just for fun, so please expect slow replies and reviews.</p></footer></div>`;
@@ -498,6 +526,13 @@ function refreshQuickLabels() {
     quick.querySelector('small').textContent = roundLimitText(round, ui.roundCaps[round.id]);
   }
 }
+// Marks `button` as the chosen one of its picker.
+function pressOnly(button) {
+  for (const other of button.parentElement.children) {
+    other.classList.toggle('on', other === button);
+    other.setAttribute('aria-pressed', String(other === button));
+  }
+}
 function wireMenu() {
   document.getElementById('start').onclick = startTournament;
   document.getElementById('start-kingdoms').onclick = () => startMatch({ roundId: KINGDOMS.id, seed: pickSeed(),
@@ -506,18 +541,19 @@ function wireMenu() {
     setTimeLimit(e.target.value);
     document.getElementById('time-limit-value').textContent = timeLimitLabel();
     e.target.setAttribute('aria-valuetext', timeLimitLabel());
+    e.target.style.setProperty('--fill', `${timeLimit / MAX_TIME_LIMIT * 100}%`);
     refreshQuickLabels();
   };
-  for (const button of document.querySelectorAll('.map-option .btn')) button.onclick = () => {
+  for (const button of document.querySelectorAll('[data-map]')) button.onclick = () => {
     setMapType(button.dataset.map);
     document.getElementById('mapdesc').textContent = MAP_DESC[mapType];
-    for (const other of document.querySelectorAll('.map-option .btn')) other.classList.toggle('on', other === button);
+    pressOnly(button);
   };
-  for (const button of document.querySelectorAll('.level:not(.map-option) .btn')) button.onclick = () => {
+  for (const button of document.querySelectorAll('[data-level]')) button.onclick = () => {
     setLevel(button.dataset.level);
     document.getElementById('leveldesc').textContent = LEVEL_DESC[level];
     refreshQuickLabels();
-    for (const other of document.querySelectorAll('.level:not(.map-option) .btn')) other.classList.toggle('on', other === button);
+    pressOnly(button);
   };
   // A quick match faces the opponent that round would have in a tournament at the chosen level.
   for (const button of document.querySelectorAll('.quick')) button.onclick = () => {
