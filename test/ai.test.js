@@ -299,7 +299,7 @@ test('the bot screens each finished tower with a wall line, rebuilds lost segmen
     let ok = false; for (let y = b.y - 1; y <= b.y + b.size && !ok; y++) for (let x = b.x - 1; x <= b.x + b.size; x++) if (reach(x, y)) { ok = true; break; }
     assert.ok(ok, `${b.type} at ${b.x},${b.y} can still be walked to from the Town Center`);
   }
-  for (const u of g.units.values()) if (u.owner === 0) assert.ok(reach(Math.floor(u.x), Math.floor(u.y)), `${u.type} at ${u.x},${u.y} is not walled in`);
+  for (const u of g.units.values()) if (u.owner === 0 && !u.naval) assert.ok(reach(Math.floor(u.x), Math.floor(u.y)), `${u.type} at ${u.x},${u.y} is not walled in`);
   const lost = walls.find(w => w.constructed), at = { x: lost.x, y: lost.y }; g.damage(lost, lost.hp, null);
   run(1500);
   assert.ok(wallsOf(g, 0).some(w => w.x === at.x && w.y === at.y && w.constructed), 'the destroyed segment is rebuilt');

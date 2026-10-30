@@ -140,15 +140,15 @@ the whole tournament, the bracket's other matches included:
 **Water and ships.** On a river map a river runs between the two bases, from edge to edge, opening into a lake
 past each ford, and each player has a home bay off it, a short walk from the Town Center. There is always a way to
 attack on foot: soldiers wade the light-blue **shallows** over the centre (where the relics are) and at a ford on each
-side, and only deep water stops them. From the Bronze Age a villager can build a **Dock** (100 wood) on deep water
+side, and only deep water stops them. From the Stone Age a villager can build a **Dock** (100 wood) on deep water
 against the shore; it trains the ships, which sail the deep water and the shallows of the whole river, so the two home
 fleets can meet:
 
 | Ship | Age | Cost | Role |
 | --- | --- | --- | --- |
+| Fishing Ship | Stone | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock |
 | War Galley | Bronze | 135 wood, 30 gold | Oared warship, shoots arrows |
 | Transport Ship | Bronze | 150 wood | Carries 8 soldiers or villagers; unarmed |
-| Fishing Ship | Medieval | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock |
 | Frigate | Age of Sail | 200 wood, 100 gold | Cannon broadsides that splash and batter buildings by the water |
 | Destroyer | Modern | 150 wood, 200 gold | Fast, armoured, long-ranged guns that splash |
 
@@ -378,3 +378,5 @@ Rules, AI and bracket are covered by headless tests and bot-vs-bot runs; the ren
 browser screenshots and scripted events. Feel, balance and fidelity to the original have not been judged by a human
 player. `progress.md` records rulings, known gaps and deferred issues; design specs and plans are in
 `docs/superpowers/`. Contributor and agent notes are in `AGENTS.md`.
+
+Villagers and ships update their appearance when their owner advances: civilian workwear and safety gear, sailing craft, powered vessels and AI Future hulls. Their roles and stats stay the same. Fishing Ships are the first boats available; transports and warships follow in Bronze.

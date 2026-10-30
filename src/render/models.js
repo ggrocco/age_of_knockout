@@ -39,6 +39,8 @@ const HELMETS = {
     .cyl(0.22, 0.02, C.iron, 0, 0.9, 0).box(0.03, 0.08, 0.03, t, 0, 0.99, 0),
   visor: (body, t) => body.sph(0.155, 0xd8e2e8, 0, 0.9, 0, 1, 0.95, 1.05)
     .box(0.22, 0.05, 0.06, 0x39f3ff, 0, 0.84, 0.14).box(0.04, 0.035, 0.28, t, 0, 1.03, 0),
+  hardhat: body => body.sph(0.16, 0xf3c62f, 0, 0.92, 0, 1, 0.7, 1).cyl(0.2, 0.025, 0xf3c62f, 0, 0.91, 0)
+    .box(0.035, 0.06, 0.24, 0xffe590, 0, 1.0, 0),
   steel: body => body.sph(0.16, 0x55603a, 0, 0.92, 0, 1, 0.62, 1).cyl(0.2, 0.018, 0x4a5034, 0, 0.9, 0),
 };
 
@@ -95,6 +97,7 @@ function humanBody(body, spec, t, td) {
     .box(0.34, 0.04, 0.24, spec.belt ?? C.woodD, 0, 0.47, 0)
     .box(0.045, 0.045, 0.025, C.bronze, 0, 0.47, 0.135);
   if (spec.armor) body.box(0.37, 0.32, 0.23, spec.armor, 0, 0.4, 0).box(0.4, 0.06, 0.25, C.stoneD, 0, 0.7, 0);
+  if (spec.apron) body.box(0.27, 0.4, 0.04, spec.apron, 0, 0.28, 0.15).box(0.16, 0.1, 0.025, t, 0, 0.45, 0.18);
   if (spec.sash) body.box(0.06, 0.4, 0.22, t, 0.1, 0.36, 0, 0, 0, -0.5);
   body.sph(0.13, C.skin, 0, 0.87, 0).sph(0.05, C.skin, 0, 0.85, 0.12, 0.7, 0.7, 0.7);
   if (!spec.helmet) body.sph(0.135, spec.hair ?? C.hair, 0, 0.9, -0.02, 1, 0.75, 1);
@@ -148,9 +151,9 @@ const HUMAN = {
   king: { scale: 1.12, tunic: 0x7a2a8a, sleeve: 0x7a2a8a, pants: 0x4a1a5a, helmet: null, cape: 'team', weapon: null, sash: true },
 };
 // The villager's job tools, held in the right hand; animate() shows the one for the current job.
-function villagerTools() {
+function villagerTools(era) {
   const toolGeometry = build => {
-    const tool = new B();
+    const tool = new B(SIEGE_REMAP[era]);
     build(tool);
     return tool.geometry();
   };
@@ -344,8 +347,8 @@ function cavalryModel(e, team, era) {
   return { root, anim, shadow: 0.55 };
 }
 // The villager's hidden tools (in the right hand) and carry sack, shown by animate() per job.
-function addVillagerGear(inner, anim) {
-  const tools = cached('vtools', villagerTools);
+function addVillagerGear(inner, anim, era) {
+  const tools = cached(`vtools:${era}`, () => villagerTools(era));
   anim.tools = {};
   for (const [name, geometry] of Object.entries(tools)) {
     const tool = mesh(geometry);
@@ -380,7 +383,7 @@ function footModel(e, team, era) {
   anim.armL = pivot(-0.22, 0.7, 0, parts.armL);
   anim.armR = pivot(0.22, 0.7, 0, parts.armR);
   inner.add(anim.legL, anim.legR, anim.armL, anim.armR);
-  if (e.type === 'villager') addVillagerGear(inner, anim);
+  if (e.type === 'villager') addVillagerGear(inner, anim, era);
   if (e.type === 'king') inner.add(mesh(cached('crown', kingCrown)));
   return { root, anim, shadow: 0.32 };
 }
@@ -389,7 +392,7 @@ function footModel(e, team, era) {
 function unitModel(e, age) {
   const team = e.owner, era = unitEra(e.type, age);
   if (['drone', 'mech', 'railgun'].includes(e.type)) return futureModel(e);
-  if (SHIP_TYPES.includes(e.type)) return shipModel(e);
+  if (SHIP_TYPES.includes(e.type)) return shipModel(e, era);
   if (e.cls === 'siege' || e.cls === 'armor') return eraSiegeModel(e, era);
   if (e.cls === 'cav') return cavalryModel(e, team, era);
   return footModel(e, team, era);

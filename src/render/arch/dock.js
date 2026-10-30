@@ -1,4 +1,4 @@
-// The Dock, one design for every era from Bronze to AI Future: a U-shaped pier standing on piles over the water, a quay
+// The Dock, one design for every era from Stone to AI Future: a U-shaped pier standing on piles over the water, a quay
 // across the back and two arms reaching forward round an open slip. A harbour house in the era's style (gates.js block())
 // stands on the quay; the rest changes with the era: a reed-bound palm-log pier with a mud store and a beached reed
 // boat (Bronze), a stone quay with a marble edge and amphorae (Iron), a timber wharf with a treadwheel crane (Medieval),
@@ -15,6 +15,8 @@ import { block } from './gates.js';
 
 // Per era: the deck, its edge, the piles and the deck's height above the water.
 const DECK = {
+  stone: { deck: 0x715538, edge: 0x59412a, pile: 0x4b3825, y: 0.12 },
+  tool: { deck: 0x99764b, edge: 0x765536, pile: 0x62472c, y: 0.14 },
   bronze: { deck: 0x8a6a42, edge: 0x6b5030, pile: 0x5d4428, y: 0.16 },
   iron: { deck: 0xbcad8d, edge: C.marble, pile: 0x9a8c70, y: 0.2 },
   medieval: { deck: 0x7a5a3a, edge: 0x5a4028, pile: 0x4a3420, y: 0.2 },
@@ -158,7 +160,20 @@ function futureHarbour(ctx, { y, quayZ, armX }, top) {
 export function dock(ctx) {
   const { h, age } = ctx, y = pier(ctx), quayZ = -h + QUAY / 2, armX = h - ARM / 2, tip = h - 0.25;
   // The harbour house on the quay's left, the team flag on the right arm's tip.
-  const houseTop = block(ctx, { w: 1.2, d: 0.8, hh: 0.62, x: -0.68, z: quayZ, y });
+  let houseTop;
+  if (age === 'stone' || age === 'tool') {
+    const { b, t } = ctx;
+    b.box(1.1, 0.48, 0.72, age === 'stone' ? C.woodD : P.mud, -0.68, y, quayZ)
+      .roof(1.24, 0.34, 0.86, C.hay, -0.68, y + 0.48, quayZ)
+      .box(0.24, 0.35, 0.025, C.dark, -0.68, y, quayZ + 0.37)
+      .box(0.3, 0.045, 0.025, t, -0.68, y + 0.36, quayZ + 0.38);
+    for (const z of [0.15, 0.85]) stick(b, 0.025, C.woodD, [armX, y, z], [armX, y + 0.6, z], CYL6);
+    b.box(0.02, 0.35, 0.7, C.hay, armX, y + 0.2, 0.5);
+    for (const x of [0.3, 0.6]) sack(b, x, y, quayZ, 0.12);
+    if (age === 'tool') b.box(0.4, 0.2, 0.35, C.wood, -armX, y, 0.5).box(0.44, 0.035, 0.39, C.woodD, -armX, y + 0.2, 0.5);
+    houseTop = y + 0.82;
+  } else houseTop = block(ctx, { w: 1.2, d: 0.8, hh: 0.62, x: -0.68, z: quayZ, y });
   flag(ctx, armX, y, tip, 0.9, age === 'future' ? P.chrome : C.woodD);
+  if (age === 'stone' || age === 'tool') return houseTop;
   return (HARBOURS[age] ?? futureHarbour)(ctx, { y, quayZ, armX, tip }, houseTop);
 }

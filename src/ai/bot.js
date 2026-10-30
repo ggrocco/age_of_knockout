@@ -13,7 +13,7 @@ import { parseTimeLimit } from '../time-limit.js';
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
 // towers: how many Towers it keeps near its Town Center from the Tool Age on.
 // fleet: warships it keeps from the Bronze Age on (two more once it has seen enemy ships); fishers: Fishing Ships from
-// the Medieval Age; transports: Transport Ships it keeps when the enemy (or, in the relics round, a relic) is across the sea.
+// the Stone Age; transports: Transport Ships it keeps when the enemy (or, in the relics round, a relic) is across the sea.
 // ageFirst: research and the second half of the army only spend what leaves the next age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
 export const DIFF = {
@@ -618,7 +618,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
   // Trains `unit` at the Dock when its queue has room and we can pay and house it.
   function trainAtDock(dock, unit) {
-    if (dock.queue.length >= 2) return;
+    if (dock.queue.length >= 2 || ageIndex(me.age) < ageIndex(UNITS[unit].age)) return;
     if (canPay(UNITS[unit].cost) && me.pop < me.popCap) cmd({ type: 'train', buildingId: dock.id, unit });
   }
   // Across the sea the Dock comes first; otherwise it waits for spare villagers and never comes out of the next age-up.
@@ -654,7 +654,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   function trainWarships(dock, done, fleet, transports, enemies, needFerries) {
     const enemyShips = enemies.filter(e => e.kind === 'unit' && e.naval), want = settings.fleet + (enemyShips.length ? 2 : 0);
     const newest = SHIPS.find(type => ageIndex(UNITS[type].age) <= ageIndex(me.age));
-    if (bot.saving || transports.length < (needFerries ? settings.transports : 0)) return;
+    if (!newest || bot.saving || transports.length < (needFerries ? settings.transports : 0)) return;
     if (fleet.length + SHIPS.reduce((sum, type) => sum + queuedOfType(done, type), 0) >= want || dock.queue.length >= 2) return;
     const cost = UNITS[newest].cost;
     if (canPay(cost) && (!settings.ageFirst || leavesAgeUp(cost)) && me.pop < me.popCap) {

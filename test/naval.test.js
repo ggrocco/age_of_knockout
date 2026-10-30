@@ -29,7 +29,7 @@ function nearest(g, x, y, test) {
 }
 
 test('a Dock goes only on deep water against the shore', () => {
-  const g = setup(), n = g.map.size, sp = dockSpot(g);
+  const g = setup('stone'), n = g.map.size, sp = dockSpot(g);
   assert.ok(sp, 'a spot in the home bay');
   for (let j = sp.y; j < sp.y + 3; j++) for (let i = sp.x; i < sp.x + 3; i++) assert.equal(g.map.tiles[j * n + i], 1);
   const s = g.map.starts[0];
@@ -46,13 +46,15 @@ test('a Dock goes only on deep water against the shore', () => {
   assert.equal(canPlace(g, 0, 'house', Math.floor(ford.x), Math.floor(ford.y)), false, 'nothing is built on shallows');
   const v = [...g.units.values()].find(u => u.owner === 0);
   assert.equal(g.command(0, { type: 'build', ids: [v.id], building: 'dock', x: sp.x, y: sp.y }).ok, true);
-  g.players[0].age = 'tool';
-  assert.equal(g.command(0, { type: 'build', ids: [v.id], building: 'dock', x: sp.x + 4, y: sp.y }).reason, 'age', 'a Bronze Age building');
 });
 
-test('the Dock trains ships onto the water; the Fishing Ship waits for the Medieval Age', () => {
-  const g = setup('bronze'), dock = dockFor(g);
-  assert.equal(g.command(0, { type: 'train', buildingId: dock.id, unit: 'fishing_ship' }).reason, 'age');
+test('Fishing Ships launch in Stone before Bronze Age warships and transports', () => {
+  const g = setup('stone'), dock = dockFor(g);
+  for (const unit of ['war_galley', 'transport_ship']) assert.equal(g.command(0, { type: 'train', buildingId: dock.id, unit }).reason, 'age');
+  assert.equal(g.command(0, { type: 'train', buildingId: dock.id, unit: 'fishing_ship' }).ok, true);
+  run(g, 20 * 31);
+  assert.ok([...g.units.values()].some(u => u.type === 'fishing_ship' && tileAt(g, u) === 1));
+  g.players[0].age = 'bronze';
   assert.equal(g.command(0, { type: 'train', buildingId: dock.id, unit: 'war_galley' }).ok, true);
   run(g, 20 * 41);
   const ship = [...g.units.values()].find(u => u.type === 'war_galley');
@@ -229,4 +231,18 @@ test('on an island map a lone bot climbs four Ages (to Medieval) on its home isl
   }
   assert.equal(g.players[0].age, 'medieval', 'reached the Medieval Age within 35 minutes');
   assert.equal(villagerAbroad, false, 'every villager stayed on the home island');
+});
+
+// Hold the age at Stone to prove the bot uses fishing before transport or combat ships unlock.
+test('a Stone Age bot launches and works Fishing Ships', () => {
+  const g = setup('stone', 2), dock = dockFor(g), bot = createBot(g, 0, 'hard');
+  for (let i = 0; i < 20 * 120; i++) {
+    g.players[0].age = 'stone'; g.players[0].ageUp = null;
+    g.tick(); if (g.time % 10 === 0) bot.think();
+  }
+  const boats = [...g.units.values()].filter(u => u.owner === 0 && u.naval);
+  assert.ok(boats.some(u => u.type === 'fishing_ship' && u.order.type === 'gather'));
+  assert.ok(boats.every(u => u.type === 'fishing_ship'));
+  assert.ok(dock.constructed);
+  assert.equal(bot.why.age ?? 0, 0, 'no rejected attempts to train locked ships');
 });
