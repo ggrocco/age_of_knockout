@@ -48,6 +48,7 @@ any difference is a behaviour change.
 | `&fps=N` | Frame cap (default 60; redraws at 10 FPS while paused/results, immediate camera/selection updates) |
 | `&quality=balanced\|high\|ultra` | Override the saved graphics preset |
 | `buildings.html?team=1&scale=true` | Design page: red team, true scale |
+| `buildings.html?view=units` | Unit evolution gallery: every unit across the eras, with close-up action previews; team and scale controls also apply |
 | `ages.html?team=1` | Age Ladder page, red team models |
 
 `window.__app` exposes the live app; `window.__app.match.game` is the running sim.
@@ -112,7 +113,7 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers use civilian workwear per era; ships use era-ships.js for later-era hulls and equipment. Only the King keeps one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
-  gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid from
+  gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid and the unit × era view (`?view=units`) from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and
   buildings appear on reload with no page edits.
 - `src/ladder`: the `ages.html` Age Ladder page (published at https://ggrocco.github.io/age_of_knockout/ages.html): per

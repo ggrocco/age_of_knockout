@@ -47,6 +47,8 @@
   dialog::backdrop { background:#000a; }
   dialog .bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:8px 12px; border-bottom:1px solid #5a4327; }
   dialog .bar h2 { margin:0; flex:1; font-size:17px; font-weight:normal; color:var(--bronze); }
+  [hidden] { display:none !important; }
+  dialog select { background:var(--stone); color:var(--parch); font:inherit; }
   dialog label { font-size:13px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
   dialog .close { background:none; border:1px solid var(--bronze); border-radius:3px; color:var(--parch); font:inherit; padding:2px 10px; cursor:pointer; }
   #stage { display:block; width:100%; height:min(560px,62vh); touch-action:none; }
@@ -62,9 +64,10 @@
 <body>
 <header>
   <h1>Buildings by Era</h1>
-  <p>Built live from <code>src/data</code> and the game's own models, so new ages and buildings appear here on reload. <a href="ages.html">Age Ladder</a> · <a href="./">Play the game</a></p>
+  <p>Built live from <code>src/data</code> and the game's own models, so compare buildings and units through every era. <a href="ages.html">Age Ladder</a> · <a href="./">Play the game</a></p>
+  <div class="seg" role="group" aria-label="Gallery"><button data-view="buildings">Buildings</button><button data-view="units">Units</button></div>
   <div class="seg" role="group" aria-label="Team colour"><span>Team</span><button data-team="0">Blue</button><button data-team="1">Red</button></div>
-  <div class="seg" role="group" aria-label="Scale"><span>Scale</span><button data-scale="fit" title="Each building zoomed to fill its cell">Fit</button><button data-scale="true" title="Every building at the same zoom, so sizes compare">True</button></div>
+  <div class="seg" role="group" aria-label="Scale"><span>Scale</span><button data-scale="fit" title="Each model zoomed to fill its cell">Fit</button><button data-scale="true" title="Every model at the same zoom, so sizes compare">True</button></div>
 </header>
 <main>
   <div class="wrap"><table id="grid"></table></div>
@@ -74,6 +77,7 @@
   <div class="bar">
     <h2 id="detail-title"></h2>
     <label><input type="checkbox" id="detail-build"> Under construction</label>
+    <label hidden>Action <select id="detail-action"><option value="idle">Idle</option><option value="move">Walk / sail</option><option value="work">Chop wood</option><option value="attack">Attack</option></select></label>
     <label><input type="checkbox" id="detail-spin" checked> Spin</label>
     <button class="close" id="detail-close" aria-label="Close">&#10005;</button>
   </div>

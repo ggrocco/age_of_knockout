@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { AGES } from '../src/data/ages.js';
+import { UNITS } from '../src/data/units.js';
 import { BUILDINGS } from '../src/data/buildings.js';
-import { galleryRows, buildingFacts, trainsBy, upgradesAt } from '../src/gallery/rows.js';
+import { galleryRows, unitGalleryRows, unitFacts, buildingFacts, trainsBy, upgradesAt } from '../src/gallery/rows.js';
 import { TECHS } from '../src/data/techs.js';
 
 test('buildings gallery has a row for every building and a cell for every age', () => {
@@ -54,4 +55,27 @@ test('buildings gallery shows each upgrade once, in the age it unlocks at its bu
   assert.deepEqual(upgradesAt('market', 'tool').map(u => u.name), ['Woodworking', 'Gold Mining']);
   const shown = Object.keys(BUILDINGS).flatMap(type => AGES.flatMap(age => upgradesAt(type, age).map(u => u.name)));
   assert.deepEqual(shown.sort(), Object.values(TECHS).map(t => t.name).sort(), 'every upgrade appears exactly once');
+});
+
+test('unit evolution gallery includes every unit only from its unlock era onward', () => {
+  const rows = unitGalleryRows();
+  assert.deepEqual(rows.map(r => r.type).sort(), Object.keys(UNITS).sort());
+  for (const row of rows) {
+    const first = row.cells.findIndex(c => c.available);
+    assert.equal(row.cells[first].age, UNITS[row.type].age, row.type);
+    assert.ok(row.cells.slice(first).every(c => c.available), row.type);
+    assert.equal(row.cells.filter(c => c.unlocks).length, 1, row.type);
+    assert.deepEqual(row.cells.map(c => c.age), AGES);
+  }
+  const future = { ...UNITS, worker_bot: { ...UNITS.villager, age: 'future' } };
+  assert.ok(unitGalleryRows(future, [...AGES, 'space']).every(r => r.cells.at(-1).available));
+  assert.ok(unitGalleryRows(future).some(r => r.type === 'worker_bot'));
+});
+
+test('unit gallery facts identify training locations, civilian ships and scenario units', () => {
+  assert.ok(unitFacts('villager', UNITS.villager).includes('Trained at: Town Center'));
+  assert.ok(unitFacts('fishing_ship', UNITS.fishing_ship).includes('Trained at: Dock'));
+  assert.ok(unitFacts('fishing_ship', UNITS.fishing_ship).includes('Carries 15 fish'));
+  assert.ok(unitFacts('transport_ship', UNITS.transport_ship).includes('Carries 8 passengers'));
+  assert.ok(unitFacts('king', UNITS.king).includes('Scenario unit'));
 });
