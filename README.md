@@ -210,7 +210,7 @@ real iPhone.
 
 <br clear="right">
 
-## Buildings by era
+## Buildings and units by era
 
 ![buildings.html: Government Center, Temple, Dock and Wonder rendered in every era from Bronze to AI Future, with what each trains and researches](docs/screenshots/gallery.jpg)
 
@@ -218,6 +218,12 @@ Open `http://localhost:8000/buildings.html` to see every building in every era, 
 models. Under each era it lists what the building trains by then and any upgrade it can start researching in that
 era, with what the upgrade does. Switch Blue/Red team and Fit/True scale; click a building to orbit it or see it under construction. The page
 reads `src/data`, so new eras and buildings appear on reload.
+
+Choose **Units**, or open `http://localhost:8000/buildings.html?view=units`, to compare villagers, fighters,
+cavalry, siege engines and ships across all nine eras. Each row shows the same unit in its owner's era from its
+unlock onward, with training location and base stats. Blue/Red and Fit/True scale also work for units.
+Click a unit to orbit it and preview walking/sailing, attacks, or a villager chopping wood. The King retains its
+royal appearance. The Age Ladder's **Unit Evolution** link opens this view.
 
 ## Age Ladder
 

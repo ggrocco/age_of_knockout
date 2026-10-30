@@ -43,3 +43,18 @@ export function upgradesAt(type, age) {
     .filter(tech => tech.building === type && tech.age === age)
     .map(tech => ({ name: tech.name, desc: tech.desc }));
 }
+
+// Units keep one row each, including scenario-only units such as the King.
+export const unitGalleryRows = (units = UNITS, ages = AGES) => galleryRows(units, ages);
+
+export function unitFacts(type, spec) {
+  const cost = RES.filter(r => spec.cost[r]).map(r => `${spec.cost[r]} ${r}`).join(', ') || 'free';
+  const trainers = Object.values(BUILDINGS).filter(b => b.trains?.includes(type)).map(b => b.name);
+  const facts = [ageTitle(spec.age), `${spec.hp} hp`, `${spec.atk} attack`, cost,
+    trainers.length ? `Trained at: ${trainers.join(', ')}` : 'Scenario unit'];
+  if (spec.naval) facts.push('Sails on water');
+  if (spec.carries) facts.push(`Carries ${spec.carries} passengers`);
+  if (spec.capacity) facts.push(`Carries ${spec.capacity} fish`);
+  if (type === 'king') facts.push('Keeps its royal appearance');
+  return facts;
+}
