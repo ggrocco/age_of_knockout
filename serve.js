@@ -1,4 +1,5 @@
-// Dev static file server (no dependencies). Usage: node serve.js [port]  (default 8000, or $PORT)
+// Dev static file server (no dependencies). Usage: node serve.js [port] (default 8000, or $PORT).
+// Loopback by default; HOST can select an interface when a development proxy requires it.
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const port = Number(process.argv[2] ?? process.env.PORT ?? 8000);
+const host = process.env.HOST ?? '127.0.0.1';
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -53,7 +55,7 @@ createServer(async (req, res) => {
   } catch {
     send(res, 404, 'Not Found');
   }
-}).listen(port, async () => {
+}).listen(port, host, async () => {
   console.log(`Serving ${root} at http://localhost:${port}/`);
   // The pages import three.js straight from node_modules: without it they load as a blank page.
   await stat(join(root, 'node_modules/three/build/three.module.js'))

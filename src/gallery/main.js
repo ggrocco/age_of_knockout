@@ -10,7 +10,7 @@ import { createStage, entity, unitEntity, modelGroup, boxOf } from './stage.js';
 import { galleryRows, unitGalleryRows, buildingFacts, unitFacts, trainsBy, upgradesAt } from './rows.js';
 
 const params = new URLSearchParams(location.search);
-const state = { team: params.get('team') === '1' ? 1 : 0, scale: params.get('scale') === 'true' ? 'true' : 'fit', view: params.get('view') === 'units' ? 'units' : 'buildings' };
+const state = { team: ['0', '1', '2', '3'].includes(params.get('team')) ? Number(params.get('team')) : 0, scale: params.get('scale') === 'true' ? 'true' : 'fit', view: params.get('view') === 'units' ? 'units' : 'buildings' };
 let rows = state.view === 'units' ? unitGalleryRows() : galleryRows();
 const isUnits = () => state.view === 'units';
 const galleryEntity = (type, team, finished = true) => isUnits() ? unitEntity(type, team) : entity(type, team, finished);
@@ -202,7 +202,7 @@ function syncToolbar() {
   for (const b of document.querySelectorAll('[data-scale]')) b.setAttribute('aria-pressed', String(b.dataset.scale === state.scale));
   const query = new URLSearchParams(location.search);
   isUnits() ? query.set('view', 'units') : query.delete('view');
-  state.team ? query.set('team', '1') : query.delete('team');
+  state.team ? query.set('team', String(state.team)) : query.delete('team');
   state.scale === 'true' ? query.set('scale', 'true') : query.delete('scale');
   history.replaceState(null, '', `${location.pathname}${query.size ? `?${query}` : ''}`);
 }

@@ -54,12 +54,14 @@ export function createMinimap(canvas, game, view) {
 
   // Resources the player knows of, then relics and every visible unit and building in its owner's colour.
   const drawEntities = () => {
-    for (const resource of game.knownResources(0)) {
+    for (const resource of view.spectating ? game.resources.values() : game.knownResources(0)) {
       const at = toCanvas(resource.x, resource.y);
       ctx.fillStyle = RESOURCE_COLORS[resource.type];
       ctx.fillRect(at.x - 1, at.y - 1, 2, 2);
     }
-    for (const e of game.visibleEntities(0)) {
+    const entities = view.spectating ? [...game.units.values(), ...game.buildings.values(), ...game.relics.values()]
+      .filter(e => !e.aboard && !e.garrisonedIn) : game.visibleEntities(0);
+    for (const e of entities) {
       if (e.kind === 'relic') {
         const at = toCanvas(e.x, e.y);
         ctx.fillStyle = '#fde047';
@@ -73,6 +75,21 @@ export function createMinimap(canvas, game, view) {
     }
   };
 
+  const drawTerritory = () => {
+    const territory = game.roundState?.territory;
+    if (!territory) return;
+    const explored = game.players[0].explored;
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < territory.owners.length; i++) {
+      const owner = territory.owners[i];
+      if (owner < 0 || !view.spectating && !explored[i]) continue;
+      const at = toCanvas(i % size + 0.5, Math.floor(i / size) + 0.5);
+      ctx.fillStyle = hex(OWNER_COLOR[owner]);
+      ctx.fillRect(at.x - scale, at.y - scale * 0.5, scale * 2 + 0.5, scale + 0.5);
+    }
+    ctx.globalAlpha = 1;
+  };
+
   // The main view's footprint as a white frame.
   const drawViewport = () => {
     const focus = view.focus, [halfX, halfY] = view.halfExtents();
@@ -83,23 +100,26 @@ export function createMinimap(canvas, game, view) {
   };
 
   // Nothing is redrawn until the sim, the terrain, the entity count or the camera moves on.
-  let drawStamp = -1, focusX, focusZ, halfX, halfY, entityCount, drawTerrainStamp;
+  let drawStamp = -1, focusX, focusZ, halfX, halfY, entityCount, drawTerrainStamp, spectating, territoryVersion;
   const unchanged = (extentX, extentY) => drawTerrainStamp === game.terrainVersion && drawStamp === game.time
     && entityCount === game.entities.size && focusX === view.focus.x && focusZ === view.focus.z
-    && halfX === extentX && halfY === extentY;
+    && halfX === extentX && halfY === extentY && spectating === view.spectating
+    && territoryVersion === game.roundState?.territory?.version;
   const minimap = {
     draw() {
       const [extentX, extentY] = view.halfExtents();
       if (unchanged(extentX, extentY)) return;
       drawTerrainStamp = game.terrainVersion; drawStamp = game.time; entityCount = game.entities.size;
+      spectating = view.spectating; territoryVersion = game.roundState?.territory?.version;
       focusX = view.focus.x; focusZ = view.focus.z; halfX = extentX; halfY = extentY;
       updateTerrain();
       ctx.fillStyle = '#0a0d09';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(terrain.layer, 0, 0);
+      drawTerritory();
       drawEntities();
       updateFog(game.players[0]);
-      ctx.drawImage(fog.layer, 0, 0);
+      if (!view.spectating) ctx.drawImage(fog.layer, 0, 0);
       drawViewport();
     },
     toWorld,

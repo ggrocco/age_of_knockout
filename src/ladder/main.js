@@ -6,7 +6,7 @@ import { ladder, jumps, findings, GROWTH, RES } from './model.js';
 import * as THREE from 'three';
 
 const params = new URLSearchParams(location.search);
-const state = { team: params.get('team') === '1' ? 1 : 0, tracing: null };
+const state = { team: ['0', '1', '2', '3'].includes(params.get('team')) ? Number(params.get('team')) : 0, tracing: null };
 const ages = ladder(), byId = Object.fromEntries(ages.map(a => [a.id, a]));
 const THUMB_W = 240, THUMB_H = 184; // 2x the CSS size
 const era = id => `var(--e-${id})`;
@@ -224,7 +224,7 @@ async function renderThumbs() {
 function syncTeam() {
   for (const b of document.querySelectorAll('[data-team]')) b.setAttribute('aria-pressed', String(+b.dataset.team === state.team));
   const query = new URLSearchParams(location.search);
-  state.team ? query.set('team', '1') : query.delete('team');
+  state.team ? query.set('team', String(state.team)) : query.delete('team');
   history.replaceState(null, '', `${location.pathname}${query.size ? `?${query}` : ''}${location.hash}`);
 }
 document.querySelector('header').addEventListener('click', ev => {

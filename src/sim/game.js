@@ -11,6 +11,7 @@ import { execute } from './commands.js';
 import { updateVision } from './vision.js';
 import { initOre, recordPileStart, updateRespawn, RESPAWN_EVERY } from './ore.js';
 import { secs, rectOf, centerOf, passable } from './util.js';
+import { isKingdoms, sheltered, kingRemoved, releaseKing, updateShelters } from './kingdoms.js';
 
 // A wall foundation (an unfinished wall) does not block movement: it only reserves its tile, and occupies it once finished.
 const opensFoundation = type => BUILDINGS[type].defence === 'wall';
@@ -24,16 +25,18 @@ const newPlayer = (id, n, workRate) => ({
 
 // workRate: per-player speed of gathering, building, training, research and age-ups (a handicap, 1 = normal).
 // capTicks: round time limit, defaults to the round's own. mapType: 'rivers' or 'islands' (map.js).
+// playerCount: two by default; Kingdom Conquest requests four through rules.playerCount.
 export function createGame({
   seed = 1, rules = null, size = 112, workRate = [1, 1], capTicks = rules?.capTicks, mapType = 'rivers',
+  playerCount = rules?.playerCount ?? 2,
 } = {}) {
-  const map = generateMap(seed, size, mapType), n = map.size;
+  const map = generateMap(seed, size, mapType, playerCount), n = map.size;
   // occupancy: per tile (y * size + x), the id of the building or resource standing on it, 0 for none.
   const occupancy = new Int32Array(n * n), reserved = new Set();
   const game = {
     seed, map, rules, capTicks, time: 0, result: null, nextId: 1,
     entities: new Map(), units: new Map(), buildings: new Map(), resources: new Map(), relics: new Map(),
-    players: [0, 1].map(id => newPlayer(id, n, workRate[id])),
+    players: Array.from({ length: playerCount }, (_, id) => newPlayer(id, n, workRate[id] ?? 1)),
     reserved, // tile indices (y * size + x) held by wall foundations: walkable, but nothing else can be placed there
     occAt: (x, y) => (x < 0 || y < 0 || x >= n || y >= n) ? 1 : occupancy[y * n + x],
     blocked: (x, y) => occupancy[y * n + x] !== 0,
@@ -138,7 +141,7 @@ function addEntityMethods(game, { mark, tilesOf, reserved, nearestFree }) {
     const rect = rectOf(building);
     for (const unit of game.units.values()) {
       const tx = Math.floor(unit.x), ty = Math.floor(unit.y);
-      if (unit.aboard || tx < rect.x0 || tx >= rect.x1 || ty < rect.y0 || ty >= rect.y1) continue;
+      if (unit.aboard || sheltered(unit) || tx < rect.x0 || tx >= rect.x1 || ty < rect.y0 || ty >= rect.y1) continue;
       placeUnit(unit, nearestFree(unit.x, unit.y, unit.naval));
     }
   };
@@ -193,7 +196,7 @@ function newBuilding(game, type, owner, x, y, constructed) {
 function pushUnitsOff(game, building) {
   const { x, y, size } = building;
   for (const unit of game.units.values()) {
-    if (unit.aboard || unit.x < x || unit.x > x + size || unit.y < y || unit.y > y + size) continue;
+    if (unit.aboard || sheltered(unit) || unit.x < x || unit.x > x + size || unit.y < y || unit.y > y + size) continue;
     placeUnit(unit, game.findSpawn(building, unit.naval));
   }
 }
@@ -202,10 +205,12 @@ function pushUnitsOff(game, building) {
 const defaultCooldown = cls => cls === 'archer' ? 40 : cls === 'siege' ? 80 : 30;
 
 function newUnit(game, type, owner, x, y) {
-  const def = UNITS[type];
+  const def = UNITS[type], royal = type === 'king' && isKingdoms(game);
+  const hp = royal ? UNITS.villager.hp * 10 : def.hp;
   return {
-    id: game.nextId++, kind: 'unit', type, owner, x, y, hp: def.hp, maxHp: def.hp,
-    atk: def.atk, atkType: def.atkType || 'melee', marmor: def.marmor || 0, parmor: def.parmor || 0, bonus: def.bonus || null,
+    id: game.nextId++, kind: 'unit', type, owner, x, y, hp, maxHp: hp,
+    atk: def.atk, atkType: def.atkType || 'melee', marmor: royal ? UNITS.villager.marmor : def.marmor || 0,
+    parmor: royal ? UNITS.villager.parmor : def.parmor || 0, bonus: def.bonus || null,
     range: def.range, speed: def.speed, sight: def.sight,
     cls: def.cls, naval: !!def.naval, splash: def.splash || 0, cooldown: def.cooldown ?? defaultCooldown(def.cls), cd: 0,
     order: { type: 'idle' }, path: null, retry: 0, carry: { type: null, amount: 0 }, relic: null, dead: false,
@@ -248,38 +253,40 @@ function addRemovalMethods(game, { n, occupancy, reserved, tilesOf, freeTileNear
       if (occupancy[i] === entity.id) occupancy[i] = 0; // a foundation never marked its tile
     }
   };
-  game.remove = entity => {
+  game.remove = (entity, attacker = null) => {
     if (entity.dead) return;
     entity.dead = true;
-    sinkPassengers(game, entity);
+    sinkPassengers(game, entity, attacker);
     leaveTransport(game, entity);
     game.entities.delete(entity.id);
     game.units.delete(entity.id);
     game.buildings.delete(entity.id);
     game.resources.delete(entity.id);
     if (entity.kind === 'building' || entity.kind === 'resource') clearTiles(entity);
+    if (entity.kind === 'building') releaseKing(game, entity);
     // A building's relics come out just past its far edge; a unit drops its relic where it stands.
     const centre = centerOf(entity), isBuilding = entity.kind === 'building';
     const dropX = isBuilding ? Math.min(n - 1, Math.floor(centre.x) + 0.5) : centre.x;
     dropRelics(entity, dropX, isBuilding ? Math.min(n - 1, entity.y + entity.size + 0.5) : centre.y);
+    kingRemoved(game, entity, attacker);
   };
   game.depleted = resource => { if (resource.kind === 'resource' || resource.gatherType) game.remove(resource); };
   game.damage = (target, amount, attacker) => {
-    if (target.dead) return;
+    if (target.dead || sheltered(target)) return;
     target.hp -= amount;
     if (target.hp <= 0) destroy(game, target, attacker);
   };
 }
 
 // A sunk transport takes its passengers down.
-function sinkPassengers(game, transport) {
+function sinkPassengers(game, transport, attacker) {
   const cargo = transport.cargo;
   if (!cargo) return;
   for (const id of cargo) {
     const passenger = game.entities.get(id);
     if (!passenger) continue;
     game.players[passenger.owner].losses++;
-    game.remove(passenger);
+    game.remove(passenger, attacker);
   }
 }
 
@@ -293,7 +300,7 @@ function leaveTransport(game, passenger) {
 function destroy(game, target, attacker) {
   if (attacker) creditKill(game, game.players[attacker.owner], target);
   if (target.kind === 'unit') game.players[target.owner].losses++; // for generalship score (any death, attributed or not)
-  game.remove(target);
+  game.remove(target, attacker);
 }
 
 const killValue = unit => unit.cls === 'civ' ? 1 : 2;
@@ -324,6 +331,7 @@ function addQueryMethods(game, { n, free, nearestFree }) {
   };
   game.recount = () => recount(game);
   game.command = (playerId, cmd) => execute(game, playerId, cmd);
+  game.refreshCivilization = playerId => refreshCivilization(game, playerId);
   game.visibleEntities = playerId => {
     const visible = game.players[playerId].visible, out = [];
     addVisible(game.units, playerId, visible, n, out);
@@ -338,7 +346,7 @@ function addQueryMethods(game, { n, free, nearestFree }) {
 // Own entities, and the other side's whose centre tile is in sight. Passengers are out of sight in the hold.
 function addVisible(entities, playerId, visible, n, out) {
   for (const entity of entities.values()) {
-    if (entity.aboard) continue;
+    if (entity.aboard || sheltered(entity)) continue;
     if (entity.owner === playerId) {
       out.push(entity);
       continue;
@@ -366,7 +374,8 @@ function recount(game) {
 function tick(game) {
   if (game.result) return;
   game.time++;
-  for (const unit of [...game.units.values()]) if (!unit.dead && !unit.aboard) updateUnit(game, unit);
+  if (isKingdoms(game)) updateShelters(game);
+  for (const unit of [...game.units.values()]) if (!unit.dead && !unit.aboard && !sheltered(unit)) updateUnit(game, unit);
   carryPassengers(game);
   for (const building of [...game.buildings.values()]) {
     if (building.dead) continue;
@@ -485,6 +494,28 @@ function refreshFarms(game, playerId) {
     farm.amount = farm.amount / farm.maxAmount * capacity;
     farm.maxAmount = capacity;
   }
+}
+
+// Rebase captured and existing assets onto the merged technology set, retaining health/food fractions.
+function refreshCivilization(game, playerId) {
+  const player = game.players[playerId];
+  player.gatherMult = { food: 1, wood: 1, gold: 1, stone: 1 };
+  for (const id of player.techs) {
+    const gather = TECHS[id].effect.gather;
+    if (gather) for (const kind in gather) player.gatherMult[kind] *= gather[kind];
+  }
+  for (const unit of game.units.values()) {
+    if (unit.owner !== playerId) continue;
+    const health = unit.hp / unit.maxHp;
+    const base = newUnit({ rules: game.rules, nextId: 0 }, unit.type, playerId, unit.x, unit.y);
+    for (const key of ['maxHp', 'hp', 'atk', 'atkType', 'marmor', 'parmor', 'bonus', 'range', 'speed', 'sight', 'splash', 'cooldown']) {
+      unit[key] = base[key];
+    }
+    for (const id of player.techs) applyUnitEffect(unit, TECHS[id].effect);
+    unit.hp = health * unit.maxHp;
+  }
+  refreshDefences(game, playerId);
+  refreshFarms(game, playerId);
 }
 
 function updateBuilding(game, building) {

@@ -28,7 +28,7 @@ function nearestVisibleEnemy(game, tower) {
   const rangeSq = tower.range * tower.range;
   let target = null, nearestSq = Infinity;
   for (const unit of game.units.values()) {
-    if (unit.owner === tower.owner || unit.dead || unit.aboard) continue;
+    if (unit.owner === tower.owner || unit.dead || unit.aboard || unit.garrisonedIn) continue;
     const dx = unit.x - center.x, dy = unit.y - center.y, distSq = dx * dx + dy * dy;
     if (distSq > rangeSq || distSq >= nearestSq) continue; // `>=`: a tie keeps the earlier (lower id) unit
     if (!visible[Math.floor(unit.y) * n + Math.floor(unit.x)]) continue;

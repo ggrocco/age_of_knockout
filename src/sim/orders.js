@@ -7,6 +7,7 @@ import { DT, distPoint, centerOf, tileOf, RES_KIND } from './util.js';
 import { drawFrom } from './ore.js';
 import { canRepair } from './commands.js';
 import { landingTiles, landingNear } from './formation.js';
+import { sheltered } from './kingdoms.js';
 
 // How close a worker stands to its job, how much a villager carries (a unit's `capacity` overrides it), and gather rates
 // per resource per second.
@@ -104,7 +105,23 @@ export function updateUnit(game, unit) {
     case 'relic': return doRelic(game, unit, order);
     case 'board': return doBoard(game, unit, order);
     case 'unload': return doUnload(game, unit, order);
+    case 'shelter': return doShelter(game, unit, order);
   }
+}
+
+function doShelter(game, unit, order) {
+  const castle = game.buildings.get(order.target);
+  if (!castle || !castle.constructed || castle.owner !== unit.owner || castle.type !== 'castle') return stop(unit);
+  if (distPoint(unit.x, unit.y, castle) <= 1) {
+    unit.garrisonedIn = castle.id;
+    castle.king = unit.id;
+    const centre = centerOf(castle);
+    unit.x = centre.x; unit.y = centre.y;
+    return stop(unit);
+  }
+  const centre = centerOf(castle);
+  const status = travel(game, unit, goalNear(castle, 1), { x: Math.floor(centre.x), y: Math.floor(centre.y) });
+  if (status === 'fail') stop(unit);
 }
 
 // A move that cannot reach its tile first settles for within 2 tiles of it. If even that fails and enemy buildings are in the
@@ -313,16 +330,19 @@ export function damageTo(attacker, target) {
 }
 
 export function hit(game, attacker, target) {
+  // Snapshot who was exposed before the primary hit can release a sheltered king or change an empire's owner.
+  const splash = attacker.splash ? [...game.units.values(), ...game.buildings.values()]
+    .filter(e => e !== target && !e.dead && !e.aboard && !sheltered(e)) : null;
   game.damage(target, damageTo(attacker, target), attacker);
-  if (attacker.splash) splashAround(game, attacker, target);
+  if (splash) splashAround(game, attacker, target, splash);
 }
 
 // Splash damage: half damage to every other enemy unit and building within `splash` of the target's centre, except units
 // in a transport's hold. The lists are copied first because a kill removes the entity from its Map.
-function splashAround(game, attacker, target) {
+function splashAround(game, attacker, target, exposed) {
   const center = centerOf(target);
-  for (const list of [game.units, game.buildings]) for (const entity of [...list.values()]) {
-    if (entity === target || entity.dead || entity.owner === attacker.owner || entity.aboard) continue;
+  for (const entity of exposed) {
+    if (entity.dead || entity.owner === attacker.owner || entity.aboard || sheltered(entity)) continue;
     if (distPoint(center.x, center.y, entity) <= attacker.splash) game.damage(entity, damageTo(attacker, entity) * 0.5, attacker);
   }
 }
@@ -331,7 +351,7 @@ function splashAround(game, attacker, target) {
 // needs ground within reach of a ship (so only ranged soldiers hit a ship on deep water; anyone can hit one in the shallows).
 // Same-layer targets are always reachable as far as this goes. game.toWater / game.toLand hold each tile's distance.
 export function canHit(game, unit, target) {
-  if (target.aboard) return false; // in a transport's hold: sink the transport instead
+  if (target.aboard || sheltered(target)) return false;
   const naval = !!unit.naval;
   if (target.kind === 'unit' ? !!target.naval === naval : !naval && !BUILDINGS[target.type]?.naval) return true;
   const distances = naval ? game.toWater : game.toLand, n = game.map.size;
@@ -402,7 +422,7 @@ function aggro(game, unit) {
 function nearestEnemyUnit(game, unit, maxDist) {
   let nearest = null, nearestDist = maxDist;
   for (const other of game.units.values()) {
-    if (other.owner === unit.owner || other.aboard) continue;
+    if (other.owner === unit.owner || other.aboard || sheltered(other)) continue;
     const distance = Math.hypot(other.x - unit.x, other.y - unit.y) - (other.cls === 'civ' ? 0.5 : 0);
     if (distance < nearestDist && canHit(game, unit, other)) {
       nearestDist = distance;

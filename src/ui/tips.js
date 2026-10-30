@@ -27,7 +27,7 @@ export const DESC = {
   market: 'Researches economy upgrades that speed up gathering, and counts toward leaving the Tool Age.',
   government_center: 'Trains Catapults and Railguns, researches Ballistics (+range) and accepts every resource. Later siege comes from the Castle and Factory.',
   wonder: `In the Wonder Race, keeping one standing for ${Math.round(WONDER_TICKS / 1200)} minutes wins the round.`,
-  castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age.',
+  castle: 'Medieval stronghold with very heavy armour. Trains Trebuchets and Cannons, and is needed to leave the Medieval Age. In Kingdom Conquest, your King automatically shelters inside until the castle falls.',
   factory: 'Industrial Age works that builds Field Artillery and Tanks. You need one to advance out of the Industrial Age.',
   temple: 'Bronze Age shrine that researches Sacred Harvest (faster food gathering). Needed, with a Government Center, to advance out of the Bronze Age.',
   academy: 'Iron Age school of drill that researches Phalanx Drill (+20 HP for infantry). Needed, with a Siege Workshop, to advance out of the Iron Age.',
@@ -72,7 +72,7 @@ export const DESC = {
   war_galley: 'Bronze Age oared warship. Shoots arrows at ships and at anything near the shore; soldiers can only hit it from the bank with ranged attacks, or in the shallows.',
   frigate: 'Age of Sail warship whose cannon broadsides splash nearby targets and batter buildings by the water.',
   destroyer: 'Modern warship: fast, heavily armoured and long-ranged, with guns that splash nearby targets.',
-  king: 'Regicide only: if your King falls, the match is lost. Keep him safe.',
+  king: 'Protect your King. In Regicide his death loses the match. In Kingdom Conquest he has 250 HP and his death transfers your civilization to the attacker; castles shelter him.',
   age: 'Research the next Age to unlock stronger units and buildings.',
   delete: 'Asks you to confirm before removing this building. Nothing is refunded, and queued training or research is lost.',
 };
@@ -98,6 +98,10 @@ const CONQUEST_GOAL = 'Eliminate all enemy units, completed buildings that train
   + ' Other buildings alone cannot keep an empire alive, and neither can ships without a Dock.';
 const ELIMINATION_ALSO_WINS = ' You can also win by eliminating the enemy empire.';
 const ROUND_INFO = {
+  kingdoms: {
+    icon: 'king',
+    goal: 'Slay opposing kings to inherit their entire civilizations. Your King has 250 HP and automatically shelters in a completed castle. Completed buildings claim land within eight ground steps; equal opposing claims are neutral. Conquer all three opponents or hold the most territory at the deadline.',
+  },
   conquest: { icon: 'town_center', goal: CONQUEST_GOAL },
   deathmatch: { icon: 'barracks', goal: CONQUEST_GOAL, start: 'Iron Age with 20,000 of each resource.' },
   regicide: {
@@ -135,9 +139,12 @@ export const NO_TIME_LIMIT_RULE = 'Play until a victory condition is met or a pl
 // Uses the same hover-card layout as buildings; durations come from the actual round rules.
 export function roundTipHtml(round, capTicks = round.capTicks) {
   const info = ROUND_INFO[round.id];
+  const deadline = round.id === 'kingdoms'
+    ? 'Most territory wins; existing game score breaks territory ties. A remaining tie is a draw.'
+    : TIME_LIMIT_RULE + ' An exact tie goes to you.';
   const endRule = capTicks === Infinity
     ? row('Match ends', NO_TIME_LIMIT_RULE, true)
-    : row('At the limit', TIME_LIMIT_RULE + ' An exact tie goes to you.', true);
+    : row('At the limit', deadline, true);
   return tipHeader(icon(info.icon), round.name, 'Game mode')
     + `<dl>${row('Goal', info.goal, true)}${row('Time limit', roundLimitText(round, capTicks), true)}`
     + endRule

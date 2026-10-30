@@ -154,14 +154,19 @@ function nearestReachable(map, reach, point) {
 }
 
 export function createBot(game, pid, difficulty = 'medium') {
-  const settings = DIFF[difficulty], me = game.players[pid], enemyPid = 1 - pid;
-  const map = game.map, mapSize = map.size, enemyStart = map.starts[enemyPid];
+  const settings = DIFF[difficulty], me = game.players[pid];
+  const map = game.map, mapSize = map.size;
+  const nearestOpponent = () => game.players.filter(p => p.id !== pid && !p.defeated)
+    .sort((a, b) => dist(map.starts[pid], map.starts[a.id]) - dist(map.starts[pid], map.starts[b.id]) || a.id - b.id)[0]?.id;
+  let enemyPid = game.players.length === 2 ? 1 - pid : nearestOpponent();
+  let enemyStart = map.starts[enemyPid];
   // Fixed sweep points can fall in a lake; every unit sent there would search the whole map for a path, so snap them
   // to reachable land.
   const reach = reachableFrom(map, map.starts[pid]), sweepScale = mapSize / 64;
   // Which land mass a point is on; soldiers only get orders for targets on their own (a transport ferries the rest).
   const mass = landMasses(map), massOf = point => mass[Math.floor(point.y) * mapSize + Math.floor(point.x)];
-  const homeMass = massOf(map.starts[pid]), enemyMass = massOf(enemyStart), overSea = enemyMass !== homeMass;
+  const homeMass = massOf(map.starts[pid]);
+  let enemyMass = massOf(enemyStart), overSea = enemyMass !== homeMass;
   const sameLand = (a, b) => massOf(a) === massOf(b);
   const sweep = [enemyStart, ...SWEEP_POINTS.map(([x, y]) =>
     nearestReachable(map, reach, { x: Math.round(x * sweepScale), y: Math.round(y * sweepScale) }))];
@@ -193,7 +198,7 @@ export function createBot(game, pid, difficulty = 'medium') {
     bot.rejects++;
     bot.maxRejects = Math.max(bot.maxRejects, bot.rejects);
   }
-  const ownEntities = kind => [...game[kind].values()].filter(e => e.owner === pid && !e.aboard); // passengers take no orders
+  const ownEntities = kind => [...game[kind].values()].filter(e => e.owner === pid && !e.aboard && !e.garrisonedIn);
   const buildingCount = type => ownEntities('buildings').filter(b => b.type === type).length;
   // True when paying `cost` still leaves, of each resource it spends, what the next age-up costs (from the Age of Sail
   // on that includes stone). No reserve while an age-up is already paid for and running, or at the last age.
@@ -366,7 +371,22 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
 
   function think() {
-    if (game.result) return;
+    if (game.result || me.defeated) return;
+    if (game.players.length > 2 && game.players[enemyPid].defeated) {
+      const next = nearestOpponent();
+      if (next === undefined) return;
+      enemyPid = next;
+      enemyStart = map.starts[enemyPid];
+      enemyMass = massOf(enemyStart);
+      overSea = enemyMass !== homeMass;
+      sweep[0] = enemyStart;
+      bot.sweepIdx = 0;
+      sentTo.clear();
+      for (const [id, job] of ferry) if (job.wave) {
+        job.dest = { ...enemyStart };
+        if (job.stage === 'sail') cmd({ type: 'unload', transportId: id, x: job.dest.x, y: job.dest.y });
+      }
+    }
     const buildings = ownEntities('buildings'), done = buildings.filter(b => b.constructed);
     const tc = buildings.find(b => b.type === 'town_center' && b.constructed), anyBase = tc || done[0];
     const units = ownEntities('units'), vills = units.filter(u => u.type === 'villager');
@@ -375,11 +395,15 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (!anyBase && !vills.length && !army.length) return;
     const home = anyBase ? centerOf(anyBase) : (units[0] || map.starts[pid]);
     const visible = game.visibleEntities(pid);
-    const enemies = visible.filter(e => e.owner === enemyPid && (e.kind === 'unit' || e.kind === 'building'));
+    const enemies = visible.filter(e => (game.players.length === 2 ? e.owner === enemyPid
+      : e.owner != null && e.owner !== pid && !game.players[e.owner].defeated) && (e.kind === 'unit' || e.kind === 'building'));
 
     trainVillagers(tc, vills, done);
     buildHouses(buildings, vills, home, roundId);
     const free = vills.filter(v => v.order.type !== 'build');
+    if (roundId === 'kingdoms' && !buildings.some(b => b.type === 'castle') && ageIndex(me.age) >= ageIndex('medieval')) {
+      tryBuild('castle', free, home);
+    }
     buildBase(tc, buildings, vills, free, home, roundId);
     advanceAge(vills, roundId);
     buildGateBuildings(free, home, roundId);
@@ -729,7 +753,14 @@ export function createBot(game, pid, difficulty = 'medium') {
     const free = army.filter(u => !ferried.has(u.id) && u.order.type === 'idle');
     const carriers = free.filter(u => u.relic !== null && massOf(u) !== homeMass);
     const loose = roundId === 'relics' && looseRelicAcross(army);
-    const waiting = free.filter(u => u.relic === null && massOf(u) === homeMass);
+    let waiting = free.filter(u => u.relic === null && massOf(u) === homeMass);
+    if (roundId === 'kingdoms') {
+      // Inherited armies can be on any conquered island. Pick one shore at a time so passengers don't call
+      // their transport back and forth between different islands while it loads.
+      const stranded = free.filter(u => u.relic === null && massOf(u) !== enemyMass);
+      const pickup = nearestFirst(stranded, transport)[0];
+      waiting = pickup ? stranded.filter(u => sameLand(u, pickup)) : [];
+    }
     if (carriers.length) return { units: carriers.slice(0, capacity), dest: home, relic: null, wave: false };
     if (loose && waiting.length) {
       const squad = nearestFirst(waiting.filter(u => u.cls !== 'siege'), transport).slice(0, Math.min(capacity, 5));
@@ -990,7 +1021,8 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
   function waveTargetOn(landMass, enemies, roundId, vaults, centre) {
     const here = enemies.filter(e => massOf(e.kind === 'building' ? centerOf(e) : e) === landMass);
-    const key = here.find(e => (roundId === 'regicide' && e.type === 'king') || (roundId === 'wonder' && e.type === 'wonder')
+    const key = here.find(e => ((roundId === 'regicide' || roundId === 'kingdoms') && e.type === 'king')
+      || (roundId === 'kingdoms' && e.type === 'castle' && e.king) || (roundId === 'wonder' && e.type === 'wonder')
       || vaults.has(e.id));
     return key || nearestFirst(here.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval), centre)[0]
       || nearestFirst(here.filter(e => e.kind === 'building'), centre)[0]
