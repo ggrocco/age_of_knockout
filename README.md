@@ -329,8 +329,8 @@ performance guarantees on those devices. Use `&quality=balanced|high|ultra` to o
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Bloom | Grass clumps |
 | --- | --- | --- | --- | --- | --- |
 | Balanced | 1.5 / 2 million | 1024 | Off | Off | 2,500 |
-| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Half resolution | 8,000 |
-| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-quarter resolution | 14,000 |
+| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Quarter resolution | 8,000 |
+| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 |
 
 Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
 own light, so they stay bright in shadow. On High and Ultra a bloom pass adds a halo around them (sun glints on gold

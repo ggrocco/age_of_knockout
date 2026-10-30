@@ -3,7 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 // Sky above the horizon, ground below it (top to bottom of the equirectangular image).
 const SKY_STOPS = [[0, '#769fc0'], [0.35, '#c0d4dc'], [0.5, '#f1e4c2'], [0.54, '#78845b'], [1, '#393426']];
@@ -55,55 +55,71 @@ class WorldAO extends SSAOPass {
   }
 }
 
-// A pixel blooms when its brightest linear HDR channel passes `threshold`: lit white walls reach about 1.2, glow
-// surfaces 2 and more. Sun glints on gold and chrome can pass it too and get a faint sparkle; separating them would
-// need a glow-only render pass. The brightest channel, not luminance, so red fire and magenta neon bloom like cyan.
-const BLOOM = Object.freeze({ strength: 0.55, radius: 0.25, threshold: 1.8 });
+// Bloom in three small passes: a bright-pass that also shrinks the frame (4x4 texels per pixel), then a horizontal and a
+// vertical blur, all at a fraction of the drawing buffer; the output pass adds the result before tone mapping
+// (withBloom). three's UnrealBloomPass needs 13 render passes; on the user's M2 Max (Chrome, Metal) that cost 3-3.5 ms a
+// frame at High, the same whether or not its full-resolution blend was skipped, so the pass count is what costs.
+// A pixel blooms when its brightest linear HDR channel passes `threshold` (lit white walls reach about 1.2, glow
+// surfaces 2 and more), so red fire and magenta neon bloom like cyan. Sun glints on gold and chrome can pass it too
+// and get a faint sparkle; separating them would need a glow-only render pass.
+const BLOOM = Object.freeze({ strength: 2, threshold: 1.8, knee: 0.1, spread: 1 });
+const QUAD_VERTEX = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const BRIGHT_SHRINK = `uniform sampler2D tDiffuse; uniform vec2 texel; uniform float threshold, knee; varying vec2 vUv;
+  vec3 bright(vec2 uv) { vec3 c = texture2D(tDiffuse, uv).rgb; return c * smoothstep(threshold, threshold + knee, max(c.r, max(c.g, c.b))); }
+  void main() {
+    gl_FragColor = vec4(0.25 * (bright(vUv + texel * vec2(-1.0, -1.0)) + bright(vUv + texel * vec2(1.0, -1.0))
+      + bright(vUv + texel * vec2(-1.0, 1.0)) + bright(vUv + texel * vec2(1.0, 1.0))), 1.0);
+  }`;
+// A 13-tap Gaussian in 7 bilinear fetches; `step` above one texel would leave gaps that show as ghost edges.
+const BLUR = `uniform sampler2D tInput; uniform vec2 step; varying vec2 vUv;
+  vec3 pair(float offset) { return texture2D(tInput, vUv + step * offset).rgb + texture2D(tInput, vUv - step * offset).rgb; }
+  void main() {
+    gl_FragColor = vec4(texture2D(tInput, vUv).rgb * 0.1964825 + pair(1.4117647) * 0.2969069
+      + pair(3.2941176) * 0.0944703 + pair(5.1764706) * 0.0103813, 1.0);
+  }`;
 
-// UnrealBloomPass without its last step, which adds the bloom back into the full-resolution multisampled scene
-// target: on a tile-based GPU that writes the whole target out and reads it back, 3-3.5 ms a frame at High on an M2
-// Max. The bloom stays in its small composite target (`glow`) and the output pass adds it (withBloom).
-class GlowPass extends UnrealBloomPass {
-  constructor(...args) {
-    super(...args);
-    const shader = this.materialHighPassFilter, luma = 'float v = luminance( texel.xyz );';
-    if (!shader.fragmentShader.includes(luma) || !this._fsQuad) throw new Error('UnrealBloomPass internals changed');
-    shader.fragmentShader = shader.fragmentShader.replace(luma, 'float v = max( texel.r, max( texel.g, texel.b ) );');
+class GlowPass extends Pass {
+  constructor() {
+    super();
+    this.needsSwap = false;
+    const target = () => new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+    this.targets = [target(), target()];
+    this.shrink = new THREE.ShaderMaterial({ vertexShader: QUAD_VERTEX, fragmentShader: BRIGHT_SHRINK, depthTest: false, depthWrite: false,
+      uniforms: { tDiffuse: { value: null }, texel: { value: new THREE.Vector2() }, threshold: { value: BLOOM.threshold }, knee: { value: BLOOM.knee } } });
+    this.blur = new THREE.ShaderMaterial({ vertexShader: QUAD_VERTEX, fragmentShader: BLUR, depthTest: false, depthWrite: false,
+      uniforms: { tInput: { value: null }, step: { value: new THREE.Vector2() } } });
+    this.quad = new FullScreenQuad();
+    this.blurSize = new THREE.Vector2(1, 1);
   }
-  get glow() { return this.renderTargetsHorizontal[0].texture; }
-  // UnrealBloomPass.render up to its composite (three r186), all at half resolution and below.
+  // The glow, blurred, at the size of the bloom buffers.
+  get glow() { return this.targets[0].texture; }
+  // `width`/`height`: the bloom buffers (a fraction of the drawing buffer); `sceneWidth`/`sceneHeight`: the frame.
+  setBloomSize(width, height, sceneWidth, sceneHeight) {
+    for (const t of this.targets) t.setSize(width, height);
+    this.blurSize.set(width, height);
+    this.shrink.uniforms.texel.value.set(1 / sceneWidth, 1 / sceneHeight);
+  }
+  setSize() {} // the composer's full-size call; createLightingEffects sizes the buffers with setBloomSize
   render(renderer, writeBuffer, readBuffer) {
-    const autoClear = renderer.autoClear, quad = this._fsQuad;
-    renderer.getClearColor(this._oldClearColor); this._oldClearAlpha = renderer.getClearAlpha();
-    renderer.autoClear = false; renderer.setClearColor(this.clearColor, 0);
-    const draw = (material, target) => { quad.material = material; renderer.setRenderTarget(target); renderer.clear(); quad.render(renderer); };
-    this.highPassUniforms.tDiffuse.value = readBuffer.texture;
-    this.highPassUniforms.luminosityThreshold.value = this.threshold;
-    draw(this.materialHighPassFilter, this.renderTargetBright);
-    let input = this.renderTargetBright;
-    for (let i = 0; i < this.nMips; i++) {
-      const blur = this.separableBlurMaterials[i];
-      blur.uniforms.colorTexture.value = input.texture; blur.uniforms.direction.value = UnrealBloomPass.BlurDirectionX;
-      draw(blur, this.renderTargetsHorizontal[i]);
-      blur.uniforms.colorTexture.value = this.renderTargetsHorizontal[i].texture; blur.uniforms.direction.value = UnrealBloomPass.BlurDirectionY;
-      draw(blur, this.renderTargetsVertical[i]);
-      input = this.renderTargetsVertical[i];
-    }
-    this.compositeMaterial.uniforms.bloomStrength.value = this.strength;
-    this.compositeMaterial.uniforms.bloomRadius.value = this.radius;
-    this.compositeMaterial.uniforms.bloomTintColors.value = this.bloomTintColors;
-    draw(this.compositeMaterial, this.renderTargetsHorizontal[0]);
-    renderer.setClearColor(this._oldClearColor, this._oldClearAlpha); renderer.autoClear = autoClear;
+    const draw = (material, target) => { this.quad.material = material; renderer.setRenderTarget(target); this.quad.render(renderer); };
+    this.shrink.uniforms.tDiffuse.value = readBuffer.texture;
+    draw(this.shrink, this.targets[0]);
+    const step = this.blur.uniforms.step.value;
+    this.blur.uniforms.tInput.value = this.targets[0].texture; step.set(BLOOM.spread / this.blurSize.x, 0);
+    draw(this.blur, this.targets[1]);
+    this.blur.uniforms.tInput.value = this.targets[1].texture; step.set(0, BLOOM.spread / this.blurSize.y);
+    draw(this.blur, this.targets[0]);
   }
+  dispose() { this.targets.forEach(t => t.dispose()); this.shrink.dispose(); this.blur.dispose(); this.quad.dispose(); }
 }
 
-// The output pass (tone mapping, sRGB) adds the glow texture before tone mapping, as UnrealBloomPass's blend would have.
+// The output pass (tone mapping, sRGB) adds the glow before tone mapping.
 function withBloom(output, glowPass) {
   const read = 'gl_FragColor = texture2D( tDiffuse, vUv );', material = output.material;
   if (!material.fragmentShader.includes(read)) throw new Error('OutputPass shader changed');
-  output.uniforms.tGlow = { value: glowPass.glow };
-  material.fragmentShader = material.fragmentShader.replace('uniform sampler2D tDiffuse;', 'uniform sampler2D tDiffuse;\nuniform sampler2D tGlow;')
-    .replace(read, `${read}\ngl_FragColor.rgb += texture2D( tGlow, vUv ).rgb;`);
+  output.uniforms.tGlow = { value: glowPass.glow }; output.uniforms.glowStrength = { value: BLOOM.strength };
+  material.fragmentShader = material.fragmentShader.replace('uniform sampler2D tDiffuse;', 'uniform sampler2D tDiffuse;\nuniform sampler2D tGlow;\nuniform float glowStrength;')
+    .replace(read, `${read}\ngl_FragColor.rgb += texture2D( tGlow, vUv ).rgb * glowStrength;`);
   return output;
 }
 
@@ -120,7 +136,7 @@ export function createLightingEffects(renderer, scene, camera, preset, cosmetics
   ao.depthRenderMaterial.defines.PERSPECTIVE_CAMERA = 0;
   ao.kernelRadius = 0.65; ao.minDistance = 0.00015; ao.maxDistance = 0.018;
   // Bloom haloes only what is brighter than lit white walls, which in practice means the glow surfaces (materials.js).
-  const bloom = preset.bloom ? new GlowPass(new THREE.Vector2(1, 1), BLOOM.strength, BLOOM.radius, BLOOM.threshold) : null;
+  const bloom = preset.bloom ? new GlowPass() : null;
   if (bloom) withBloom(output, bloom);
   composer.addPass(beauty); composer.addPass(ao); if (bloom) composer.addPass(bloom); composer.addPass(output);
   return {
@@ -130,8 +146,9 @@ export function createLightingEffects(renderer, scene, camera, preset, cosmetics
       composer.setPixelRatio(ratio); composer.setSize(width, height);
       // AO runs at a fraction (preset.ao) of the drawing-buffer resolution.
       ao.setSize(Math.max(1, Math.round(width * ratio * preset.ao)), Math.max(1, Math.round(height * ratio * preset.ao)));
-      // Bloom is blurry by design, so it also runs at a fraction (preset.bloom) of the resolution.
-      bloom?.setSize(Math.max(1, Math.round(width * ratio * preset.bloom)), Math.max(1, Math.round(height * ratio * preset.bloom)));
+      // Bloom is blurry by design: its buffers are a fraction (preset.bloom / 2) of the drawing buffer.
+      const scale = preset.bloom / 2;
+      bloom?.setBloomSize(Math.max(1, Math.round(width * ratio * scale)), Math.max(1, Math.round(height * ratio * scale)), width * ratio, height * ratio);
     },
     render() { composer.render(); },
     dispose() { ao.dispose(); bloom?.dispose(); output.dispose(); beauty.dispose(); composer.dispose(); },
