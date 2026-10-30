@@ -20,7 +20,7 @@ function checkGeometry(model, label) {
     if (object.geometry.attributes.surface) {
       const surface = object.geometry.attributes.surface;
       assert.equal(surface.count, position.count, `${label}: missing material categories`);
-      assert.ok(surface.array.every(v => Number.isFinite(v) && v >= 0 && v <= 4), `${label}: invalid material category`);
+      assert.ok(surface.array.every(v => Number.isFinite(v) && v >= 0 && v <= 5), `${label}: invalid material category`); // 0 plain .. 4 metal, 5 glow (materials.js)
     }
     for (const attribute of [position, normal, color].filter(Boolean)) {
       assert.ok(attribute.array.every(Number.isFinite), `${label}: non-finite vertex data`);

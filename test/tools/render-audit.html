@@ -59,6 +59,8 @@ async function measure(name,count=150,live=false){
  report.scenes.push(sample);return sample;
 }
 await measure('high-natural');
+// Bloom (Ultra only) with and without, in the same run, so its cost is not confused with other changes or thermal drift.
+view.setQuality('ultra');await measure('ultra-natural');view.setBloom?.(false);await measure('ultra-natural-no-bloom');view.setBloom?.(true);view.setQuality('high');
 const batch=view.scene.children.find(o=>o.isBatchedMesh);batch.sortObjects=false;
 await measure('high-natural-sort-off');batch.sortObjects=true;
 view.setQuality('balanced');await measure('balanced-natural');

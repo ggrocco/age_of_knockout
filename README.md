@@ -326,11 +326,16 @@ restarting the match and are saved in this browser. The default is **High**; try
 on an M2 Max, then adjust for frame rate and battery use. These are starting recommendations, not measured
 performance guarantees on those devices. Use `&quality=balanced|high|ultra` to override the saved preference.
 
-| Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Grass clumps |
-| --- | --- | --- | --- | --- |
-| Balanced | 1.5 / 2 million | 1024 | Off | 2,500 |
-| High | 2 / 4 million | 2048 | Half resolution, 12 samples | 8,000 |
-| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | 14,000 |
+| Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Bloom | Grass clumps |
+| --- | --- | --- | --- | --- | --- |
+| Balanced | 1.5 / 2 million | 1024 | Off | Off | 2,500 |
+| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 |
+| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 |
+
+Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
+own light, so they stay bright in shadow. On Ultra a bloom pass adds a halo around them (sun glints on gold and
+chrome can sparkle a little too); it costs about 3 ms a frame on an M2 Max, so Balanced and High keep the lights a
+little brighter without the halo.
 
 No extra assets, network downloads, or build step are needed. Geometry is shared between models, every model is
 drawn through one batched mesh, and grass is instanced. Decorative grass respects fog and building/resource

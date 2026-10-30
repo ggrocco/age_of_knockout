@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BUILDINGS } from '../data/buildings.js';
 import { buildModel, animate, unitEra, TEAM, MODEL_MATERIAL } from './models.js';
+import { setGlowBloom } from './materials.js';
 import { createModelBatch, PROXY_LAYER } from './batch.js';
 import { prepareCosmetics } from './cosmetics.js';
 import { createContactShadows } from './contact-shadows.js';
@@ -193,6 +194,7 @@ export function createView(container, game) {
   const batch = createModelBatch(MODEL_MATERIAL);
   scene.add(batch.mesh);
   let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
+  setGlowBloom(effects.bloom); // lights glow harder when the bloom pass is there to halo them
   view.revision = 0;
   view.invalidate = () => { view.revision++; };
 
@@ -232,13 +234,15 @@ export function createView(container, game) {
     effects.resize(width, height);
     view.invalidate();
   };
+  // Measurement hook (test/tools/render-audit.html): bloom off while keeping this preset's other effects.
+  view.setBloom = on => { effects.setBloom?.(on); setGlowBloom(on && effects.bloom); view.invalidate(); };
   view.setQuality = name => {
     if (!validQuality(name)) return;
     sessionQuality = name; saveQuality(name, storage);
     if (name === qualityName) return;
     qualityName = name; preset = QUALITY[name]; view.quality = name;
     effects.dispose();
-    effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
+    effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics); setGlowBloom(effects.bloom);
     sun.shadow.map?.dispose(); sun.shadow.map = null;
     sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
     terrain.setQuality(preset);
