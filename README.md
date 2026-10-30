@@ -29,10 +29,11 @@ For hardware render measurements, start the dev server and open `http://localhos
 
 ## How a tournament works
 
-![Main menu: difficulty and map pickers, time-limit slider, Begin Tournament and five quick-match buttons](docs/screenshots/menu-time-limit.png)
+![Main menu: the Rules panel (difficulty, map, time-limit slider) beside the Play panel (Begin Tournament, Kingdom Conquest), with five quick-match tiles below](docs/screenshots/menu.jpg)
 
 Pick a **difficulty**, set the **Time limit** slider, and press **Begin Tournament**, or jump straight into one
-game type with a **Quick** button. Both choices are saved in this browser.
+game type with a **Quick match** tile. Both choices are saved in this browser. The keyboard and mouse (or touch)
+controls are under **Controls** at the bottom of the menu.
 The difficulty sets the opponent for each of your five rounds:
 
 | Level | Round 1 | Round 2 | Round 3 | Round 4 | Round 5 |
