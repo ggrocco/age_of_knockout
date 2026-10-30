@@ -120,7 +120,7 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     Sail on, and guns and the Tank take the era's finish (hovering in AI Future). Villagers use civilian workwear per era; ships use era-ships.js for later-era hulls and equipment. Only the King keeps one look.
   - Graphics presets (Balanced/High/Ultra) live in `render/quality.js`. Light-source colours (fire, embers, lamp
     lenses, muzzle-flash cores, AI Future neon; the `GLOW` set in `render/materials.js`) are surface kind 5 and emit.
-    On High/Ultra `render/lighting.js` adds a three-pass bloom after SSAO (`GlowPass`: bright-pass and shrink, then a
+    On Ultra `render/lighting.js` adds a three-pass bloom after SSAO (`GlowPass`: bright-pass and shrink, then a
     two-pass blur, added by the output pass) that picks pixels by their brightest HDR channel;
     `setGlowBloom` makes lights emit harder only when that pass runs. A new light-coloured part only needs one of
     those colours.

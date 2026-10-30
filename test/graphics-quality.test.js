@@ -50,10 +50,11 @@ test('Balanced and browsers without float render targets use the direct-render f
 });
 
 test('bloom only runs on presets that already render through the composer', () => {
-  assert.equal(QUALITY.balanced.bloom, 0);
-  for (const preset of [QUALITY.high, QUALITY.ultra]) assert.ok(preset.bloom > 0 && preset.ao > 0, preset.label);
+  // Bloom costs about 3 ms a frame on an M2 Max (Chrome, Metal) whatever its size, so only Ultra pays for it.
+  assert.equal(QUALITY.balanced.bloom, 0); assert.equal(QUALITY.high.bloom, 0);
+  assert.ok(QUALITY.ultra.bloom > 0 && QUALITY.ultra.ao > 0);
   const renderer = { extensions: { has: () => false }, render() {} };
-  assert.equal(createLightingEffects(renderer, {}, {}, QUALITY.high).bloom, false, 'no float targets: no bloom pass');
+  assert.equal(createLightingEffects(renderer, {}, {}, QUALITY.ultra).bloom, false, 'no float targets: no bloom pass');
 });
 
 test('light-source colours become glow surfaces, which emit harder when bloom is on', () => {

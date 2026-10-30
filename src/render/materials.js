@@ -7,10 +7,10 @@ const STONE = new Set([0x9a9a92, 0x6f6f68, 0xefe9dc, 0xd9cfb0, 0xa6977b, 0xb3a48
 const WALL = new Set([0xe6d8b4, 0xd7c7a4, 0xbda77f, 0xcbb890]);
 const METAL = new Set([0xb9c0c8, 0xb5803a, 0xf2c230, 0x697678, 0x303a3c]);
 // Light sources: fire and embers, lamp lenses and beams, muzzle-flash cores, and the AI Future cyan and magenta neon.
-// They emit, so they stay bright in shadow, and on High and Ultra the bloom pass (lighting.js) haloes them.
+// They emit, so they stay bright in shadow, and on Ultra the bloom pass (lighting.js) haloes them.
 const GLOW = new Set([0xff8a2a, 0xffc04a, 0xfff3c2, 0xfff3c0, 0xffe17a, 0xffe9a0, 0x39f3ff, 0xff3df2]);
-// With bloom (High, Ultra) a light mostly emits, 1.9x its colour over a dimmed lit colour: enough to clear the bloom
-// threshold, which then draws the halo. Without bloom (Balanced, the design pages) stronger emission only tone-maps
+// With bloom (Ultra) a light mostly emits, 1.9x its colour over a dimmed lit colour: enough to clear the bloom
+// threshold, which then draws the halo. Without bloom (Balanced, High, the design pages) stronger emission only tone-maps
 // towards white, so a light keeps its lit colour with a little emission on top, staying bright in shadow.
 const glow = { emit: { value: 0.35 }, lit: { value: 1 } };
 export function setGlowBloom(on) { glow.emit.value = on ? 1.9 : 0.35; glow.lit.value = on ? 0.35 : 1; }
