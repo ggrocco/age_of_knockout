@@ -128,6 +128,12 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     `game.entities` (the view's sync), and dust under moving cavalry, siege and infantry, all one instanced draw.
     Particles are written once when born (ring buffer, `preset.particles` budget) and moved by the vertex shader;
     premultiplied blending draws additive fire and alpha smoke together. Render only, so it may use `Math.random`.
+  - `render/sun-shadow.js`: `fitSunShadow` frames the sun's shadow map on what the camera shows (receivers up to 6
+    tall, clipped to the map) and snaps it to whole texels; `installSoftShadows` swaps three's PCF `getShadow` in
+    `ShaderChunk` for a contact-hardening filter (`preset.softShadows`: High, Ultra). `shadow.radius` carries the mode:
+    positive is the soft filter's texels per unit of shadow depth (`sunShadowRadius`), negative a fixed radius (Balanced).
+    The design pages' stage (`gallery/stage.js`) uses the same filter. A three.js upgrade that reshapes the chunk
+    makes `softenShadowChunk` throw (`test/sun-shadow.test.js`).
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid and the unit × era view (`?view=units`) from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and

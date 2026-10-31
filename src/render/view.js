@@ -10,6 +10,7 @@ import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } fro
 import { viewHalfHeight } from './camera-fit.js';
 import { createSkyLighting, createLightingEffects } from './lighting.js';
 import { createParticles } from './particles.js';
+import { SUN_NEAR, SUN_FAR, installSoftShadows, fitSunShadow, sunShadowRadius } from './sun-shadow.js';
 
 let sessionQuality = null;
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
@@ -68,9 +69,9 @@ function addLights(scene, renderer, preset) {
   const sun = new THREE.DirectionalLight(0xffe5ba, 3.3);
   sun.castShadow = true;
   sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
-  sun.shadow.radius = 2.5; sun.shadow.intensity = 0.85;
+  sun.shadow.intensity = 0.85; // radius: fitSunShadow, per frame
   sun.shadow.normalBias = 0.035; sun.shadow.bias = -0.00015;
-  sun.shadow.camera.near = 1; sun.shadow.camera.far = 150;
+  sun.shadow.camera.near = SUN_NEAR; sun.shadow.camera.far = SUN_FAR;
   scene.add(sun, sun.target);
   return { sun, skyLighting };
 }
@@ -180,6 +181,7 @@ export function createView(container, game) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+  installSoftShadows();
   container.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x20271b);
@@ -204,14 +206,10 @@ export function createView(container, game) {
 
   // ---------- camera ----------
   let cameraKey = '';
-  // The shadow camera follows the view and covers what it shows (at least 18 tiles, at most the map).
-  function fitSunShadow(halfHeight, aspect) {
-    const extent = Math.min(mapSize, Math.max(18, halfHeight * Math.max(1, aspect) * 1.4)), shadowCamera = sun.shadow.camera;
-    shadowCamera.left = shadowCamera.bottom = -extent;
-    shadowCamera.right = shadowCamera.top = extent;
-    shadowCamera.updateProjectionMatrix();
-    sun.target.position.copy(view.focus);
-    sun.position.copy(view.focus).add(sunOffset);
+  // The shadow map covers what the view shows (sun-shadow.js); High and Ultra soften it by caster distance.
+  function fitShadow() {
+    const texel = fitSunShadow(sun, camera, sunOffset, mapSize, sun.shadow.mapSize.x);
+    sun.shadow.radius = sunShadowRadius(preset.softShadows, texel);
   }
   function placeCamera() {
     const width = renderer.domElement.clientWidth || 1, height = renderer.domElement.clientHeight || 1, aspect = width / height;
@@ -224,7 +222,7 @@ export function createView(container, game) {
     camera.position.copy(view.focus).addScaledVector(CAMERA_DIRECTION, 120);
     camera.lookAt(view.focus);
     camera.updateMatrixWorld(true);
-    fitSunShadow(halfHeight, aspect);
+    fitShadow();
   }
   view.refreshCamera = placeCamera;
   view.halfExtents = () => [camera.right, camera.top];

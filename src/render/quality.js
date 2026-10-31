@@ -1,8 +1,8 @@
 // Explicit preferences, not device-model guesses: browsers do not reliably expose the GPU.
 export const QUALITY = Object.freeze({
-  balanced: Object.freeze({ label: 'Balanced', pixelRatio: 1.5, maxPixels: 2000000, shadows: 1024, grass: 2500, ao: 0, samples: 8, bloom: 0, particles: { capacity: 600, rate: 0.5 } }),
-  high: Object.freeze({ label: 'High', pixelRatio: 2, maxPixels: 4000000, shadows: 2048, grass: 8000, ao: 0.5, samples: 12, bloom: 0, particles: { capacity: 1500, rate: 1 } }),
-  ultra: Object.freeze({ label: 'Ultra', pixelRatio: 2.5, maxPixels: 8000000, shadows: 4096, grass: 14000, ao: 0.75, samples: 24, bloom: 0.75, particles: { capacity: 2500, rate: 1 } }),
+  balanced: Object.freeze({ label: 'Balanced', pixelRatio: 1.5, maxPixels: 2000000, shadows: 1024, grass: 2500, ao: 0, samples: 8, softShadows: false, bloom: 0, particles: { capacity: 600, rate: 0.5 } }),
+  high: Object.freeze({ label: 'High', pixelRatio: 2, maxPixels: 4000000, shadows: 2048, grass: 8000, ao: 0.5, samples: 12, softShadows: true, bloom: 0, particles: { capacity: 1500, rate: 1 } }),
+  ultra: Object.freeze({ label: 'Ultra', pixelRatio: 2.5, maxPixels: 8000000, shadows: 4096, grass: 14000, ao: 0.75, samples: 24, softShadows: true, bloom: 0.75, particles: { capacity: 2500, rate: 1 } }),
 });
 const KEY = 'age-of-knockout.graphics';
 export const validQuality = value => Object.hasOwn(QUALITY, value);

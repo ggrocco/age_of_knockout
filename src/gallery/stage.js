@@ -5,6 +5,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { UNITS } from '../data/units.js';
 import { buildModel, animate } from '../render/models.js';
 import { createSkyLighting } from '../render/lighting.js';
+import { SUN_NEAR, SUN_FAR, installSoftShadows, sunShadowRadius } from '../render/sun-shadow.js';
 
 const DIR = new THREE.Vector3(1, 1.05, 1).normalize(); // the game camera's view direction
 
@@ -13,16 +14,18 @@ function configureRenderer(renderer) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+  installSoftShadows();
 }
 
-// The game's sun, its shadow framed on the 16×16 tiles around the model.
+// The game's sun, its shadow framed on the 16×16 tiles around the model and softened as on High.
 function createSun(renderer) {
   const sun = new THREE.DirectionalLight(0xffe5ba, 3.3);
   sun.position.set(-22, 38, 16).setLength(40);
   sun.castShadow = true;
   sun.shadow.mapSize.setScalar(Math.min(2048, renderer.capabilities.maxTextureSize));
-  sun.shadow.radius = 2.5; sun.shadow.intensity = 0.85; sun.shadow.normalBias = 0.035; sun.shadow.bias = -0.00015;
-  Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 90 });
+  sun.shadow.radius = sunShadowRadius(true, 16 / sun.shadow.mapSize.x);
+  sun.shadow.intensity = 0.85; sun.shadow.normalBias = 0.035; sun.shadow.bias = -0.00015;
+  Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: SUN_NEAR, far: SUN_FAR });
   return sun;
 }
 

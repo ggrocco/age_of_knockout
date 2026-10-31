@@ -327,11 +327,15 @@ restarting the match and are saved in this browser. The default is **High**; try
 on an M2 Max, then adjust for frame rate and battery use. These are starting recommendations, not measured
 performance guarantees on those devices. Use `&quality=balanced|high|ultra` to override the saved preference.
 
-| Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Bloom | Grass clumps | Fire, smoke and dust |
-| --- | --- | --- | --- | --- | --- | --- |
-| Balanced | 1.5 / 2 million | 1024 | Off | Off | 2,500 | Half as many, up to 600 at once |
-| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
-| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+| Preset | Maximum pixel ratio / rendered pixels | Shadow map | Shadow edges | Ambient occlusion | Bloom | Grass clumps | Fire, smoke and dust |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Balanced | 1.5 / 2 million | 1024 | Fixed blur | Off | Off | 2,500 | Half as many, up to 600 at once |
+| High | 2 / 4 million | 2048 | Soft, sharp at contact | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
+| Ultra | 2.5 / 8 million | 4096 | Soft, sharp at contact | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+
+The shadow map is framed on what the camera shows, so zooming in sharpens shadows, and it moves in whole texels, so
+shadow edges hold still while the camera pans. On High and Ultra a shadow is sharp where it meets the thing casting
+it and softens the further it falls from it: a soldier's feet stay crisp, the far edge of a roof's shadow is soft.
 
 Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
 own light, so they stay bright in shadow. On Ultra a bloom pass adds a halo around them (sun glints on gold and
