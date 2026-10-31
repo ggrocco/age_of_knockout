@@ -249,9 +249,6 @@ body.touch #placebar { display: flex; gap: 12px; position: absolute; left: 50%; 
 body.touch #placebar.hidden { display: none; }
 body.touch #placebar .btn { height: 52px; min-width: 128px; font-size: 17px; } body.touch #placebar .ok { background: linear-gradient(#2f7d45, #1d5a30); }
 body.touch #toast { bottom: calc(var(--sab) + 110px); font-size: 13px; max-width: 86vw; text-align: center; }
-body.touch #gamemenu:not(.hidden) { display: flex; position: absolute; inset: 0; z-index: 12; background: #000b; align-items: center; justify-content: center; }
-body.touch #gamemenu .card { padding: 16px; max-width: 320px; } body.touch #gamemenu .btn { display: block; width: 100%; height: 48px; margin: 8px 0 0; font-size: 16px; } body.touch #gamemenu .row { display: flex; gap: 8px; } body.touch #gamemenu .row .btn { margin-top: 8px; }
-body.touch #gamemenu .btn.on { outline: 2px solid var(--ok); }
 #gamemenu:not(.hidden) { display:flex; position:absolute; inset:0; z-index:12; background:#000b; align-items:center; justify-content:center; }
 #pausemodal:not(.hidden) { display:flex; position:absolute; inset:0; z-index:11; background:#0008; align-items:center; justify-content:center; }
 #pausemodal .card { max-width:380px; padding:20px 24px; }
@@ -259,14 +256,24 @@ body.touch #gamemenu .btn.on { outline: 2px solid var(--ok); }
 #pausemodal .btn { min-width:160px; min-height:44px; }
 #pausemodal .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
 #viewport.grab { cursor:grab; } #viewport.grabbing { cursor:grabbing; }
-#gamemenu .card { max-width:420px; max-height:90dvh; overflow:auto; padding:20px; }
-#gamemenu .btn.on { outline:2px solid var(--ok); }
-#gamemenu .graphics { margin:18px 0 0; padding:12px 0 0; border:0; border-top:1px solid #c8a05266; }
-#gamemenu .graphics legend { padding:0 10px; color:var(--bronze); font-size:16px; }
-#gamemenu .quality-options { display:flex; gap:8px; }
-#gamemenu .quality-options .btn { flex:1; min-width:0; min-height:44px; margin:0; padding:8px 4px; font-size:14px; }
-#gamemenu .graphics p { font-size:12px; line-height:1.45; margin:12px 0 0; color:#c7b795; }
-body.touch #gamemenu .card { max-height:90dvh; }
+#gamemenu .card { width:min(400px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); box-sizing:border-box; overflow:auto; padding:18px 20px 20px; border-radius:6px; }
+#gamemenu h2 { margin:0; font-size:26px; letter-spacing:.1em; text-transform:uppercase; }
+#gamemenu .menu-status { margin:0 0 12px; font-size:13px; font-style:italic; color:#a9997a; }
+#gamemenu .btn { margin:0; min-height:44px; font-size:16px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+#gamemenu .btn.primary { display:block; width:100%; font-size:18px; color:var(--ink); border-color:#f6e2a8; border-radius:4px; background:linear-gradient(#e6c679,#c49a48 55%,#a37a33); box-shadow:0 3px 12px #0009, inset 0 1px 0 #fff8; }
+#gamemenu .btn.primary:hover { background:linear-gradient(#f6dc9a,#d4a754 55%,#b3873a); }
+#gamemenu .menu-set { margin:16px 0 0; padding:0; border:0; text-align:left; }
+#gamemenu .menu-set legend { padding:0 0 6px; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--bronze); }
+#gamemenu .seg .btn { flex:1; min-width:0; padding:6px 4px; font-size:15px; border:0; border-radius:4px; background:transparent; color:#cbb98f; }
+#gamemenu .seg .btn:hover { background:#c8a0521f; color:var(--parch); }
+#gamemenu .seg .btn.on, #gamemenu .seg .btn.on:hover { background:linear-gradient(#e6c679,#b38a3e); color:var(--ink); box-shadow:0 1px 4px #0009, inset 0 1px 0 #fff6; }
+#gamemenu .menu-set p { max-width:none; margin:8px 0 0; font-size:12px; line-height:1.45; color:#c7b795; }
+#gamemenu .menu-exit { display:flex; gap:8px; margin-top:18px; padding-top:14px; border-top:1px solid #c8a05266; }
+#gamemenu .menu-exit .btn { flex:1; padding:6px 8px; font-size:15px; }
+#gamemenu .menu-exit .btn.armed { background:linear-gradient(#8a2a22,#5a1712); border-color:var(--red); }
+#gamemenu .btn:focus-visible { outline:2px solid var(--parch); outline-offset:2px; }
+@media (hover: none) { #gamemenu .seg .btn:hover { background:transparent; color:#cbb98f; } }
+@media (max-height: 480px) { #gamemenu .card { padding:12px 16px 14px; } #gamemenu .menu-set { margin-top:10px; } #gamemenu .menu-exit { margin-top:12px; padding-top:10px; } #gamemenu .menu-set p { display:none; } }
 body.touch #topbar .grow, body.touch #topbar [data-speed], body.touch #topbar [data-pause], body.touch #topbar [data-resign] { display: none; }
 /* phone screens (menus, bracket, results) */
 body.touch #screen { align-items: flex-start; padding: calc(var(--sat) + 8px) calc(var(--sar) + 8px) calc(var(--sab) + 8px) calc(var(--sal) + 8px); }
