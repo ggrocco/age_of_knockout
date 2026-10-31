@@ -124,6 +124,10 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
     two-pass blur, added by the output pass) that picks pixels by their brightest HDR channel;
     `setGlowBloom` makes lights emit harder only when that pass runs. A new light-coloured part only needs one of
     those colours.
+  - `render/particles.js`: fire and smoke on buildings below half health, a burst when a building or unit leaves
+    `game.entities` (the view's sync), and dust under moving cavalry, siege and infantry, all one instanced draw.
+    Particles are written once when born (ring buffer, `preset.particles` budget) and moved by the vertex shader;
+    premultiplied blending draws additive fire and alpha smoke together. Render only, so it may use `Math.random`.
 - `src/gallery`: the `buildings.html` design page (each cell also lists what the building trains and the upgrades it
   gains in that era). `rows.js` (DOM-free, tested) builds the building × era grid and the unit × era view (`?view=units`) from
   the data tables; `main.js` renders each cell with the game's own models under the game's light rig, so new eras and

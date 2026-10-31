@@ -9,6 +9,7 @@ import { createTerrain } from './terrain.js';
 import { QUALITY, readQuality, saveQuality, validQuality, renderPixelRatio } from './quality.js';
 import { viewHalfHeight } from './camera-fit.js';
 import { createSkyLighting, createLightingEffects } from './lighting.js';
+import { createParticles } from './particles.js';
 
 let sessionQuality = null;
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
@@ -193,6 +194,9 @@ export function createView(container, game) {
   };
   const batch = createModelBatch(MODEL_MATERIAL);
   scene.add(batch.mesh);
+  // Fire on damaged buildings, explosions, dust under moving armies (particles.js).
+  const particles = createParticles(preset.particles);
+  scene.add(particles.mesh);
   let effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics);
   setGlowBloom(effects.bloom); // lights glow harder when the bloom pass is there to halo them
   view.revision = 0;
@@ -245,7 +249,7 @@ export function createView(container, game) {
     effects = createLightingEffects(renderer, scene, camera, preset, batch.cosmetics); setGlowBloom(effects.bloom);
     sun.shadow.map?.dispose(); sun.shadow.map = null;
     sun.shadow.mapSize.setScalar(Math.min(preset.shadows, renderer.capabilities.maxTextureSize));
-    terrain.setQuality(preset);
+    terrain.setQuality(preset); particles.setQuality(preset.particles);
     view.resize();
   };
   view.pan = (dx, dz) => {
@@ -412,7 +416,12 @@ export function createView(container, game) {
       seen.add(e.id);
       syncEntity(e, force);
     }
-    for (const [id, group] of view.groups) if (!seen.has(id) || !game.entities.has(id)) forget(id, group);
+    for (const [id, group] of view.groups) {
+      if (seen.has(id) && game.entities.has(id)) continue;
+      // Gone from the game (destroyed or killed), not just out of sight: it goes out with a burst.
+      if (!game.entities.has(id) && group.userData.entity) particles.burst(group, group.userData.entity);
+      forget(id, group);
+    }
   };
 
   // One entity's group per frame: position, facing, hit pop, animation, ring and bar. Returns false when it is skipped.
@@ -442,6 +451,7 @@ export function createView(container, game) {
     for (const group of activeGroups) if (updateGroup(group, dt, t, blend)) dirtyGroups.add(group);
     fog.mesh.visible = view.fogEnabled;
     scene.updateMatrixWorld();
+    particles.update(t, activeGroups); // after the matrix update: it measures buildings in world space
     for (const group of dirtyGroups) { batch.update(group); shadows.update(group); }
     batch.flush(t);
     renderer.info.reset();
@@ -519,7 +529,7 @@ export function createView(container, game) {
     return { x: rect.left + (projected.x + 1) / 2 * rect.width, y: rect.top + (1 - projected.y) / 2 * rect.height };
   };
   view.dispose = () => {
-    effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); shadows.dispose(); ghostLine.dispose();
+    effects.dispose(); terrain.dispose(); skyLighting?.dispose(); batch.dispose(); shadows.dispose(); ghostLine.dispose(); particles.dispose();
     for (const group of view.groups.values()) if (group.userData.kind === 'resource') disposeObject(group);
     disposeObject(scene);
     blobShadow.material.dispose(); blobShadow.texture.dispose();
