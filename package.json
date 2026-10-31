@@ -1,1 +1,1 @@
-{"name":"aoe-knockout","version":"0.1.0","type":"module","scripts":{"start":"node serve.js","test":"node --test test/*.test.js","lint":"eslint ."},"dependencies":{"three":"^0.186.1"},"devDependencies":{"@eslint/js":"^9.39.5","eslint":"^9.39.5","globals":"^17.13.0"}}
+{"name":"aoe-knockout","version":"0.1.0","type":"module","scripts":{"start":"node serve.js","test":"node --test test/*.test.js","lint":"eslint ."},"dependencies":{"three":"^0.186.1"},"devDependencies":{"@eslint/js":"^10.0.1","eslint":"^10.14.0","globals":"^17.13.0"},"overrides":{"minimatch":"^11.0.1"}}
