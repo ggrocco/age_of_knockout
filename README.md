@@ -196,7 +196,9 @@ small fleet that answers yours and patrols to your bay during its attacks.
 **Transport Ships.** Right-click your Transport Ship with soldiers or villagers selected (tap it on a phone) and they
 walk to it and board; it sails to the shore nearest them if it is out at sea. With it selected, right-click the far
 shore to land everyone there (they walk on to the spot you clicked), or press **Unload** to land them on the nearest
-shore. Passengers are out of sight and can't be attacked, but if the ship sinks everyone aboard is lost; a relic they
+shore. Or just order soldiers or villagers to a spot on another island (right-click it, or the minimap): your free
+Transport Ships (the selected ones, else the nearest empty ones) come to the nearest shore, take them across a boatload
+at a time, land them in formation and go back for the rest until everyone is over. Passengers are out of sight and can't be attacked, but if the ship sinks everyone aboard is lost; a relic they
 carried washes up on the nearest land. A relic carrier landed at home takes the relic on to a Town Center. On an island
 map the opponent ferries its attack waves to your island and sends squads to fetch the relics from the centre.
 

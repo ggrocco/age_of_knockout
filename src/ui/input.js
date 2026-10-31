@@ -129,7 +129,7 @@ export function createInput(ui) {
     let result = null;
     for (const id of loaded) result = ui.cmd({ type: 'unload', transportId: id, x: ground.x, y: ground.y });
     const rest = ids.filter(id => !loaded.includes(id));
-    return rest.length ? ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y }) : result;
+    return rest.length ? ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true }) : result;
   }
   const isDeepWater = ground => {
     const map = game().map;
@@ -141,7 +141,8 @@ export function createInput(ui) {
     if (command) return ui.cmd(command);
     const loaded = ids.filter(isLoadedTransport);
     if (ground && loaded.length && !isDeepWater(ground)) return unloadAt(ground, ids, loaded);
-    if (ground) return ui.cmd({ type: 'move', ids, x: ground.x, y: ground.y });
+    // Walkers sent to another island are ferried over by the free Transport Ships (commands.js ferryPlan).
+    if (ground) return ui.cmd({ type: 'move', ids, x: ground.x, y: ground.y, ferry: true });
     return null;
   }
   // Orders the selected units at a screen point and drops a marker on the ground when the order took.
@@ -371,9 +372,9 @@ export function createInput(ui) {
     if (!ui.game) return;
     const world = minimapPoint(e.clientX, e.clientY);
     if (e.button === 0) ui.view.centerOn(world.x, world.y);
-    else if (e.button === 2) { // right-click on the minimap moves the selected units there
+    else if (e.button === 2) { // right-click on the minimap moves the selected units there (by sea, if need be)
       const ids = selectedUnitIds();
-      if (ids.length) ui.cmd({ type: 'move', ids, x: world.x, y: world.y });
+      if (ids.length) ui.cmd({ type: 'move', ids, x: world.x, y: world.y, ferry: true });
     }
   });
   minimapEl.addEventListener('contextmenu', e => e.preventDefault());
