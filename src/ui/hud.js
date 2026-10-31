@@ -288,8 +288,8 @@ export function createHud(ui) {
     const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}"></span>`;
     if (ui.spectating) {
       return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
-        + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}">${speed}x</button>`).join('')
-          + `<button data-pause="1">${ui.paused ? 'Resume' : 'Pause'}</button>`)
+        + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}" class="${ui.speed === speed ? 'on' : ''}">${speed}x</button>`).join('')
+          + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`)
         + '<button data-menu="open" aria-label="Game settings">Menu</button>';
     }
     const popTitle = `title="Population (${ageTitle(player.age)} limit ${popLimit(player.age)})"`;
@@ -517,21 +517,25 @@ export function createHud(ui) {
   };
 
   // ----- settings menu -----
-  const graphicsHtml = () => {
-    const options = Object.entries(QUALITY).map(([id, option]) => {
-      const on = ui.view?.quality === id;
-      return `<button class="btn ${on ? 'on' : ''}" data-quality="${id}" aria-pressed="${on}">${option.label}</button>`;
-    });
-    return `<fieldset class="graphics"><legend>Graphics quality</legend><div class="quality-options">${options.join('')}</div>`
-      + '<p>High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.</p></fieldset>';
-  };
+  // A labelled segmented control: the chosen option is filled gold and announced through aria-pressed.
+  const segHtml = (id, label, options, note = '') =>
+    `<fieldset class="menu-set"><legend id="${id}-label">${label}</legend>`
+    + `<div class="seg" role="group" aria-labelledby="${id}-label">${options.map(([attr, value, text, on]) =>
+      `<button class="btn ${on ? 'on' : ''}" data-${attr}="${value}" aria-pressed="${on}">${text}</button>`).join('')}</div>`
+    + (note ? `<p>${note}</p>` : '') + '</fieldset>';
   const menuHtml = () => {
-    const speeds = SPEEDS.map(speed =>
-      `<button class="btn ${ui.speed === speed ? 'on' : ''}" data-speed="${speed}">${speed}x</button>`);
-    return `<div class="card"><h2>Menu</h2><button class="btn" data-menu="close">Resume game</button>`
-      + `<div class="row">${speeds.join('')}</div>`
-      + `<button class="btn" data-resign="1">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`
-      + `<button class="btn" data-quit="1">${ui.quitArmed ? 'Confirm quit?' : 'Quit to menu'}</button></div>`;
+    const speeds = SPEEDS.map(speed => ['speed', speed, `${speed}x`, ui.speed === speed]);
+    const qualities = Object.entries(QUALITY).map(([id, option]) => ['quality', id, option.label, ui.view?.quality === id]);
+    const armed = (on, text, armedText) => on ? `<b>${armedText}</b>` : text;
+    return '<div class="card"><h2>Menu</h2><p class="menu-status">Game paused</p>'
+      + '<button class="btn primary" data-menu="close">&#9654; Resume game</button>'
+      + segHtml('menu-speed', 'Game speed', speeds)
+      + segHtml('menu-quality', 'Graphics quality', qualities,
+        'High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.')
+      + '<div class="menu-exit">'
+      + `<button class="btn ${ui.resignArmed ? 'armed' : ''}" data-resign="1">${armed(ui.resignArmed, 'Resign', 'Confirm resign?')}</button>`
+      + `<button class="btn ${ui.quitArmed ? 'armed' : ''}" data-quit="1">${armed(ui.quitArmed, 'Quit to menu', 'Confirm quit?')}</button>`
+      + '</div></div>';
   };
   // Opens the menu, or re-renders it in place when it is already open (after a speed / quality / arming click).
   hud.openMenu = () => {
@@ -542,7 +546,6 @@ export function createHud(ui) {
       ui.paused = true;
     }
     menuEl.innerHTML = menuHtml();
-    menuEl.querySelector('.card').insertAdjacentHTML('beforeend', graphicsHtml());
     menuEl.setAttribute('role', 'dialog');
     menuEl.setAttribute('aria-modal', 'true');
     menuEl.setAttribute('aria-label', 'Game settings');
@@ -578,12 +581,25 @@ export function createHud(ui) {
   // Quit and Resign ask twice: the first click arms the button for 3 seconds.
   const arm = field => {
     ui[field] = true;
-    setTimeout(() => { ui[field] = false; }, 3000);
+    setTimeout(() => {
+      if (!ui[field]) return;
+      ui[field] = false;
+      refreshMenu();
+    }, 3000);
+  };
+  // Re-renders the open menu so the chosen option lights up, keeping focus on it.
+  const refreshMenu = selector => {
+    if (menuHidden()) return;
+    hud.openMenu();
+    if (selector) $('gamemenu').querySelector(selector)?.focus({ preventScroll: true });
   };
   const onQuality = quality => {
     ui.view?.setQuality(quality);
-    hud.openMenu();
-    $('gamemenu').querySelector(`[data-quality="${ui.view.quality}"]`)?.focus();
+    refreshMenu(`[data-quality="${ui.view?.quality}"]`);
+  };
+  const onSpeed = speed => {
+    ui.setSpeed(speed);
+    refreshMenu(`[data-speed="${speed}"]`);
   };
   const onQuit = () => {
     if (ui.quitArmed) {
@@ -633,7 +649,7 @@ export function createHud(ui) {
     if (data.quality) return onQuality(data.quality);
     if (data.act) return ui.actions?.[data.act]?.();
     if (data.quit) return onQuit();
-    if (data.speed) ui.setSpeed(+data.speed);
+    if (data.speed) onSpeed(+data.speed);
     else if (data.pause) ui.togglePause();
     else if (data.resign) onResign();
     else onTileClick(button, e);
