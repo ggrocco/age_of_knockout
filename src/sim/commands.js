@@ -2,7 +2,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
-import { secs, RES_KIND, WATER, passable } from './util.js';
+import { secs, RES_KIND, WATER, passable, landMasses } from './util.js';
 import { formationSlots, nearestOpen, landingNear } from './formation.js';
 import { isKingdoms, sheltered, eliminateKingdom, updateTerritory } from './kingdoms.js';
 
@@ -142,12 +142,99 @@ function moveUnits(game, pid, cmd) {
   const units = ownUnits(game, pid, cmd.ids);
   if (!units.length) return fail('no units');
   if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('bad target');
-  // A group spreads out instead of piling onto one tile; soldiers and ships each form up on their own ground, and
-  // ships sent onto land head for the nearest water.
-  for (const group of [units.filter(unit => !unit.naval), units.filter(unit => unit.naval)]) {
-    if (group.length) moveGroup(game, group, cmd);
+  const walkers = units.filter(unit => !unit.naval), ships = units.filter(unit => unit.naval);
+  const plan = cmd.ferry && walkers.length ? ferryPlan(game, pid, walkers, ships, cmd) : null;
+  if (!plan) {
+    // A group spreads out instead of piling onto one tile; soldiers and ships each form up on their own ground, and
+    // ships sent onto land head for the nearest water.
+    for (const group of [walkers, ships]) if (group.length) moveGroup(game, group, cmd);
+    return OK;
   }
+  // Some of the walkers are sent to another island: those go by sea (startFerries), the rest walk; all of them form up
+  // together at the point.
+  const slots = walkers.length > 1 ? formationSlots(game, walkers, cmd.x, cmd.y) : null;
+  const slotOf = unit => slots ? slots.get(unit.id) : { x: cmd.x, y: cmd.y };
+  for (const unit of walkers) {
+    if (!plan.riders.has(unit.id)) giveOrder(unit, { type: 'move', x: slotOf(unit).x, y: slotOf(unit).y, slack: 0 });
+  }
+  startFerries(game, plan, cmd, slotOf);
+  const sailing = ships.filter(ship => !plan.boats.has(ship.id));
+  if (sailing.length) moveGroup(game, sailing, cmd);
   return OK;
+}
+
+// ---- ferries ----
+// Land masses of a map (util.js landMasses): deep water, which parts them, never changes during a match.
+const MASSES = new WeakMap();
+function massesOf(map) {
+  if (!MASSES.has(map)) MASSES.set(map, landMasses(map));
+  return MASSES.get(map);
+}
+// An empty Transport Ship of the player's that is free to take a ferry job: idle or just moving.
+const freeTransport = (unit, pid) => unit.cargo && !unit.dead && unit.owner === pid && !unit.aboard && !unit.cargo.length
+  && (unit.order.type === 'idle' || unit.order.type === 'move');
+
+// With `ferry` set (the player's own orders; the bot runs its own ferries), walkers sent to ground on another land mass
+// than their own go by sea, if the player has free Transport Ships: the
+// selected ones, else any. Riders are grouped by the land mass they stand on; each group gets the nearest transports it
+// needs (at least one) while any are left, and a landing where they can walk to the shore. Returns
+// { riders: Set of ids, boats: Set of ids, jobs: [{ boats, units, pickup }], drop }, or null when nobody goes by sea.
+function ferryPlan(game, pid, walkers, ships, cmd) {
+  const map = game.map, n = map.size, mass = massesOf(map), tx = Math.floor(cmd.x), ty = Math.floor(cmd.y);
+  if (tx < 0 || ty < 0 || tx >= n || ty >= n || mass[ty * n + tx] < 0) return null; // off the map or on deep water
+  const massOf = unit => mass[Math.floor(unit.y) * n + Math.floor(unit.x)], destMass = mass[ty * n + tx];
+  const groups = new Map();
+  for (const unit of walkers) {
+    const from = massOf(unit);
+    if (from < 0 || from === destMass) continue;
+    if (!groups.has(from)) groups.set(from, []);
+    groups.get(from).push(unit);
+  }
+  if (!groups.size) return null;
+  // A shore on the point's land mass, one they can walk to the point from where there is one (the point itself may be
+  // a building).
+  const foot = nearestOpen(game, cmd.x, cmd.y, false);
+  const drop = (foot && massOf(foot) === destMass && landingNear(game, cmd.x, cmd.y, foot)) || landingNear(game, cmd.x, cmd.y);
+  if (!drop || massOf(drop.shore) !== destMass) return null;
+  const selected = ships.filter(ship => freeTransport(ship, pid));
+  const pool = selected.length ? selected : [...game.units.values()].filter(unit => freeTransport(unit, pid));
+  const plan = { riders: new Set(), boats: new Set(), jobs: [], drop };
+  // Biggest group first; a tie goes to the one met first in the selection.
+  for (const units of [...groups.values()].sort((a, b) => b.length - a.length)) {
+    if (!pool.length) break;
+    const centre = centroid(units), pickup = landingNear(game, centre.x, centre.y, units[0]);
+    if (!pickup) continue;
+    const near = boat => Math.hypot(boat.x - pickup.sea.x, boat.y - pickup.sea.y);
+    pool.sort((a, b) => near(a) - near(b) || a.id - b.id);
+    const boats = pool.splice(0, Math.ceil(units.length / UNITS[pool[0].type].carries));
+    plan.jobs.push({ boats, units, pickup });
+    for (const unit of units) plan.riders.add(unit.id);
+    for (const boat of boats) plan.boats.add(boat.id);
+  }
+  return plan.jobs.length ? plan : null;
+}
+
+// Each transport of a job takes its share of the riders (a boatload each in turn), and shuttles them from the pickup
+// landing to the drop landing until all are across (orders.js doFerry); the riders wait for it at the pickup and board.
+function startFerries(game, plan, cmd, slotOf) {
+  const { drop } = plan;
+  for (const { boats, units, pickup } of plan.jobs) {
+    const shares = boats.map(() => []), carries = UNITS[boats[0].type].carries;
+    units.forEach((unit, k) => shares[Math.floor(k / carries) % boats.length].push(unit));
+    boats.forEach((boat, k) => {
+      const slots = {};
+      for (const unit of shares[k]) {
+        slots[unit.id] = slotOf(unit);
+        giveOrder(unit, { type: 'ferry', transport: boat.id, fails: 0 });
+      }
+      giveOrder(boat, {
+        type: 'ferry', phase: 'load', ids: shares[k].map(unit => unit.id), slots,
+        px: pickup.sea.x, py: pickup.sea.y, psx: pickup.shore.x, psy: pickup.shore.y,
+        x: drop.sea.x, y: drop.sea.y, sx: drop.shore.x, sy: drop.shore.y, to: { x: cmd.x, y: cmd.y },
+        docked: false, since: game.time, held: 0, slack: 0,
+      });
+    });
+  }
 }
 
 function moveGroup(game, group, cmd) {
