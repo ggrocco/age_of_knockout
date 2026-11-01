@@ -31,7 +31,5 @@ export async function toggleFullscreen(doc = globalThis.document) {
   return isFullscreen(doc);
 }
 
-// What the menus show for each mode: a button label, or the Home Screen hint.
+// The full-screen button's label.
 export const fullscreenLabel = on => on ? 'Exit full screen' : 'Play full screen';
-export const HOMESCREEN_HINT = 'To play without the browser bars, tap Share, then <b>Add to Home Screen</b>, and open'
-  + ' the game from its icon.';

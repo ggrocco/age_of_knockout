@@ -9,7 +9,8 @@ import { TEAMS } from '../data/teams.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { HUD_ICONS } from './icons.js';
-import { HOMESCREEN_HINT, fullscreenLabel, fullscreenMode, isFullscreen, toggleFullscreen } from './fullscreen.js';
+import { toggleFullscreen } from './fullscreen.js';
+import { onInstallChange, openInstallGuide, promptInstall, screenControlsHtml } from './install.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';
 
@@ -304,8 +305,8 @@ export function createHud(ui) {
     const popAttrs = `title="Population${full ? ' full' : ''} (${ageTitle(player.age)} limit ${popLimit(player.age)})"`
       + ` aria-label="Population ${player.pop} of ${player.popCap}${full ? ', full' : ''}"`;
     const popHtml = chip(`pop${full ? ' full' : ''}`, HUD_ICONS.pop, `${player.pop}<small>/${player.popCap}</small>`, popAttrs);
-    const ageHtml = `<span class="res age${player.ageUp ? ' rising' : ''}" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">`
-      + `${ui.touch ? ageLabel(player.age) : ageTitle(player.age)}${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`;
+    const ageHtml = `<span class="res chip age${player.ageUp ? ' rising' : ''}" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">`
+      + `${HUD_ICONS.age}<b>${ui.touch ? ageLabel(player.age) : ageTitle(player.age)}</b>${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`;
     if (ui.touch) {
       return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
         + `<span class="spacer"></span>${clockHtml}`
@@ -369,9 +370,15 @@ export function createHud(ui) {
     if (ui.inspect && ui.inspect.kind === 'resource') return `<h3>${ui.inspect.type}</h3>`;
     return `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}` + DESKTOP_HELP;
   };
+  // On a phone the panel shows only what is selected or inspected, with a small x to let go of it; with nothing
+  // chosen it hides, since the objective pill already names the round.
+  const DESELECT = '<button class="info-close" data-act="clear" aria-label="Deselect">&#x2715;</button>';
+  const hasFocus = (game, selected) => selected.length > 0 || !!(ui.inspect && (ui.inspect.kind === 'resource' || game.entities.get(ui.inspect.id)));
 
   const updateInfo = (game, player, selected) => {
-    const html = infoHtml(game, player, selected);
+    const focused = hasFocus(game, selected);
+    if (ui.touch) document.body.classList.toggle('no-info', !focused);
+    const html = (ui.touch && focused ? DESELECT : '') + infoHtml(game, player, selected);
     if (html === infoKey) return;
     info.innerHTML = html;
     infoKey = html;
@@ -534,13 +541,10 @@ export function createHud(ui) {
     + `<div class="seg" role="group" aria-labelledby="${id}-label">${options.map(([attr, value, text, on]) =>
       `<button class="btn ${on ? 'on' : ''}" data-${attr}="${value}" aria-pressed="${on}">${text}</button>`).join('')}</div>`
     + (note ? `<p>${note}</p>` : '') + '</fieldset>';
-  // Full screen: a toggle where the browser can do it, else (iPhone) how to get there from the Home Screen.
+  // Full screen and Install as an app (see install.js); nothing once running from the Home Screen.
   const screenSetHtml = () => {
-    const mode = fullscreenMode();
-    if (mode === 'api') return '<fieldset class="menu-set"><legend>Screen</legend>'
-      + `<button class="btn screen-btn" data-fullscreen="1" aria-pressed="${isFullscreen()}">${fullscreenLabel(isFullscreen())}</button></fieldset>`;
-    if (mode === 'homescreen') return `<fieldset class="menu-set"><legend>Screen</legend><div class="hint">${HOMESCREEN_HINT}</div></fieldset>`;
-    return '';
+    const buttons = screenControlsHtml(ui.touch);
+    return buttons ? `<fieldset class="menu-set"><legend>Screen</legend><div class="screen-btns">${buttons}</div></fieldset>` : '';
   };
   const menuHtml = () => {
     const speeds = SPEEDS.map(speed => ['speed', speed, `${speed}x`, ui.speed === speed]);
@@ -599,6 +603,7 @@ export function createHud(ui) {
 
   // Leaving full screen with the browser's own gesture or Esc relabels the open menu's button.
   for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, () => refreshMenu('[data-fullscreen]'));
+  onInstallChange(() => refreshMenu());
 
   // ----- button clicks -----
   // Quit and Resign ask twice: the first click arms the button for 3 seconds.
@@ -665,12 +670,13 @@ export function createHud(ui) {
   };
   document.addEventListener('click', e => {
     const button = e.target.closest('button');
-    if (!button || button.classList.contains('off')) return;
+    if (!button || button.classList.contains('off') || button.closest('#install-guide')) return;
     const data = button.dataset;
     if (data.menu === 'open') return hud.openMenu();
     if (data.menu === 'close') return hud.closeMenu();
     if (data.quality) return onQuality(data.quality);
     if (data.fullscreen) return void toggleFullscreen().then(() => refreshMenu('[data-fullscreen]'));
+    if (data.install) return void (data.install === 'prompt' ? promptInstall() : openInstallGuide());
     if (data.act) return ui.actions?.[data.act]?.();
     if (data.quit) return onQuit();
     if (data.speed) onSpeed(+data.speed);

@@ -14,7 +14,7 @@ import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
 import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
 import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
-import { HOMESCREEN_HINT, fullscreenLabel, fullscreenMode, isFullscreen } from './ui/fullscreen.js';
+import { onInstallChange, screenControlsHtml } from './ui/install.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
@@ -480,13 +480,10 @@ const CREST = '<svg class="crest" viewBox="0 0 64 64" aria-hidden="true" fill="n
   + ` stroke-linecap="round" stroke-linejoin="round">${SWORD}<g transform="matrix(-1 0 0 1 64 0)">${SWORD}</g>`
   + '<path d="M32 12 48 17v13c0 11-7 19-16 23-9-4-16-12-16-23V17Z" fill="#2a1f13"/>'
   + '<path d="M32 18 43 21.5V30c0 8-5 13.5-11 16.5-6-3-11-8.5-11-16.5v-8.5Z" opacity=".5"/><path d="M27 33l5-6 5 6-5 6Z" fill="currentColor"/></svg>';
-// On a phone the main menu offers full screen (or, on an iPhone, the Home Screen route to it) before the first match.
+// On a phone the main menu offers full screen and Install as an app before the first match.
 function screenRowHtml() {
-  if (!TOUCH) return '';
-  const mode = fullscreenMode();
-  if (mode === 'api') return `<div class="screen-row"><button class="btn screen-btn" data-fullscreen="1" aria-pressed="${isFullscreen()}">&#x26F6; ${fullscreenLabel(isFullscreen())}</button></div>`;
-  if (mode === 'homescreen') return `<p class="screen-row hint">&#x26F6; ${HOMESCREEN_HINT}</p>`;
-  return '';
+  const buttons = TOUCH ? screenControlsHtml(true) : '';
+  return buttons ? `<div class="screen-row">${buttons}</div>` : '';
 }
 const menuHtml = () => `<div class="card menu">
   <header class="menu-head">${CREST}<h1>Age of Knockout</h1>
@@ -528,10 +525,12 @@ const menuHtml = () => `<div class="card menu">
   <p>Issues, ideas and pull requests are welcome and much appreciated! Age of Knockout is a one-person project made just for fun, so please expect slow replies and reviews.</p></footer></div>`;
 
 // The full-screen button (clicks go through the HUD's button handler) relabels itself when the page enters or leaves.
-for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, () => {
+const refreshScreenRow = () => {
   const row = screenEl.querySelector('.screen-row');
   if (row) row.outerHTML = screenRowHtml();
-});
+};
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, refreshScreenRow);
+onInstallChange(refreshScreenRow);
 
 // A new level or time limit changes every round's cap, so the Quick buttons' time labels follow.
 function refreshQuickLabels() {
