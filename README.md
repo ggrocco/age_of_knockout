@@ -142,7 +142,9 @@ The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +
 +20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
 foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster; the station also trains the Armored Train),
 Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks, Armored Trains and siege +30 HP). The Airfield also trains the Combat Drone once you reach AI Future. Farms, Mines,
-Docks, Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
+Docks, Towers, Walls and the Wonder never count. On a phone, selecting the Town Center lists the buildings that still
+count towards the next era, with a tick on those already finished, and the Advance tile shows how many are still
+missing. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
 catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers, the King and ships keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,

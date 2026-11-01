@@ -111,7 +111,13 @@ function finishedGates(game, pid, age) {
     if (building.type === 'town_center') hasTownCenter = true;
     if (counted.has(building.type)) owned.add(building.type);
   }
-  return { hasTownCenter, gates: owned.size };
+  return { hasTownCenter, gates: owned.size, owned };
+}
+
+// The buildings of the player's current Age that count towards advancing, each with whether one is finished.
+export function ageGateStatus(game, pid) {
+  const age = game.players[pid].age, { owned } = finishedGates(game, pid, age);
+  return ageBuildings(age).map(type => ({ type, done: owned.has(type) }));
 }
 
 export function execute(game, pid, cmd) {
