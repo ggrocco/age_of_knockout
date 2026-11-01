@@ -120,6 +120,10 @@ export const HUD_ICONS = {
     + `<path d="M7 3.6 7.8 8.4 3.2 7M7.8 8.4l6.8.9M7.8 8.4l-1.2 4.4" ${LIGHT}/>`),
   // a person: population
   pop: hud('<circle cx="8" cy="4.4" r="2.7" fill="currentColor"/><path d="M2.6 14.4c0-3.4 2.3-5.5 5.4-5.5s5.4 2.1 5.4 5.5z" fill="currentColor"/>'),
+  // a column: the Age
+  age: hud('<path d="M2.5 5 8 1.8 13.5 5z" fill="currentColor"/><rect x="3" y="5.6" width="10" height="1.5" rx=".4" fill="currentColor"/>'
+    + '<path d="M4.6 8.2v4.6M8 8.2v4.6M11.4 8.2v4.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
+    + '<rect x="2.4" y="13.4" width="11.2" height="1.8" rx=".5" fill="currentColor"/>'),
   // an hourglass: the match clock
   clock: hud('<path d="M3.5 1.8h9M3.5 14.2h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
     + '<path d="M4.6 2c0 3 3.4 4.4 3.4 6s-3.4 3-3.4 6h6.8c0-3-3.4-4.4-3.4-6s3.4-3 3.4-6z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>'

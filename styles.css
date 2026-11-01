@@ -41,8 +41,9 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 #topbar .chip.pop.full { --rc:#ff8a7a; background:rgb(150 40 30 / .55); box-shadow:inset 0 0 0 1px rgb(255 138 122 / .55); }
 #topbar .chip.pop.full b, #topbar .chip.pop.full small { color:#ffe0db; }
 #topbar .match-clock { --rc:#d9c28e; }
-#topbar .age { color:var(--bronze); letter-spacing:.03em; }
-#topbar .age i { margin-left:4px; font-size:9px; font-style:normal; color:var(--ok); animation:rise 1.4s ease-in-out infinite; }
+#topbar .chip.age { --rc:var(--bronze); }
+#topbar .chip.age b { font:15px/1 Georgia, 'Palatino Linotype', serif; color:#e7c77e; letter-spacing:.02em; }
+#topbar .age i { margin-left:1px; font-size:9px; font-style:normal; color:var(--ok); animation:rise 1.4s ease-in-out infinite; }
 @keyframes rise { 0%, 100% { transform:translateY(1px); opacity:.6 } 50% { transform:translateY(-2px); opacity:1 } }
 @media (prefers-reduced-motion: reduce) { #topbar .age i { animation:none; } }
 #topbar .grow { flex:1; text-align:center; color:var(--bronze); letter-spacing:.04em; }
@@ -270,7 +271,8 @@ body.touch #tip { display:none; }
 html, body { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 button { touch-action: manipulation; }
 #objective, #touchbar, #placebar, #gamemenu { display: none; }
-body.touch #app { position: fixed; inset: 0; height: 100dvh; touch-action: none; }
+/* --app-h: the screen height, set only in an iPhone Home Screen app whose viewport comes up short (install.js). */
+body.touch #app { position: fixed; inset: 0; height: var(--app-h, 100dvh); touch-action: none; }
 body.touch #viewport { touch-action: none; }
 body.touch #topbar { height: calc(36px + var(--sat)); padding: var(--sat) calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px); gap: 10px; font-size: 14px; }
 body.touch #topbar .res-group { gap: 4px; }
@@ -381,9 +383,37 @@ body.touch #topbar .spacer { flex: 1; }
   body.touch #objective { top: calc(70px + var(--sat)); }
   body.touch #kingdoms-standings { top: calc(98px + var(--sat)); }
 }
-/* Full screen: the menus' toggle, or on an iPhone the Home Screen hint. */
+/* Full screen and Install: the row under the main menu's title on phones. */
 .screen-row { display:flex; justify-content:center; margin:-8px 0 16px; }
-.card.menu p.screen-row.hint, #gamemenu .hint { display:block; max-width:520px; margin:-6px auto 16px; padding:8px 12px; border:1px solid #c8a05255; border-radius:8px; background:rgb(0 0 0 / .25); font-size:13.5px; line-height:1.45; color:#d9c9a3; text-align:center; }
-#gamemenu .hint { margin:0; text-align:left; font-size:12.5px; }
 .card.menu .screen-btn { margin:0; min-height:44px; padding:6px 18px; font-size:16px; border-radius:6px; }
-#gamemenu .screen-btn { display:block; width:100%; }
+/* Phone menu button: a glass pill like the chips beside it. */
+body.touch #topbar > [data-menu] { height: 28px; min-width: 46px; border-radius: 14px; font-size: 17px; line-height: 1; border-color: rgb(200 160 82 / .55);
+  background: linear-gradient(rgb(255 255 255 / .1), rgb(0 0 0 / .25)), rgb(0 0 0 / .25); }
+/* Phone info panel: only for a selection, with a small x to let go of it. */
+body.touch.no-info #info { display: none; }
+body.touch #info { padding-right: 38px; }
+.info-close { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; padding: 0; border-radius: 16px; display: grid; place-items: center;
+  color: var(--parch); font: 14px/1 system-ui, sans-serif; background: rgb(255 255 255 / .08); border: 1px solid rgb(200 160 82 / .5); cursor: pointer; }
+.info-close:active { background: rgb(255 255 255 / .2); }
+/* Full screen and Install as an app buttons (main menu on phones, and the in-game menu). */
+.screen-btns, .screen-row { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+#gamemenu .screen-btns .screen-btn { flex:1 1 140px; width:auto; padding:6px 10px; }
+/* The install guide: browser tabs, then the steps as illustrated cards (two across on a phone). */
+#install-guide { width:min(860px, calc(100vw - 20px)); max-height:calc(100dvh - 20px); padding:18px 18px 16px; color:var(--parch); }
+#install-guide::backdrop { background:rgb(10 7 4 / .6); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); }
+#install-guide h2 { margin:0; font-size:26px; letter-spacing:.08em; text-transform:uppercase; }
+#install-guide .guide-lead { margin:4px auto 12px; font-size:14px; color:#d9c9a3; }
+#install-guide .guide-tabs { max-width:520px; margin:0 auto 14px; }
+#install-guide .guide-tabs .btn { flex:1; margin:0; min-height:40px; padding:6px 4px; font-size:14px; border:0; border-radius:4px; background:transparent; color:#cbb98f; }
+#install-guide .guide-tabs .btn.on { background:linear-gradient(#e6c679,#b38a3e); color:var(--ink); box-shadow:0 1px 4px #0009, inset 0 1px 0 #fff6; }
+.guide-steps { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; margin:0; padding:0; list-style:none; }
+.guide-steps figure { margin:0; height:100%; display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid #c8a05244; border-radius:10px; background:rgb(0 0 0 / .25); }
+.guide-art { display:block; width:100%; max-width:150px; margin:0 auto; }
+.guide-art .tap { animation:tap-pulse 1.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
+@keyframes tap-pulse { 0% { opacity:1; transform:scale(.9) } 70%, 100% { opacity:0; transform:scale(1.25) } }
+@media (prefers-reduced-motion: reduce) { .guide-art .tap { animation:none; } }
+.guide-steps figcaption { font-size:13.5px; line-height:1.4; text-align:left; color:#e6d8b6; }
+.step-n { display:inline-grid; place-items:center; width:20px; height:20px; margin-right:3px; border-radius:50%; background:var(--bronze); color:var(--ink); font:600 12px/1 system-ui, sans-serif; vertical-align:1px; }
+#install-guide .guide-close { display:block; min-width:160px; margin:14px auto 0; }
+@media (max-width:700px) { .guide-steps { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; } .guide-steps figure { padding:8px; } .guide-steps figcaption { font-size:12.5px; } #install-guide h2 { font-size:21px; } }
+@media (max-height:500px) { .guide-art { width:auto; max-height:150px; } #install-guide .guide-lead { margin-bottom:8px; } #install-guide .guide-tabs { margin-bottom:8px; } }

@@ -211,5 +211,5 @@ test('queueText groups queued units by type in first-queued order', () => {
 
 test('the top bar has a 16px glyph for every resource, population and the clock', async () => {
   const { HUD_ICONS } = await import('../src/ui/icons.js');
-  for (const id of ['food', 'wood', 'gold', 'stone', 'pop', 'clock']) assert.match(HUD_ICONS[id] || '', /^<svg class="hico" viewBox="0 0 16 16"/, id);
+  for (const id of ['food', 'wood', 'gold', 'stone', 'pop', 'age', 'clock']) assert.match(HUD_ICONS[id] || '', /^<svg class="hico" viewBox="0 0 16 16"/, id);
 });

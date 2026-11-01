@@ -8,7 +8,7 @@ Or play **Kingdom Conquest**, a standalone round against three AI civilizations:
 
 **Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
-![A Bronze Age base in Wonder Race: mud-brick houses, towers, a Temple and a Wonder under construction, with a Dock, War Galleys and a Transport Ship in the home bay](docs/screenshots/wonder.jpg)
+![A Bronze Age base in Wonder Race: mud-brick houses, towers, a market and a Wonder 90% built under scaffolding, with the resource chips in the top bar](docs/screenshots/wonder.jpg)
 
 ## Run
 
@@ -145,7 +145,7 @@ Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 
 1800 in AI Future, and villagers work it faster (normal speed in Stone, up to 2.4x in AI Future). When you advance,
 every Farm you already have grows to the new size and keeps its share of food left.
 
-![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with Frigates, a War Galley and Fishing Ships at the Dock](docs/screenshots/deathmatch.jpg)
+![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with five-digit stockpiles in the top bar](docs/screenshots/deathmatch.jpg)
 
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
@@ -237,25 +237,45 @@ Tap your unit or building to select it; with a selection, tap a target to order 
 tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
-Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode, deselect. Building placement: tap
-or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, resign
-and quit.
+Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode. The panel at the bottom
+shows what is selected; its **&#x2715;** deselects, and it hides when nothing is selected. Building placement: tap or drag
+to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, install,
+resign and quit.
 
 The top bar shows each resource as a chip with its icon, then population (red when full: build a House or advance),
 the Age (a green arrow while advancing) and the match clock. In portrait it takes two rows: resources first, then
 population, Age and clock.
 
 **Full screen:** on Android (and on iPads and desktops) the main menu and the in-game menu have a **Play full screen**
-button. iPhone browsers cannot hide their bars from a web page, so there the menus explain the way round it: tap
-Share, then **Add to Home Screen**, and open the game from that icon; it then runs full screen like an app.
+button. For the whole screen with no browser bars at all, install the game as an app (below).
 
 The **Delete** tile opens the same **Cancel / Delete building** confirmation as desktop, including for unfinished
 buildings, towers and walls.
 
-Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a
-real iPhone.
+Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser.
 
 <br clear="right">
+
+### Install on your phone (full screen, no browser bars)
+
+Added to the Home Screen, the game opens like an app: full screen, no address bar or toolbar. No web page can add itself
+to the Home Screen on an iPhone, so there it takes the steps below. On Android, Chrome may offer its own install prompt:
+when it does, the menus show an **Install app** button that opens it in one tap. Otherwise, **Install as an app** in the
+main menu (on a phone) or the in-game menu opens this same guide, with a tab for each browser.
+
+**iPhone, Safari:** Share, then **Add to Home Screen**, then **Add**.
+
+![Four steps on an iPhone in Safari: tap Share in the toolbar, tap Add to Home Screen, tap Add, open Knockout from the Home Screen](docs/screenshots/install-iphone-safari.png)
+
+**iPhone, Chrome:** the Share button at the right of the address bar, then **Add to Home Screen**, then **Add**.
+
+![Four steps on an iPhone in Chrome: tap Share in the address bar, tap Add to Home Screen, tap Add, open Knockout from the Home Screen](docs/screenshots/install-iphone-chrome.png)
+
+**Android, Chrome:** the &#8942; menu, then **Add to Home screen** (or **Install app**), then **Install**.
+
+![Four steps on Android in Chrome: tap the three-dot menu, tap Add to Home screen, tap Install, open Knockout from the home screen](docs/screenshots/install-android.png)
+
+On an iPhone the installed game keeps its own settings, separate from the browser's.
 
 ## Buildings and units by era
 
