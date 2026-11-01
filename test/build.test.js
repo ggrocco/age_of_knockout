@@ -1,6 +1,6 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { createGame } from '../src/sim/game.js';
-import { canPlace, ageUpNeed, ageBuildings } from '../src/sim/commands.js';
+import { canPlace, ageUpNeed, ageBuildings, ageGateStatus } from '../src/sim/commands.js';
 import { AGES, AGE_POP_LIMIT, popLimit } from '../src/data/ages.js';
 const freeSpot = (g, p, type, skip = []) => { const t = tc(g, p); for (let r = 3; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(t.x) + dx, y = Math.floor(t.y) + dy; if (skip.some(k => Math.abs(k.x - x) < 4 && Math.abs(k.y - y) < 4)) continue; if (canPlace(g, p, type, x, y)) return { x, y }; } };
 const mine = (g, p, type) => [...g.units.values()].filter(u => u.owner === p && u.type === type);
@@ -97,6 +97,14 @@ test('iron advances to medieval; AI Future is the max age', () => {
   for (let i = 0; i < 1100; i++) g.tick();
   assert.equal(p.age, 'medieval');
   p.age = 'future'; const again = g.command(0, { type: 'age' }); assert.equal(again.ok, false); assert.equal(again.reason, 'max age');
+});
+test('ageGateStatus lists the current Age gate buildings, ticking only finished own ones', () => {
+  const g = createGame({ seed: 1 }), p = g.players[0], t = tc(g, 0); p.age = 'bronze';
+  g.addBuilding('government_center', 0, t.x, t.y + 8, true); g.addBuilding('temple', 0, t.x + 8, t.y, false);
+  g.addBuilding('temple', 1, t.x - 9, t.y - 9, true);
+  assert.deepEqual(ageGateStatus(g, 0), [{ type: 'government_center', done: true }, { type: 'temple', done: false }]);
+  assert.deepEqual(ageGateStatus(g, 0).map(gate => gate.type), ageBuildings('bronze'));
+  p.age = 'future'; assert.deepEqual(ageGateStatus(g, 0), []);
 });
 const rich = p => { p.res = { food: 9000, wood: 9000, gold: 9000, stone: 9000 }; };
 test('every Age from Bronze to Modern needs both of its gate buildings, finished', () => {
