@@ -26,7 +26,7 @@ window.__app = app;
 let gpuWarned = false;
 // Tournament difficulty level: ?level= wins, else the last pick (browser storage may be unavailable), else Normal.
 const LEVEL_DESC = {
-  relaxed: 'A long peaceful start: opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking.',
+  relaxed: 'A gentle ramp: rounds 1-2 opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking; then easy, easy, medium.',
   normal: 'The standard ramp, from easy to hard opponents.',
   hard: 'Tough opponents from the first round.',
 };
