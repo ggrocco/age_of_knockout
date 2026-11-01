@@ -8,7 +8,7 @@ Or play **Kingdom Conquest**, a standalone round against three AI civilizations:
 
 **Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
-![A Bronze Age base in Wonder Race: mud-brick houses, towers, a Temple and a Wonder under construction, with a Dock, War Galleys and a Transport Ship in the home bay](docs/screenshots/wonder.jpg)
+![A Bronze Age base in Wonder Race: mud-brick houses, towers, a market and a Wonder 90% built under scaffolding, with the resource chips in the top bar](docs/screenshots/wonder.jpg)
 
 ## Run
 
@@ -145,7 +145,7 @@ Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 
 1800 in AI Future, and villagers work it faster (normal speed in Stone, up to 2.4x in AI Future). When you advance,
 every Farm you already have grows to the new size and keeps its share of food left.
 
-![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with Frigates, a War Galley and Fishing Ships at the Dock](docs/screenshots/deathmatch.jpg)
+![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with five-digit stockpiles in the top bar](docs/screenshots/deathmatch.jpg)
 
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
