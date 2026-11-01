@@ -8,6 +8,8 @@ import { kingdomStandingsHtml } from './kingdoms.js';
 import { TEAMS } from '../data/teams.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
+import { HUD_ICONS } from './icons.js';
+import { HOMESCREEN_HINT, fullscreenLabel, fullscreenMode, isFullscreen, toggleFullscreen } from './fullscreen.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';
 
@@ -279,29 +281,37 @@ export function createHud(ui) {
     + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`
     + `<button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
 
+  // Each count is a chip: the resource's glyph in its colour, then the number in a lining, tabular face so the digits
+  // line up and read at a glance (the serif's old-style figures bob up and down).
+  const RES_NAME = { food: 'Food', wood: 'Wood', gold: 'Gold', stone: 'Stone' };
+  const chip = (cls, glyph, body, attrs = '') => `<span class="res chip ${cls}" ${attrs}>${glyph}<b>${body}</b></span>`;
   const topBarHtml = (game, player, objective) => {
     const round = game.rules;
-    const resourcesHtml = RES.map(resource => `<span class="res"><i class="dot" style="background:${COLORS[resource]}"></i>`
-      + `${Math.floor(player.res[resource])}</span>`).join('');
+    const resourcesHtml = RES.map(resource => chip(`r-${resource}`, HUD_ICONS[resource], Math.floor(player.res[resource]),
+      `style="--rc:${COLORS[resource]}" title="${RES_NAME[resource]}" aria-label="${RES_NAME[resource]} ${Math.floor(player.res[resource])}"`)).join('');
     const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
     const clockLabel = round ? (game.capTicks === Infinity ? ' / no time limit' : ' / time limit') : '';
-    const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}"></span>`;
+    const clockHtml = `<span class="res chip match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}">`
+      + `${HUD_ICONS.clock}<b class="clock-now"></b><small class="clock-cap"></small></span>`;
     if (ui.spectating) {
       return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
         + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}" class="${ui.speed === speed ? 'on' : ''}">${speed}x</button>`).join('')
           + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`)
         + '<button data-menu="open" aria-label="Game settings">Menu</button>';
     }
-    const popTitle = `title="Population (${ageTitle(player.age)} limit ${popLimit(player.age)})"`;
+    // The population chip turns red when it is full: nothing more can be trained until a House (or the next Age).
+    const full = player.pop >= player.popCap;
+    const popAttrs = `title="Population${full ? ' full' : ''} (${ageTitle(player.age)} limit ${popLimit(player.age)})"`
+      + ` aria-label="Population ${player.pop} of ${player.popCap}${full ? ', full' : ''}"`;
+    const popHtml = chip(`pop${full ? ' full' : ''}`, HUD_ICONS.pop, `${player.pop}<small>/${player.popCap}</small>`, popAttrs);
+    const ageHtml = `<span class="res age${player.ageUp ? ' rising' : ''}" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">`
+      + `${ui.touch ? ageLabel(player.age) : ageTitle(player.age)}${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`;
     if (ui.touch) {
-      return resourcesHtml + `<span class="res" ${popTitle}>&#9823;${player.pop}/${player.popCap}</span>`
-        + `<span class="res">${ageLabel(player.age)}${player.ageUp ? '&hellip;' : ''}</span>`
-        + `<span style="flex:1"></span>${clockHtml}`
+      return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
+        + `<span class="spacer"></span>${clockHtml}`
         + '<button data-menu="open" aria-label="Menu">&#9776;</button>';
     }
-    return resourcesHtml
-      + `<span class="res" ${popTitle}>Pop ${player.pop}/${player.popCap}</span>`
-      + `<span class="res">${player.ageUp ? 'Advancing... ' : ''}${ageTitle(player.age)}</span>`
+    return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${objective}</span></span>`
       + clockHtml
       + topBarControlsHtml()
@@ -343,9 +353,10 @@ export function createHud(ui) {
 
   const updateClock = game => {
     const clock = top.querySelector('.match-clock');
-    const limit = game.rules ? ` / ${game.capTicks === Infinity ? '∞' : fmtTime(game.capTicks)}` : '';
-    const clockText = fmtTime(game.time) + limit;
-    if (clock.textContent !== clockText) clock.textContent = clockText;
+    const now = fmtTime(game.time), cap = game.rules ? `/${game.capTicks === Infinity ? '∞' : fmtTime(game.capTicks)}` : '';
+    const nowEl = clock.querySelector('.clock-now'), capEl = clock.querySelector('.clock-cap');
+    if (nowEl.textContent !== now) nowEl.textContent = now;
+    if (capEl.textContent !== cap) capEl.textContent = cap;
   };
 
   const DESKTOP_HELP = '<br><br><small>Left-click / drag to select. Right-click to order. WASD or Space + drag pans,'
@@ -523,6 +534,14 @@ export function createHud(ui) {
     + `<div class="seg" role="group" aria-labelledby="${id}-label">${options.map(([attr, value, text, on]) =>
       `<button class="btn ${on ? 'on' : ''}" data-${attr}="${value}" aria-pressed="${on}">${text}</button>`).join('')}</div>`
     + (note ? `<p>${note}</p>` : '') + '</fieldset>';
+  // Full screen: a toggle where the browser can do it, else (iPhone) how to get there from the Home Screen.
+  const screenSetHtml = () => {
+    const mode = fullscreenMode();
+    if (mode === 'api') return '<fieldset class="menu-set"><legend>Screen</legend>'
+      + `<button class="btn screen-btn" data-fullscreen="1" aria-pressed="${isFullscreen()}">${fullscreenLabel(isFullscreen())}</button></fieldset>`;
+    if (mode === 'homescreen') return `<fieldset class="menu-set"><legend>Screen</legend><div class="hint">${HOMESCREEN_HINT}</div></fieldset>`;
+    return '';
+  };
   const menuHtml = () => {
     const speeds = SPEEDS.map(speed => ['speed', speed, `${speed}x`, ui.speed === speed]);
     const qualities = Object.entries(QUALITY).map(([id, option]) => ['quality', id, option.label, ui.view?.quality === id]);
@@ -532,6 +551,7 @@ export function createHud(ui) {
       + segHtml('menu-speed', 'Game speed', speeds)
       + segHtml('menu-quality', 'Graphics quality', qualities,
         'High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.')
+      + screenSetHtml()
       + '<div class="menu-exit">'
       + `<button class="btn ${ui.resignArmed ? 'armed' : ''}" data-resign="1">${armed(ui.resignArmed, 'Resign', 'Confirm resign?')}</button>`
       + `<button class="btn ${ui.quitArmed ? 'armed' : ''}" data-quit="1">${armed(ui.quitArmed, 'Quit to menu', 'Confirm quit?')}</button>`
@@ -576,6 +596,9 @@ export function createHud(ui) {
       first.focus();
     }
   });
+
+  // Leaving full screen with the browser's own gesture or Esc relabels the open menu's button.
+  for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, () => refreshMenu('[data-fullscreen]'));
 
   // ----- button clicks -----
   // Quit and Resign ask twice: the first click arms the button for 3 seconds.
@@ -647,6 +670,7 @@ export function createHud(ui) {
     if (data.menu === 'open') return hud.openMenu();
     if (data.menu === 'close') return hud.closeMenu();
     if (data.quality) return onQuality(data.quality);
+    if (data.fullscreen) return void toggleFullscreen().then(() => refreshMenu('[data-fullscreen]'));
     if (data.act) return ui.actions?.[data.act]?.();
     if (data.quit) return onQuit();
     if (data.speed) onSpeed(+data.speed);

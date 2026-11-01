@@ -60,6 +60,8 @@ pipeline {
           check /src/main.js javascript
           check /buildings.html text/html
           check /ages.html text/html
+          check /manifest.webmanifest manifest+json
+          check /icons/apple-touch-icon.png image/png
           # the content-hashed paths the Dockerfile writes into the pages
           v=$(docker exec "$CI_ID-web" grep -o 'src="v/[^/]*' /usr/share/nginx/html/index.html | cut -d/ -f2)
           [ -n "$v" ] || { echo "FAIL index.html has no versioned script path"; exit 1; }

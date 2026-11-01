@@ -27,14 +27,31 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 #viewport { position:absolute; inset:0; }
 #viewport canvas { width:100%; height:100%; display:block; }
 #topbar { position:absolute; left:0; right:0; top:0; height:40px; display:flex; align-items:center; gap:18px; padding:0 14px; background:var(--hud-top); border-bottom:1px solid var(--bronze); box-shadow:var(--edge), 0 1px 0 rgb(0 0 0 / .45), 0 6px 18px rgb(0 0 0 / .3); font-size:15px; text-shadow:var(--legible); z-index:5; }
-#topbar .res { display:flex; align-items:center; gap:5px; font-variant-numeric: tabular-nums; min-width:64px; }
-#topbar .dot { width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid #0006; }
+#topbar .res { display:flex; align-items:center; gap:5px; font-variant-numeric: tabular-nums; white-space:nowrap; }
+/* Counters are chips: the resource's glyph in its colour, then the number in a lining, tabular sans (the serif's
+   old-style figures bob up and down). The chip is tinted with the resource colour, --rc. */
+#topbar .res-group { display:flex; align-items:center; gap:6px; }
+#topbar .chip { --rc:var(--parch); display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 10px 0 6px; border-radius:13px;
+  background:rgb(0 0 0 / .32); background:linear-gradient(90deg, color-mix(in srgb, var(--rc) 24%, rgb(0 0 0 / .3)), rgb(0 0 0 / .3) 70%);
+  box-shadow:inset 0 0 0 1px rgb(255 255 255 / .09), inset 0 1px 0 rgb(255 255 255 / .07); }
+#topbar .res-group .chip { min-width:68px; }
+#topbar .chip b { font:600 14px/1 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-variant-numeric:tabular-nums lining-nums; color:#fbf1d6; }
+#topbar .chip small { font:inherit; font-size:12px; font-weight:500; color:#cbbb95; }
+#topbar .hico { width:16px; height:16px; flex:none; color:var(--rc); filter:drop-shadow(0 1px 1px rgb(0 0 0 / .65)); }
+#topbar .chip.pop.full { --rc:#ff8a7a; background:rgb(150 40 30 / .55); box-shadow:inset 0 0 0 1px rgb(255 138 122 / .55); }
+#topbar .chip.pop.full b, #topbar .chip.pop.full small { color:#ffe0db; }
+#topbar .match-clock { --rc:#d9c28e; }
+#topbar .age { color:var(--bronze); letter-spacing:.03em; }
+#topbar .age i { margin-left:4px; font-size:9px; font-style:normal; color:var(--ok); animation:rise 1.4s ease-in-out infinite; }
+@keyframes rise { 0%, 100% { transform:translateY(1px); opacity:.6 } 50% { transform:translateY(-2px); opacity:1 } }
+@media (prefers-reduced-motion: reduce) { #topbar .age i { animation:none; } }
 #topbar .grow { flex:1; text-align:center; color:var(--bronze); letter-spacing:.04em; }
 #topbar .grow { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #topbar > button { flex-shrink:0; }
 @media (max-width:1200px) {
   body:not(.touch) #topbar { gap:8px; padding:0 8px; font-size:13px; }
-  body:not(.touch) #topbar .res { min-width:0; white-space:nowrap; }
+  body:not(.touch) #topbar .res-group .chip { min-width:0; }
+  body:not(.touch) #topbar .res-group { gap:4px; }
   body:not(.touch) #topbar button { padding:4px 7px; }
 }
 @media (max-width:800px) {
@@ -256,8 +273,10 @@ button { touch-action: manipulation; }
 body.touch #app { position: fixed; inset: 0; height: 100dvh; touch-action: none; }
 body.touch #viewport { touch-action: none; }
 body.touch #topbar { height: calc(36px + var(--sat)); padding: var(--sat) calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px); gap: 10px; font-size: 14px; }
-body.touch #topbar .res { min-width: 0; gap: 4px; }
-body.touch #topbar .dot { width: 11px; height: 11px; }
+body.touch #topbar .res-group { gap: 4px; }
+body.touch #topbar .res-group .chip { min-width: 0; }
+body.touch #topbar .chip { height: 26px; gap: 4px; padding: 0 8px 0 5px; }
+body.touch #topbar .hico { width: 15px; height: 15px; }
 body.touch #topbar button { min-width: 44px; height: 32px; font-size: 18px; padding: 0 8px; }
 body.touch #objective { display: block; position: absolute; left: 50%; transform: translateX(-50%); top: calc(40px + var(--sat)); max-width: min(92vw, 640px); padding: 3px 12px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--edge), 0 2px 8px rgb(0 0 0 / .35); border: 1px solid #c8a05266; border-radius: 12px; font-size: 12px; text-align: center; z-index: 4; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: var(--legible); }
 body.touch #bottom { position: absolute; inset: 0; height: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; pointer-events: none; }
@@ -321,7 +340,7 @@ body.touch .card.menu .quick { min-height: 44px; } body.touch .ladder li { width
 body.touch .ladder li + li::before { width: 10px; }
 /* portrait: commands become a bottom strip, minimap moves top-right */
 @media (orientation: portrait) {
-  body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(66px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
+  body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(96px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
   body.touch #objective { font-size: 11px; }
   body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 132px; }
   body.touch.has-cmds #info { bottom: calc(var(--sab) + 66px); }
@@ -348,5 +367,23 @@ body.touch .ladder li + li::before { width: 10px; }
 body.touch.placing #info { display: none; }
 body.touch #placebar .btn { min-width: 116px; }
 body:not(.ingame) #topbar, body:not(.ingame) #bottom, body:not(.ingame) #touchbar, body:not(.ingame) #objective, body:not(.ingame) #placebar { visibility: hidden; }
-body.touch #topbar .res { white-space: nowrap; }
-@media (orientation: portrait) { body.touch #topbar { gap: 7px; font-size: 13px; padding-left: calc(var(--sal) + 6px); padding-right: calc(var(--sar) + 6px); } }
+body.touch #topbar .spacer { flex: 1; }
+/* Portrait phones are too narrow for one row: the four resources share the first row with the menu button, each chip
+   an equal quarter so a five-digit stockpile still fits; population, Age and clock take the second row. */
+@media (orientation: portrait) {
+  body.touch #topbar { flex-wrap: wrap; align-content: center; height: calc(66px + var(--sat)); gap: 4px 6px; font-size: 13px;
+    padding: calc(var(--sat) + 3px) calc(var(--sar) + 6px) 3px calc(var(--sal) + 6px); }
+  body.touch #topbar > * { order: 2; }
+  body.touch #topbar .res-group { order: 0; flex: 1 1 calc(100% - 60px); gap: 4px; }
+  body.touch #topbar .res-group .chip { flex: 1 1 0; justify-content: center; }
+  body.touch #topbar > [data-menu] { order: 1; height: 28px; }
+  body.touch #topbar .chip { height: 26px; }
+  body.touch #objective { top: calc(70px + var(--sat)); }
+  body.touch #kingdoms-standings { top: calc(98px + var(--sat)); }
+}
+/* Full screen: the menus' toggle, or on an iPhone the Home Screen hint. */
+.screen-row { display:flex; justify-content:center; margin:-8px 0 16px; }
+.card.menu p.screen-row.hint, #gamemenu .hint { display:block; max-width:520px; margin:-6px auto 16px; padding:8px 12px; border:1px solid #c8a05255; border-radius:8px; background:rgb(0 0 0 / .25); font-size:13.5px; line-height:1.45; color:#d9c9a3; text-align:center; }
+#gamemenu .hint { margin:0; text-align:left; font-size:12.5px; }
+.card.menu .screen-btn { margin:0; min-height:44px; padding:6px 18px; font-size:16px; border-radius:6px; }
+#gamemenu .screen-btn { display:block; width:100%; }

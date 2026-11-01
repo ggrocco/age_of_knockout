@@ -231,14 +231,23 @@ siege, and villagers at the back.
 
 ### Controls (phone / touch)
 
-<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
+<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with resource chips, population, Age and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
 tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
 Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode, deselect. Building placement: tap
-or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit.
+or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, resign
+and quit.
+
+The top bar shows each resource as a chip with its icon, then population (red when full: build a House or advance),
+the Age (a green arrow while advancing) and the match clock. In portrait it takes two rows: resources first, then
+population, Age and clock.
+
+**Full screen:** on Android (and on iPads and desktops) the main menu and the in-game menu have a **Play full screen**
+button. iPhone browsers cannot hide their bars from a web page, so there the menus explain the way round it: tap
+Share, then **Add to Home Screen**, and open the game from that icon; it then runs full screen like an app.
 
 The **Delete** tile opens the same **Cancel / Delete building** confirmation as desktop, including for unfinished
 buildings, towers and walls.
@@ -385,7 +394,7 @@ For four-team play, try `?mode=kingdoms&seed=3`, or add `&map=islands&autoplay=1
 docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PORT=9000 to change)
 ```
 
-The image is static files only (`index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/`, the two
+The image is static files only (`index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `manifest.webmanifest`, `icons/`, `src/`, the two
 three.js folders the import map uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .`
 builds the same image.
 
