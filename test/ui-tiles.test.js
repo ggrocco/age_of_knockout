@@ -114,7 +114,7 @@ test('round tips disclose the actual game-time cap and score decision', () => {
 test('round tips use the effective time limit for each difficulty', () => {
   for (const [level, diffs] of Object.entries(LEVELS)) for (const [i, round] of ROUNDS.entries()) {
     const game = createGame({ rules: round, ...matchOptions([null, diffs[i]]) });
-    const expected = level === 'relaxed' ? 40 : round.capTicks / 1200;
+    const expected = diffs[i] === 'relaxed' ? 40 : round.capTicks / 1200;
     assert.equal(roundTimeLabel(round, game.capTicks), `${expected} minutes`, `${level} ${round.id}`);
     assert.ok(roundTipHtml(round, game.capTicks).includes(`${expected} minutes of game time`), `${level} ${round.id}`);
   }
