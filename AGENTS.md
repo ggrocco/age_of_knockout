@@ -187,7 +187,7 @@ Shortcuts:
 
 ## Deployment
 
-`Dockerfile` copies only `index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/` and the two three.js
+`Dockerfile` copies only `index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `manifest.webmanifest`, `icons/`, `src/` and the two three.js
 folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. Its `test` stage
 (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
 

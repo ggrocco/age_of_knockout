@@ -34,7 +34,8 @@ jobs:
           # page never mixes old and new modules (the Dockerfile does the same through an nginx rewrite).
           v=$(find index.html buildings.html ages.html styles.css src -type f | sort | xargs cat | md5sum | cut -c1-12)
           mkdir -p _site/v/$v _site/node_modules/three/examples
-          cp index.html buildings.html ages.html favicon.svg _site/
+          cp index.html buildings.html ages.html favicon.svg manifest.webmanifest _site/
+          cp -r icons _site/
           cp -r styles.css src _site/v/$v/
           sed -i "s#href=\"styles.css\"#href=\"v/$v/styles.css\"#; s#src=\"src/#src=\"v/$v/src/#" \
             _site/index.html _site/buildings.html _site/ages.html

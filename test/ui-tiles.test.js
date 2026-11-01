@@ -208,3 +208,8 @@ test('queueText groups queued units by type in first-queued order', () => {
   assert.equal(queueText(q(['villager', 'villager', 'villager'])), 'Villager ×3');
   assert.equal(queueText(q(['clubman', 'villager', 'clubman'])), `${UNITS.clubman.name} ×2, Villager`);
 });
+
+test('the top bar has a 16px glyph for every resource, population and the clock', async () => {
+  const { HUD_ICONS } = await import('../src/ui/icons.js');
+  for (const id of ['food', 'wood', 'gold', 'stone', 'pop', 'clock']) assert.match(HUD_ICONS[id] || '', /^<svg class="hico" viewBox="0 0 16 16"/, id);
+});
