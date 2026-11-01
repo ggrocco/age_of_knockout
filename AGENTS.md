@@ -90,7 +90,9 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   `src/sim/map-four.js`. `node test/kingdom-sim.js 12` exercises four bots on both maps. Captured population may
   exceed the age ceiling; do not delete captured units or treat that overflow as a sim invariant failure.
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
-  waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
+  waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Medium and
+  hard (`vary` in `DIFF`) give each attack wave one of the `STRATEGIES` (assault, raid, siege, pincer), drawn from the
+  bot's own seeded RNG (never the game's) and never the previous wave's plan; easy and relaxed always assault. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
   sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
   Center, a Dock with Fishing Ships and a fleet of the newest warship, and Transport Ship ferries (`ferryWork`: attack

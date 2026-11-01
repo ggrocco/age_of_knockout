@@ -8,6 +8,7 @@ import { RES_KIND, WATER, centerOf, distPoint, flood4, landMasses } from '../sim
 import { canHit } from '../sim/orders.js';
 import { nearestOpen } from '../sim/formation.js';
 import { parseTimeLimit } from '../time-limit.js';
+import { makeRng } from '../sim/rng.js';
 
 // attackAge: the bot sends no wave before reaching this age. grace: no wave before this tick in any round
 // (overrides the early Wonder rush and Death Match timings), so a relaxed match starts peacefully like AoE1.
@@ -16,16 +17,31 @@ import { parseTimeLimit } from '../time-limit.js';
 // the Stone Age; transports: Transport Ships it keeps when the enemy (or, in the relics round, a relic) is across the sea.
 // ageFirst: research and the second half of the army only spend what leaves the next age-up affordable.
 // work: the bot's sim workRate handicap (half-speed economy and production). cap: the match's time limit in ticks.
+// vary: each attack wave follows one of the STRATEGIES below, a different one from the wave before (else always an
+// assault).
 export const DIFF = {
   relaxed: { every: 40, villagers: 14, wave: 10, attackAt: 36000, army: 12, attackAge: 'bronze', grace: 36000,
     dmWave: 20, dmArmy: 24, work: 0.5, cap: 48000, towers: 1, fleet: 1, fishers: 2, transports: 1 },
   easy:    { every: 20, villagers: 18, wave: 12, attackAt: 10000, army: 16, attackAge: 'tool', grace: 0,
     dmWave: 24, dmArmy: 44, towers: 1, ageFirst: true, fleet: 2, fishers: 2, transports: 1 },
   medium:  { every: 15, villagers: 20, wave: 14, attackAt: 8000, army: 28, attackAge: 'stone', grace: 0,
-    dmWave: 32, dmArmy: 44, towers: 2, fleet: 3, fishers: 3, transports: 2 },
+    dmWave: 32, dmArmy: 44, towers: 2, fleet: 3, fishers: 3, transports: 2, vary: true },
   hard:    { every: 10, villagers: 26, wave: 18, attackAt: 8000, army: 36, attackAge: 'stone', grace: 0,
-    dmWave: 38, dmArmy: 44, towers: 3, fleet: 4, fishers: 4, transports: 2 },
+    dmWave: 38, dmArmy: 44, towers: 3, fleet: 4, fishers: 4, transports: 2, vary: true },
 };
+// Attack plans. size: the army a wave waits for, as a share of the tier's `wave` (or `dmWave`); first: what the wave
+// goes for once the round's objective (King, Wonder, relic vault) is out of sight; flank: half the army first swings
+// round the side of the enemy base and comes in from there. Pincer needs the enemy on our land.
+export const STRATEGIES = {
+  assault: { size: 1, first: 'army' }, // the enemy's soldiers, then its buildings
+  // a smaller, earlier party at the villagers and the buildings they work from (soldiers trained meanwhile stay home on
+  // guard); it pulls back home once half of it is lost, or when, `retreat` ticks after setting out (about two minutes at
+  // the enemy base), it has killed nothing for a minute
+  raid: { size: 0.6, first: 'economy', retreat: 3600, party: true },
+  siege: { size: 1.25, first: 'defences' }, // a bigger, later wave at the towers, then whatever trains units
+  pincer: { size: 1, first: 'army', flank: true },
+};
+const ECONOMY = new Set(['granary', 'storage_pit', 'farm', 'mine', 'house', 'dock']);
 // Bot think interval in ticks for each difficulty.
 export const THINK_EVERY = Object.fromEntries(Object.entries(DIFF).map(([tier, settings]) => [tier, settings.every]));
 // createGame options for a match between these bot difficulties (null = a human player): each bot's handicap,
@@ -143,7 +159,19 @@ export function createBot(game, pid, difficulty = 'medium') {
   const sentTo = new Map(); // unit id -> sweepIdx of the waypoint it was last sent to
   const bot = {
     saving: false, why: {}, rejects: 0, maxRejects: 0, issued: 0, waveActive: false, sweep, sweepIdx: 0, scout: 0, think,
+    // Attack plans: the current (or next) wave's, every wave's so far, a pincer's flank group, a raid's party (only they
+    // go out), when the wave set out and how big it was, no new wave before restUntil, our kill count and when it last rose.
+    strategy: 'assault', waves: [], flank: null, party: null, waveAt: 0, waveSize: 0, restUntil: 0, kills: 0, killAt: 0,
   };
+  // The bot's own seeded stream for its attack plans: never the game's, so the sim draws the same numbers as before.
+  const plans = makeRng((Math.imul(game.seed | 0, 0x9E3779B1) ^ Math.imul(pid + 1, 0x85EBCA6B)) >>> 0);
+  // A plan for the next wave, never the last one again.
+  function nextStrategy(previous) {
+    if (!settings.vary) return 'assault';
+    const options = Object.keys(STRATEGIES).filter(s => s !== previous && !(STRATEGIES[s].flank && overSea));
+    return options[plans.int(options.length)];
+  }
+  bot.strategy = nextStrategy(null);
 
   // In the Wonder round, keep the wonder's cost untouched until it is placed.
   const wonderPlaced = () => ownEntities('buildings').some(b => b.type === 'wonder');
@@ -351,6 +379,7 @@ export function createBot(game, pid, difficulty = 'medium') {
       overSea = enemyMass !== homeMass;
       sweep[0] = enemyStart;
       bot.sweepIdx = 0;
+      bot.flank = null;
       sentTo.clear();
       for (const [id, job] of ferry) if (job.wave) {
         job.dest = { ...enemyStart };
@@ -918,16 +947,19 @@ export function createBot(game, pid, difficulty = 'medium') {
     const idle = army.filter(u => u.order.type === 'idle'); // taken before the relic runners get their orders
     if (roundId === 'relics') sendRelicRunners(army);
     if (defendHome(idle, enemies, home)) return;
-    if (!updateWave(army, roundId)) return;
+    if (!updateWave(army, roundId, home)) return;
+    const party = bot.party ? army.filter(u => bot.party.has(u.id)) : army, out = party.length ? party : army;
     const centre = {
-      x: army.reduce((sum, u) => sum + u.x, 0) / army.length,
-      y: army.reduce((sum, u) => sum + u.y, 0) / army.length,
+      x: out.reduce((sum, u) => sum + u.x, 0) / out.length,
+      y: out.reduce((sum, u) => sum + u.y, 0) / out.length,
     };
     const targetFor = waveTargets(enemies, roundId, centre);
-    const onTower = siegeOnTowers(army, enemies);
+    const onTower = siegeOnTowers(out, enemies);
+    const flanking = flankMoves(idle);
     let advanced = false;
     for (const soldier of idle) {
-      if (soldier.relic !== null || onTower.has(soldier.id) || ferried.has(soldier.id)) continue;
+      if (soldier.relic !== null || onTower.has(soldier.id) || ferried.has(soldier.id) || flanking.has(soldier.id)) continue;
+      if (bot.party && !bot.party.has(soldier.id)) continue; // the home guard
       const target = targetFor(soldier);
       if (target) cmd({ type: 'attack', ids: [soldier.id], targetId: target.id });
       else if (massOf(soldier) === enemyMass) advanced = sweepOn(soldier, advanced);
@@ -958,18 +990,71 @@ export function createBot(game, pid, difficulty = 'medium') {
     for (const soldier of idle) if (sameLand(soldier, threat)) cmd({ type: 'attack', ids: [soldier.id], targetId: threat.id });
     return true;
   }
-  // Starts a wave once the army is big enough (and the round's time and our age allow it), ends it when the army is
-  // nearly gone. Returns whether a wave is on.
-  function updateWave(army, roundId) {
+  // Starts a wave once the army is big enough for the plan (and the round's time and our age allow it), ends it when the
+  // army is nearly gone or a raid pulls back, and then picks the next wave's plan. Returns whether a wave is on.
+  function updateWave(army, roundId, home) {
     const rush = roundId === 'wonder'; // contest the Wonder while it is being built
     // Death Match: whoever attacks piecemeal loses to defenders, so wait for a big army (bigger for harder bots)
-    const needWave = rush ? 5 : roundId === 'deathmatch' ? settings.dmWave : settings.wave;
+    const base = roundId === 'deathmatch' ? settings.dmWave : settings.wave;
+    const most = Math.floor(0.9 * (roundId === 'deathmatch' ? settings.dmArmy : settings.army)); // a size it can reach
+    const sized = Math.min(Math.round(base * STRATEGIES[bot.strategy].size), Math.max(most, base));
+    const needWave = rush ? 5 : Math.max(5, sized);
     const needTime = Math.max(settings.grace, rush ? 3600 : roundId === 'deathmatch' ? 9000 : settings.attackAt);
-    if (!bot.waveActive && game.time >= needTime && ageIndex(me.age) >= ageIndex(settings.attackAge) && army.length >= needWave) {
+    const ready = game.time >= Math.max(needTime, bot.restUntil) && ageIndex(me.age) >= ageIndex(settings.attackAge);
+    if (!bot.waveActive && ready && army.length >= needWave) {
       bot.waveActive = true;
+      bot.waveAt = game.time;
+      bot.waveSize = army.length;
+      bot.waves.push(bot.strategy);
+      if (STRATEGIES[bot.strategy].flank && !overSea) startFlank(army);
+      if (STRATEGIES[bot.strategy].party && !overSea) bot.party = new Set(army.map(u => u.id));
     }
-    if (bot.waveActive && army.length + unitsAboard() < 3) bot.waveActive = false; // a wave at sea is still a wave
+    if (me.kills !== bot.kills) { bot.kills = me.kills; bot.killAt = game.time; }
+    const plan = STRATEGIES[bot.strategy], aboard = bot.waveActive ? unitsAboard() : 0;
+    const out = bot.party ? army.filter(u => bot.party.has(u.id)) : army;
+    const stalled = game.time - bot.waveAt >= plan.retreat && game.time - bot.killAt >= 1200;
+    const pullBack = bot.waveActive && plan.retreat && !aboard && !overSea && !rush
+      && (stalled || out.length * 2 < bot.waveSize);
+    if (pullBack) { retreat(out, home); bot.restUntil = game.time + 1200; } // a minute to regroup
+    if (bot.waveActive && (pullBack || army.length + aboard < 3)) { // a wave at sea is still a wave
+      bot.waveActive = false;
+      bot.flank = null;
+      bot.party = null;
+      bot.strategy = nextStrategy(bot.strategy);
+    }
     return bot.waveActive;
+  }
+  // Everyone on the home land walks back home in one group move (relic carriers keep going).
+  function retreat(army, home) {
+    const ids = army.filter(u => u.relic === null && u.order.type !== 'relic' && !ferried.has(u.id) && sameLand(u, home)
+      && dist(u, home) > 8).map(u => u.id);
+    if (ids.length) cmd({ type: 'move', ids, x: home.x, y: home.y });
+  }
+  // Pincer: every other soldier (siege stays with the main body) is told off to a point beside the enemy base, on a
+  // side picked at random, and joins the fight from there.
+  function startFlank(army) {
+    const from = map.starts[pid], dx = enemyStart.x - from.x, dy = enemyStart.y - from.y, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len, side = plans.int(2) ? 1 : -1;
+    const clamp = v => Math.min(mapSize - 2, Math.max(1, Math.round(v)));
+    const goal = { x: clamp(enemyStart.x - 10 * ux - 16 * side * uy), y: clamp(enemyStart.y - 10 * uy + 16 * side * ux) };
+    const point = nearestReachable(map, reach, goal);
+    const ids = new Set(army.filter(u => u.cls !== 'siege').filter((u, i) => i % 2 === 1).map(u => u.id));
+    bot.flank = { x: point.x, y: point.y, ids, sent: new Set() };
+  }
+  // Moves the idle flank soldiers still on their way to the flank point there, as one group. A flank soldier idle at
+  // the point, or idle again after being sent (arrived, or the move failed), joins the wave. Returns the ids sent.
+  function flankMoves(idle) {
+    const flank = bot.flank, sent = new Set();
+    if (!flank) return sent;
+    for (const soldier of idle) {
+      if (!flank.ids.has(soldier.id)) continue;
+      if (flank.sent.has(soldier.id) || dist(soldier, flank) < 4 || massOf(soldier) !== massOf(flank)) flank.ids.delete(soldier.id);
+      else sent.add(soldier.id);
+    }
+    if (!sent.size) return sent;
+    if (cmd({ type: 'move', ids: [...sent], x: flank.x + 0.5, y: flank.y + 0.5 })) for (const id of sent) flank.sent.add(id);
+    else { for (const id of sent) flank.ids.delete(id); sent.clear(); }
+    return sent;
   }
   function unitsAboard() {
     let count = 0;
@@ -994,9 +1079,18 @@ export function createBot(game, pid, difficulty = 'medium') {
     const key = here.find(e => ((roundId === 'regicide' || roundId === 'kingdoms') && e.type === 'king')
       || (roundId === 'kingdoms' && e.type === 'castle' && e.king) || (roundId === 'wonder' && e.type === 'wonder')
       || vaults.has(e.id));
-    return key || nearestFirst(here.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval), centre)[0]
-      || nearestFirst(here.filter(e => e.kind === 'building'), centre)[0]
-      || nearestFirst(here.filter(e => e.kind === 'unit' && !e.naval), centre)[0];
+    if (key) return key;
+    const soldiers = here.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval);
+    const buildings = here.filter(e => e.kind === 'building'), anyone = here.filter(e => e.kind === 'unit' && !e.naval);
+    const first = STRATEGIES[bot.strategy].first;
+    const order = first === 'economy' // raiders still fight the soldiers that come at them
+      ? [soldiers.filter(e => dist(e, centre) < 7), here.filter(e => e.kind === 'unit' && e.type === 'villager'),
+        buildings.filter(e => ECONOMY.has(e.type)), soldiers]
+      : first === 'defences'
+        ? [buildings.filter(e => e.type === 'tower' && e.constructed), buildings.filter(e => BUILDINGS[e.type]?.trains), soldiers]
+        : [soldiers];
+    for (const list of [...order, buildings, anyone]) if (list.length) return nearestFirst(list, centre)[0];
+    return undefined;
   }
   // Siege goes for the defences first: a siege unit with no attack order of its own takes the finished enemy tower
   // nearest it on its land that we can see. Returns the ids of the siege units sent.

@@ -45,6 +45,12 @@ The difficulty sets the opponent for each of your five rounds:
 Relaxed opponents work at half your speed and wait 30 minutes, and until the Bronze Age, before attacking.
 Easy opponents keep a smaller army than medium and hard ones, but put their economy into reaching the next age and
 quickly replace lost villagers.
+Medium and hard opponents change their attack plan from one wave to the next, so no single defence answers them all:
+a **raid** (an early, smaller party that goes for your villagers and the buildings they work from, fights off the
+soldiers that come at it, and pulls back home once it stops getting kills or loses half its men, while the soldiers
+trained meanwhile stay home on guard), a **siege** (a bigger, later wave that knocks down your Towers first, then the
+buildings that train units), a **pincer** (half the army swings round the side of your base and comes in from there)
+or a straight **assault** on your army. The plan is never the same twice in a row, and differs from match to match.
 
 ![Round 1 bracket: the rules, time limit and map, you against Ramses, the other first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
