@@ -4,7 +4,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
 import { TECHS } from '../data/techs.js';
 import { canPlace, canAfford, canRepair, ageUpProblem, ageUpNeed, ageBuildings } from '../sim/commands.js';
-import { RES_KIND, WATER, centerOf, distPoint, flood4, landMasses } from '../sim/util.js';
+import { RES_KIND, WATER, centerOf, distPoint, flood4, landMasses, passable } from '../sim/util.js';
 import { canHit } from '../sim/orders.js';
 import { nearestOpen } from '../sim/formation.js';
 import { parseTimeLimit } from '../time-limit.js';
@@ -127,6 +127,27 @@ function reachableFrom(map, start) {
     return true;
   });
   return seen;
+}
+// Water a Dock is worth building on: per tile, 1 when it is part of a body of navigable water (deep water and shallows,
+// 4-neighbour) of at least OPEN_WATER tiles. The river, the home bays and the sea all qualify; a pond (a few dozen tiles)
+// has no fish, nowhere to sail and nothing to defend, so a Dock there is wasted wood.
+export const OPEN_WATER = 200;
+export function bigWater(map) {
+  const n = map.size, body = new Int32Array(n * n).fill(-1), sizes = [];
+  for (let start = 0; start < n * n; start++) {
+    if (body[start] >= 0 || !passable(map.tiles[start], true)) continue;
+    const id = sizes.length;
+    let count = 1;
+    body[start] = id;
+    flood4(n, start, j => {
+      if (body[j] >= 0 || !passable(map.tiles[j], true)) return false;
+      body[j] = id;
+      count++;
+      return true;
+    });
+    sizes.push(count);
+  }
+  return Uint8Array.from(body, id => id >= 0 && sizes[id] >= OPEN_WATER ? 1 : 0);
 }
 // Nearest tile (by square rings) in the reachable set.
 function nearestReachable(map, reach, point) {
@@ -396,7 +417,9 @@ export function createBot(game, pid, difficulty = 'medium') {
     const visible = game.visibleEntities(pid);
     const enemies = visible.filter(e => (game.players.length === 2 ? e.owner === enemyPid
       : e.owner != null && e.owner !== pid && !game.players[e.owner].defeated) && (e.kind === 'unit' || e.kind === 'building'));
+    dangers = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval);
 
+    flee(vills, home);
     trainVillagers(tc, vills, done);
     buildHouses(buildings, vills, home, roundId);
     const free = vills.filter(v => v.order.type !== 'build');
@@ -412,14 +435,37 @@ export function createBot(game, pid, difficulty = 'medium') {
     if (!bot.saving) research(done);
     buildWonder(buildings, vills, free, home, roundId);
 
-    const idle = vills.filter(v => v.order.type === 'idle');
+    const idle = vills.filter(v => v.order.type === 'idle' && !hiding(v));
     if (idle.length) assign(idle, vills, home, done);
     rebalanceForAgeUp(vills, home, done);
 
-    trainArmy(army, ships, vills, done, enemies, roundId);
-    orderArmy(army, enemies, home, roundId);
+    trainArmy(army, ships, vills, tc, done, enemies, roundId);
+    orderArmy(army, enemies, home, roundId, buildings, vills);
     navy(ships, done, buildings, free, enemies, home, roundId, army);
   }
+
+  // ---- staying alive ----
+  // Enemy soldiers we can see (not ships, not the King): what villagers run from and the army turns on. Set every think.
+  let dangers = [];
+  const fled = new Map(); // villager id -> tick it last ran from an enemy soldier
+  const dangerNear = (point, range) => dangers.some(e => dist(e, point) < range && sameLand(e, point));
+  // Villagers out at work with an enemy soldier within 5 tiles run home, where the towers and the army are (one group
+  // move). Builders of a tower stay. While the soldier is still about they are left out of the work rota (hiding).
+  function flee(vills, home) {
+    if (!dangers.length) return;
+    const ids = [];
+    for (const villager of vills) {
+      if (dist(villager, home) <= 6 || !dangerNear(villager, 5)) continue;
+      if (villager.order.type === 'move' && game.time - (fled.get(villager.id) ?? -Infinity) < 200) continue;
+      const job = villager.order.type === 'build' ? game.entities.get(villager.order.target) : null;
+      if (job?.type === 'tower') continue;
+      fled.set(villager.id, game.time);
+      ids.push(villager.id);
+    }
+    if (ids.length) cmd({ type: 'move', ids, x: home.x, y: home.y });
+  }
+  // A villager that ran in the last 30 s and still has an enemy soldier within 10 tiles waits before going back to work.
+  const hiding = villager => game.time - (fled.get(villager.id) ?? -Infinity) < 600 && dangerNear(villager, 10);
 
   // ---- economy and buildings ----
   function trainVillagers(tc, vills, done) {
@@ -539,7 +585,7 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
 
   // ---- military production ----
-  function trainArmy(army, ships, vills, done, enemies, roundId) {
+  function trainArmy(army, ships, vills, tc, done, enemies, roundId) {
     // Across the sea nobody can land before they have a Transport Ship: until ours is out, keep a small home guard and
     // put the rest into reaching the Dock's age (a full army would only wait on the beach).
     const roundCap = roundId === 'deathmatch' ? settings.dmArmy : settings.army;
@@ -547,8 +593,14 @@ export function createBot(game, pid, difficulty = 'medium') {
     const armyCount = army.length + queuedUnits(done, unit => UNITS[unit].cls !== 'civ' && !UNITS[unit].naval);
     if (bot.saving || armyCount >= armyCap) return;
     if (!(vills.length >= settings.villagers * 0.6 || roundId === 'deathmatch' || roundId === 'wonder')) return;
+    // Villagers lost (killed, or never trained for want of room): soldiers leave the last few places for their
+    // replacements (every place they need once Houses can add no more), so a full army never stops the Town Center
+    // putting the economy back.
+    const missing = Math.max(0, tc ? villagerTarget() - vills.length - queuedOfType(done, 'villager') : 0);
+    const room = me.popCap - (me.popCap >= popLimit(me.age) ? missing : Math.min(3, missing));
     const enemyClass = dominantEnemyClass(enemies); // counter-pick against what we can see
     for (const { building, unit } of productionPicks(done, enemyClass, roundId)) {
+      if (me.pop >= room) break;
       if (shouldTrain(unit, army, done, armyCount, armyCap)) cmd({ type: 'train', buildingId: building.id, unit });
     }
   }
@@ -594,15 +646,16 @@ export function createBot(game, pid, difficulty = 'medium') {
 
   // ---- the navy: a Dock in the home bay, Fishing Ships, and a small fleet that patrols to the enemy's bay ----
   // Dock spots, nearest home first: every 3x3 block of deep water against the shore, beside ground we can walk to from our
-  // start, on our side of the map and within 30 tiles of it. Fixed terrain, so worked out once; canPlace is checked when used.
+  // start, on our side of the map and within 30 tiles of it, on open water (not a pond: see bigWater). Fixed terrain, so
+  // worked out once; canPlace is checked when used.
   let dockSpots = null;
   const isWater = (x, y) => map.tiles[y * mapSize + x] === WATER;
   const isReachable = (x, y) => !!reach[y * mapSize + x];
   function findDockSpots() {
-    const own = map.starts[pid], spots = [];
+    const own = map.starts[pid], spots = [], open = bigWater(map);
     for (let y = 1; y < mapSize - 4; y++) for (let x = 1; x < mapSize - 4; x++) {
       const centre = { x: x + 1.5, y: y + 1.5 }, d = dist(centre, own);
-      if (d > 30 || d >= dist(centre, enemyStart)) continue;
+      if (d > 30 || d >= dist(centre, enemyStart) || !open[(y + 1) * mapSize + x + 1]) continue;
       if (isWaterBlock(x, y) && isShore(x, y)) spots.push({ x, y, d });
     }
     return spots.sort((a, b) => a.d - b.d);
@@ -860,7 +913,8 @@ export function createBot(game, pid, difficulty = 'medium') {
   function assign(idle, vills, home, done, force) {
     const gatherers = { food: 0, wood: 0, gold: 0, stone: 0 };
     for (const v of vills) if (v.order.type === 'gather') gatherers[v.order.kind]++;
-    const known = game.knownResources(pid).filter(r => sameLand(r, home)); // nothing across the sea
+    // nothing across the sea, nor where enemy soldiers are
+    const known = game.knownResources(pid).filter(r => sameLand(r, home) && !dangerNear(r, 7));
     const shares = vills.length < 12 || ageIndex(me.age) === 0 ? EARLY_SHARE : SHARE;
     const total = vills.length || 1;
     for (const villager of idle) {
@@ -942,17 +996,16 @@ export function createBot(game, pid, difficulty = 'medium') {
   }
 
   // ---- military orders ----
-  function orderArmy(army, enemies, home, roundId) {
+  function orderArmy(army, enemies, home, roundId, buildings, vills) {
     if (!army.length) return;
-    const idle = army.filter(u => u.order.type === 'idle'); // taken before the relic runners get their orders
+    let idle = army.filter(u => u.order.type === 'idle'); // taken before the relic runners get their orders
     if (roundId === 'relics') sendRelicRunners(army);
-    if (defendHome(idle, enemies, home)) return;
-    if (!updateWave(army, roundId, home)) return;
+    const defending = defendHome(army, idle, home, buildings, vills);
+    if (defending) idle = idle.filter(u => !defending.has(u.id));
+    if (!updateWave(army, roundId, home, !!defending)) return;
     const party = bot.party ? army.filter(u => bot.party.has(u.id)) : army, out = party.length ? party : army;
-    const centre = {
-      x: out.reduce((sum, u) => sum + u.x, 0) / out.length,
-      y: out.reduce((sum, u) => sum + u.y, 0) / out.length,
-    };
+    const centre = centreOf(out);
+    if (bot.march && marching(out, enemies, centre)) return;
     const targetFor = waveTargets(enemies, roundId, centre);
     const onTower = siegeOnTowers(out, enemies);
     const flanking = flankMoves(idle);
@@ -980,19 +1033,88 @@ export function createBot(game, pid, difficulty = 'medium') {
       }
     }
   }
-  // Enemy soldiers within 14 tiles of home on our land (ships are the towers' and the fleet's): idle soldiers on the
-  // nearest one's land attack it. True when there was a threat.
-  function defendHome(idle, enemies, home) {
-    const threats = enemies.filter(e => e.kind === 'unit' && e.cls !== 'civ' && !e.naval
-      && dist(e, home) < 14 && sameLand(e, home));
-    if (!threats.length) return false;
-    const threat = nearestFirst(threats, home)[0];
-    for (const soldier of idle) if (sameLand(soldier, threat)) cmd({ type: 'attack', ids: [soldier.id], targetId: threat.id });
+  const centreOf = units => ({
+    x: units.reduce((sum, u) => sum + u.x, 0) / units.length,
+    y: units.reduce((sum, u) => sum + u.y, 0) / units.length,
+  });
+  // Enemy soldiers on our land within 14 tiles of home, or within 7 of one of our buildings or villagers (ships are the
+  // towers' and the fleet's). The soldiers who are home (idle ones not out on a wave, within 25 tiles of home) take on
+  // the threat nearest each of them. A big attack (as many soldiers as our wave has left, and at least 4) calls the wave
+  // home to fight: we keep the base before we take theirs. Returns the ids sent, or null when nothing threatens us.
+  function defendHome(army, idle, home, buildings, vills) {
+    const ours = [...buildings.map(centerOf), ...vills];
+    const threats = dangers.filter(e => sameLand(e, home)
+      && (dist(e, home) < 14 || ours.some(o => dist(e, o) < 7)));
+    if (!threats.length) return null;
+    const out = bot.waveActive ? (bot.party ? army.filter(u => bot.party.has(u.id)) : army) : [];
+    const away = out.filter(u => dist(u, home) >= 25);
+    const recall = bot.waveActive && !overSea && away.length && threats.length >= Math.max(4, away.length);
+    if (recall) endWave(home, 1200, false);
+    const defenders = (recall ? army : idle).filter(u => sameLand(u, home) && u.relic === null && u.order.type !== 'relic'
+      && !ferried.has(u.id) && (recall || !bot.waveActive || !out.includes(u) || dist(u, home) < 25));
+    const sent = new Set();
+    for (const soldier of defenders) {
+      const threat = nearestFirst(threats, soldier)[0];
+      if (cmd({ type: 'attack', ids: [soldier.id], targetId: threat.id })) sent.add(soldier.id);
+    }
+    return sent;
+  }
+  // Ends the wave: the soldiers out on it walk home (when `walk`), no new wave for `rest` ticks, and the next plan is drawn.
+  function endWave(home, rest, walk = true) {
+    if (walk) retreat(bot.party ? [...game.units.values()].filter(u => bot.party.has(u.id) && !u.dead) : ownArmy(), home);
+    if (rest) bot.restUntil = Math.max(bot.restUntil, game.time + rest);
+    bot.waveActive = false;
+    bot.flank = null;
+    bot.party = null;
+    bot.march = null;
+    bot.strategy = nextStrategy(bot.strategy);
+  }
+  const ownArmy = () => ownEntities('units').filter(u => u.cls !== 'civ' && u.type !== 'king' && !u.naval);
+  // Before a wave attacks it forms up: first at a rally point a few tiles out from home towards the enemy, then at a
+  // staging point short of the enemy base, each time as one group move, going on when four in five are there (or after a
+  // minute). Running into enemy soldiers or a tower on the way ends the march there and then: they fight.
+  function startMarch(home) {
+    const dx = enemyStart.x - home.x, dy = enemyStart.y - home.y, len = Math.hypot(dx, dy) || 1;
+    const along = k => nearestReachable(map, reach, { x: Math.round(home.x + dx * k / len), y: Math.round(home.y + dy * k / len) });
+    const points = [along(9)];
+    if (len > 40) points.push(along(len - 22));
+    bot.march = { points, stage: -1, since: game.time };
+  }
+  // True while the wave is still forming up (orderArmy gives no attack orders meanwhile).
+  function marching(out, enemies, centre) {
+    const march = bot.march;
+    const contact = enemies.some(e => (e.kind === 'unit' && e.cls !== 'civ' && !e.naval && dist(e, centre) < 10)
+      || (e.type === 'tower' && e.constructed && distPoint(centre.x, centre.y, e) < 11));
+    if (contact) { bot.march = null; return false; }
+    const walkers = out.filter(u => u.relic === null && u.order.type !== 'relic' && !ferried.has(u.id) && massOf(u) === homeMass);
+    const point = march.points[march.stage];
+    const near = Math.max(5, Math.sqrt(walkers.length) + 3);
+    const formed = point && walkers.filter(u => dist(u, point) < near).length >= walkers.length * 0.8;
+    if (march.stage < 0 || formed || game.time - march.since > 1200) {
+      march.stage++;
+      march.since = game.time;
+      const next = march.points[march.stage];
+      if (!next) {
+        bot.march = null;
+        bot.waveSize = out.length; // the army that actually goes in
+        if (STRATEGIES[bot.strategy].flank) startFlank(out);
+        return false;
+      }
+      if (walkers.length) cmd({ type: 'move', ids: walkers.map(u => u.id), x: next.x + 0.5, y: next.y + 0.5 });
+      return true;
+    }
+    // Soldiers who fell idle short of the point (a blocked tile, or a fight they finished) catch up.
+    const late = walkers.filter(u => u.order.type === 'idle' && dist(u, point) >= near);
+    if (late.length) cmd({ type: 'move', ids: late.map(u => u.id), x: point.x + 0.5, y: point.y + 0.5 });
     return true;
   }
-  // Starts a wave once the army is big enough for the plan (and the round's time and our age allow it), ends it when the
-  // army is nearly gone or a raid pulls back, and then picks the next wave's plan. Returns whether a wave is on.
-  function updateWave(army, roundId, home) {
+  // Rough fighting strength of a group: hit points times attack, summed.
+  const power = units => units.reduce((sum, u) => sum + u.hp * Math.max(1, u.atk || 0), 0);
+  // Starts a wave once the army is big enough for the plan (and the round's time and our age allow it, and nobody is
+  // attacking us), ends it when the army is nearly gone, when it is losing (the enemy soldiers around it clearly
+  // stronger, or half of it lost and they at least as many) or a raid pulls back, and then picks the next wave's plan.
+  // Returns whether a wave is on.
+  function updateWave(army, roundId, home, defending) {
     const rush = roundId === 'wonder'; // contest the Wonder while it is being built
     // Death Match: whoever attacks piecemeal loses to defenders, so wait for a big army (bigger for harder bots)
     const base = roundId === 'deathmatch' ? settings.dmWave : settings.wave;
@@ -1001,31 +1123,32 @@ export function createBot(game, pid, difficulty = 'medium') {
     const needWave = rush ? 5 : Math.max(5, sized);
     const needTime = Math.max(settings.grace, rush ? 3600 : roundId === 'deathmatch' ? 9000 : settings.attackAt);
     const ready = game.time >= Math.max(needTime, bot.restUntil) && ageIndex(me.age) >= ageIndex(settings.attackAge);
-    if (!bot.waveActive && ready && army.length >= needWave) {
+    if (!bot.waveActive && ready && !defending && army.length >= needWave) {
       bot.waveActive = true;
       bot.waveAt = game.time;
       bot.waveSize = army.length;
       bot.waves.push(bot.strategy);
-      if (STRATEGIES[bot.strategy].flank && !overSea) startFlank(army);
       if (STRATEGIES[bot.strategy].party && !overSea) bot.party = new Set(army.map(u => u.id));
+      if (!overSea && !rush) startMarch(home); // a pincer's flank splits off once the march is over
+      else if (STRATEGIES[bot.strategy].flank && !overSea) startFlank(army);
     }
     if (me.kills !== bot.kills) { bot.kills = me.kills; bot.killAt = game.time; }
-    const plan = STRATEGIES[bot.strategy], aboard = bot.waveActive ? unitsAboard() : 0;
+    if (!bot.waveActive) return false;
+    const plan = STRATEGIES[bot.strategy], aboard = unitsAboard();
     const out = bot.party ? army.filter(u => bot.party.has(u.id)) : army;
     const stalled = game.time - bot.waveAt >= plan.retreat && game.time - bot.killAt >= 1200;
-    const pullBack = bot.waveActive && plan.retreat && !aboard && !overSea && !rush
-      && (stalled || out.length * 2 < bot.waveSize);
-    if (pullBack) { retreat(out, home); bot.restUntil = game.time + 1200; } // a minute to regroup
-    if (bot.waveActive && (pullBack || army.length + aboard < 3)) { // a wave at sea is still a wave
-      bot.waveActive = false;
-      bot.flank = null;
-      bot.party = null;
-      bot.strategy = nextStrategy(bot.strategy);
-    }
+    const centre = out.length ? centreOf(out) : home;
+    const foes = dangers.filter(e => dist(e, centre) < 12), ours = out.filter(u => dist(u, centre) < 12);
+    const losing = !bot.march && foes.length
+      && (power(foes) > 1.3 * power(ours) || (out.length * 2 < bot.waveSize && foes.length >= out.length));
+    const pullBack = !aboard && !overSea && !rush && (losing || (plan.retreat && (stalled || out.length * 2 < bot.waveSize)));
+    if (pullBack) endWave(home, 1200); // a minute to regroup
+    else if (army.length + aboard < 3) endWave(home, 0, false); // a wave at sea is still a wave
     return bot.waveActive;
   }
   // Everyone on the home land walks back home in one group move (relic carriers keep going).
   function retreat(army, home) {
+    if (!army.length) return;
     const ids = army.filter(u => u.relic === null && u.order.type !== 'relic' && !ferried.has(u.id) && sameLand(u, home)
       && dist(u, home) > 8).map(u => u.id);
     if (ids.length) cmd({ type: 'move', ids, x: home.x, y: home.y });
