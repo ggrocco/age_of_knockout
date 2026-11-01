@@ -1,6 +1,6 @@
 // Installing the game as a Home Screen app, and sizing it right once installed.
 import { INSTALL_GUIDES, guideFor, installGuideHtml } from './install-guide.js';
-import { fullscreenLabel, fullscreenMode, isFullscreen } from './fullscreen.js';
+import { fullscreenLabel, fullscreenMode, isFullscreen, shortViewport } from './fullscreen.js';
 
 // Chrome (Android and desktop) offers its own install prompt through beforeinstallprompt; keep the event so a menu
 // button can show the prompt. Safari and every iPhone browser never fire it: there the guide explains the steps.
@@ -64,17 +64,25 @@ export function openInstallGuide(chosen = guideFor(navigator.userAgent)) {
   dialog.scrollTop = 0;
 }
 
-// iPhone Home Screen apps with a black-translucent status bar get a viewport short by the status bar's height (a
-// WebKit bug), leaving a black strip along the bottom. There, size the app from the screen itself (--app-h).
+// An iPhone Home Screen app installed while the page still asked for a black-translucent status bar keeps that style
+// until it is added again, and iOS 26 gives such an app a viewport short by the status bar's height (WebKit bug
+// 301108): nothing paints below innerHeight, so the bottom of the screen is a dead strip. index.html now asks for an
+// opaque status bar, which avoids the bug; for the old installs, keep every control inside the short viewport and drop
+// the bottom safe-area margin, since that viewport already ends above the home indicator.
 // navigator.standalone exists only on iOS, so Android and desktop keep their normal sizing.
+let insetProbe = null;
 function fitStandalone() {
   if (!navigator.standalone) return;
+  if (!insetProbe) {
+    insetProbe = document.createElement('div');
+    insetProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px)';
+    document.body.append(insetProbe);
+  }
+  const insetTop = parseFloat(getComputedStyle(insetProbe).paddingTop) || 0;
   const { width, height } = screen;
   const portrait = matchMedia('(orientation: portrait)').matches;
   const full = portrait ? Math.max(width, height) : Math.min(width, height);
-  const root = document.documentElement.style;
-  if (full > innerHeight) root.setProperty('--app-h', `${full}px`);
-  else root.removeProperty('--app-h');
+  document.body.classList.toggle('short-viewport', shortViewport({ standalone: true, innerHeight, screenHeight: full, insetTop }));
 }
 fitStandalone();
 window.addEventListener('resize', fitStandalone);
