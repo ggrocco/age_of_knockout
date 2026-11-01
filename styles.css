@@ -276,6 +276,10 @@ body.touch #app { position: fixed; inset: 0; height: 100dvh; touch-action: none;
 body.short-viewport { --sab: 0px; }
 body.touch #viewport { touch-action: none; }
 body.touch #topbar { height: calc(36px + var(--sat)); padding: var(--sat) calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px); gap: 10px; font-size: 14px; }
+/* iOS 26 Safari lays a soft blur-and-dim fade ("scroll edge effect") under the status bar that reaches the first row
+   of counters, unless a fixed bar with a solid background touches the top edge: then it extends that bar's colour
+   into the status bar instead. So on phones the top bar is fixed and opaque (the theme colour), not smoked glass. */
+body.touch #topbar { position: fixed; background: #231a11; -webkit-backdrop-filter: none; backdrop-filter: none; }
 body.touch #topbar .res-group { gap: 4px; }
 body.touch #topbar .res-group .chip { min-width: 0; }
 body.touch #topbar .chip { height: 26px; gap: 4px; padding: 0 8px 0 5px; }
