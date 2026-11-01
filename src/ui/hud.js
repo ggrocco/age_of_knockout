@@ -13,6 +13,7 @@ import { toggleFullscreen } from './fullscreen.js';
 import { onInstallChange, openInstallGuide, promptInstall, screenControlsHtml } from './install.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';
+import { morphHtml } from './morph.js';
 
 const REASONS = {
   defeated: 'Your civilization has been conquered',
@@ -357,7 +358,7 @@ export function createHud(ui) {
     const active = document.activeElement, focusedTip = top.contains(active) && active.matches('[data-tip]');
     const focusSelector = focusedTip ? (active.classList.contains('match-clock') ? '.match-clock' : '.grow') : null;
     const tipWasShown = tipEl.classList.contains('show');
-    top.innerHTML = html;
+    morphHtml(top, html); // in place: the buttons stay the same nodes (see morph.js)
     top._html = html;
     if (!focusSelector) return;
     top.querySelector(focusSelector)?.focus({ preventScroll: true });
@@ -392,7 +393,7 @@ export function createHud(ui) {
     if (ui.touch) document.body.classList.toggle('no-info', !focused);
     const html = (ui.touch && focused ? DESELECT : '') + infoHtml(game, player, selected);
     if (html === infoKey) return;
-    info.innerHTML = html;
+    morphHtml(info, html); // keeps the deselect button the same node while the text changes
     infoKey = html;
   };
 
@@ -492,14 +493,14 @@ export function createHud(ui) {
   const renderCommands = tiles => {
     const structure = tiles.map(entry => entry.key).join('|');
     if (structure !== cmds._struct) {
-      cmds.innerHTML = tiles.map(entry => entry.html).join('');
+      morphHtml(cmds, tiles.map(entry => entry.html).join('')); // tiles in the same place stay the same nodes
       cmds._struct = structure;
     } else {
       for (let i = 0; i < tiles.length; i++) {
         const entry = tiles[i], tileEl = cmds.children[i], small = tileEl.querySelector('small');
         tileEl.classList.toggle('off', entry.off);
         tileEl.setAttribute('aria-disabled', entry.off);
-        if (small.innerHTML !== entry.small) small.innerHTML = entry.small;
+        morphHtml(small, entry.small); // touches only the text and attributes that changed
       }
     }
     if (!tipKey || roundTips.has(tipKey)) return;

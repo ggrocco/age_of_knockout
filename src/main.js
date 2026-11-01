@@ -9,6 +9,7 @@ import { createView } from './render/view.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud, reasonText } from './ui/hud.js';
 import { createInput } from './ui/input.js';
+import { installTapActivation } from './ui/tap.js';
 import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
@@ -120,6 +121,7 @@ const ui = app.ui = {
 };
 window.addEventListener('orientationchange', () => setTimeout(() => app.onResize?.(), 250));
 const hud = createHud(ui), input = createInput(ui);
+installTapActivation();
 ui.toast = hud.toast;
 ui.confirmDelete = hud.confirmDelete;
 ui.quit = () => {
