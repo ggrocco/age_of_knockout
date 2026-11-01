@@ -269,6 +269,9 @@ to the Home Screen on an iPhone, so there it takes the steps below. On Android, 
 when it does, the menus show an **Install app** button that opens it in one tap. Otherwise, **Install as an app** in the
 main menu (on a phone) or the in-game menu opens this same guide, with a tab for each browser.
 
+If you added the game to an iPhone Home Screen before November 2026 and a dark strip runs along the bottom of the
+screen, remove the icon and add it again: iOS keeps the status-bar style an app was installed with.
+
 **iPhone, Safari:** Share, then **Add to Home Screen**, then **Add**.
 
 ![Four steps on an iPhone in Safari: tap Share in the toolbar, tap Add to Home Screen, tap Add, open Knockout from the Home Screen](docs/screenshots/install-iphone-safari.png)

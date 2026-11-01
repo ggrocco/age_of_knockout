@@ -19,6 +19,7 @@ node test/bot-sim.js 12                     # bot-vs-bot termination check (12 s
 node test/bot-sim.js 12 medium,medium islands   # the same on island maps (transports and ferries)
 node test/kingdom-sim.js 12                 # four bots, both map types (optional third arg: rivers or islands)
 node test/era-reach.js 12 deathmatch        # measurement, not a test: how far bots climb the eras
+node test/tools/phone-shots.js              # iPhone screenshots into phone-shots/ (needs npm start; see below)
 docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
 ```
@@ -185,6 +186,11 @@ Shortcuts:
   `const p = __app.match.game.players[0]; p.age = 'future'; p.res = {food: 9999, wood: 9999, gold: 9999, stone: 9999};`
   then use the real UI (train, build, age-up button) and read the HUD.
 - Phone layout: `?touch=1` at 402x874 and 874x402. Touch input needs dispatched `TouchEvent`s.
+- **Check the iPhone layout after every change**, not only phone work (the owner plays on an iPhone from the Home
+  Screen): with the server running, `node test/tools/phone-shots.js` writes four screenshots to `phone-shots/`
+  (Safari portrait, Home Screen portrait, the short iOS 26 Home Screen viewport, landscape) with the iPhone's safe-area
+  insets faked, and exits non-zero on a console error or a control cut off by the screen or the build strip. Open every
+  PNG and look at it; pass a URL as the second argument to shoot another round or state.
 - Whole flow: `?autotour=1` should reach a champion/eliminated screen with no console errors.
 
 ## Deployment

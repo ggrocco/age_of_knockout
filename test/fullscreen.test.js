@@ -1,5 +1,5 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
-import { fullscreenMode, fullscreenLabel, isFullscreen, toggleFullscreen } from '../src/ui/fullscreen.js';
+import { fullscreenMode, fullscreenLabel, isFullscreen, shortViewport, toggleFullscreen } from '../src/ui/fullscreen.js';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148';
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36';
@@ -36,4 +36,12 @@ test('toggleFullscreen enters on the root element and leaves again, tolerating a
   assert.equal(await toggleFullscreen(doc), false);
   doc.documentElement.requestFullscreen = () => Promise.reject(new Error('denied'));
   assert.equal(await toggleFullscreen(doc), false);
+});
+
+test('short viewport: only an iPhone Home Screen app drawn under its status bar yet stopping short of the bottom', () => {
+  const iphone17 = { standalone: true, screenHeight: 874 };
+  assert.equal(shortViewport({ ...iphone17, innerHeight: 812, insetTop: 62 }), true, 'iOS 26 black-translucent bug');
+  assert.equal(shortViewport({ ...iphone17, innerHeight: 874, insetTop: 62 }), false, 'translucent bar, full viewport');
+  assert.equal(shortViewport({ ...iphone17, innerHeight: 812, insetTop: 0 }), false, 'opaque status bar');
+  assert.equal(shortViewport({ ...iphone17, standalone: undefined, innerHeight: 700, insetTop: 62 }), false, 'Safari tab');
 });
