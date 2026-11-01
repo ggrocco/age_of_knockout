@@ -93,7 +93,11 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
   waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Medium and
   hard (`vary` in `DIFF`) give each attack wave one of the `STRATEGIES` (assault, raid, siege, pincer), drawn from the
-  bot's own seeded RNG (never the game's) and never the previous wave's plan; easy and relaxed always assault. Also
+  bot's own seeded RNG (never the game's) and never the previous wave's plan; easy and relaxed always assault. A land
+  wave first marches (`bot.march`: a rally point by home, then a staging point short of the enemy base), ends early
+  when the fight turns against it (`power`), and is recalled by a big attack on home (`defendHome`); villagers flee
+  enemy soldiers (`flee`/`hiding`), and soldiers leave pop room for lost villagers. Docks only go on water bodies of
+  `OPEN_WATER` tiles (`bigWater`), never ponds; `test/bot-survival.test.js` covers all of this. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
   sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
   Center, a Dock with Fishing Ships and a fleet of the newest warship, and Transport Ship ferries (`ferryWork`: attack

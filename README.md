@@ -51,6 +51,11 @@ soldiers that come at it, and pulls back home once it stops getting kills or los
 trained meanwhile stay home on guard), a **siege** (a bigger, later wave that knocks down your Towers first, then the
 buildings that train units), a **pincer** (half the army swings round the side of your base and comes in from there)
 or a straight **assault** on your army. The plan is never the same twice in a row, and differs from match to match.
+Whatever the plan, a wave forms up first: the army gathers just outside its base, walks out as one group and gathers
+again short of yours before it attacks, so it arrives together instead of one soldier at a time. It never sets out while
+its own base is under attack, pulls back home when the fight around it turns clearly against it, and is called home
+when a big attack hits its base. Its villagers run home from your soldiers and stay off that work while they are about,
+and any villager you kill is trained again: near the population limit its soldiers leave the room for them.
 
 ![Round 1 bracket: the rules, time limit and map, you against Ramses, the other first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
@@ -142,7 +147,9 @@ The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +
 +20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
 foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster; the station also trains the Armored Train),
 Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks, Armored Trains and siege +30 HP). The Airfield also trains the Combat Drone once you reach AI Future. Farms, Mines,
-Docks, Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
+Docks, Towers, Walls and the Wonder never count. On a phone, selecting the Town Center lists the buildings that still
+count towards the next era, with a tick on those already finished, and the Advance tile shows how many are still
+missing. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
 catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers, the King and ships keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
@@ -196,7 +203,7 @@ fleets can meet:
 
 A ship can hit anything within its range of the water, ships first; soldiers on the bank can only hit a ship with ranged
 attacks, but a ship in the shallows can be attacked by anyone, and Towers shoot ships too. Ships alone don't keep a
-beaten side in the game (a Dock does). The opponent builds a Dock in its bay, fishes from the Medieval Age, and keeps a
+beaten side in the game (a Dock does). The opponent builds a Dock in its bay (never on a pond: only on water of 200 tiles or more), fishes from the Medieval Age, and keeps a
 small fleet that answers yours and patrols to your bay during its attacks.
 
 **Transport Ships.** Right-click your Transport Ship with soldiers or villagers selected (tap it on a phone) and they

@@ -491,9 +491,11 @@ test('a siege wave waits for a bigger army and knocks down the towers first; an 
   assert.equal(siege.target?.type, 'tower');
   assert.equal(assault.target?.type, 'clubman');
 });
-test('a pincer sends half the army round the side of the enemy base', () => {
-  const { g, b, size } = waveWith('pincer');
-  const flank = b.flank, enemy = g.map.starts[0], home = g.map.starts[1];
+test('a pincer forms up, then sends half the army round the side of the enemy base', () => {
+  const { g, b, ev, soldiers } = waveWith('pincer');
+  assert.ok(b.march && !b.flank, 'the whole army marches together first');
+  while (b.march && g.time - b.waveAt < 4000) { g.tick(); if (g.time % ev === 3 % ev) b.think(); }
+  const size = soldiers().filter(u => u.cls !== 'siege').length, flank = b.flank, enemy = g.map.starts[0], home = g.map.starts[1];
   assert.ok(flank && flank.ids.size === Math.floor(size / 2), `half of ${size} on the flank: ${flank?.ids.size}`);
   // The flank point sits off the straight line between the bases.
   const lx = enemy.x - home.x, ly = enemy.y - home.y, off = Math.abs(lx * (flank.y - home.y) - ly * (flank.x - home.x)) / Math.hypot(lx, ly);

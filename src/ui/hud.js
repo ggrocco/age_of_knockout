@@ -2,7 +2,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
-import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
+import { canAfford, ageUpProblem, ageUpNeed, ageGateStatus, popFullReason } from '../sim/commands.js';
 import { ROUNDS, KINGDOMS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { kingdomStandingsHtml } from './kingdoms.js';
 import { TEAMS } from '../data/teams.js';
@@ -113,7 +113,19 @@ const needsRepair = (entity) => entity.kind === 'building' && entity.owner === 0
   && !entity.gatherType && entity.hp < entity.maxHp;
 
 // The info panel for one entity, selected or inspected.
-function describe(entity, player, touch) {
+// Phones have no tooltips, so the Town Center lists which current-Age buildings advancing still needs (finished ones
+// ticked), as "Build 2 of: Barracks ✓ · Granary · ...". Empty once enough are finished or while advancing.
+function ageGatesHtml(game, player) {
+  const need = ageUpNeed(player.age);
+  if (!need || player.ageUp) return '';
+  const gates = ageGateStatus(game, 0), done = gates.filter(gate => gate.done).length;
+  if (done >= need) return '';
+  const names = gates.map(gate => gate.done
+    ? `<span class="win">${BUILDINGS[gate.type].name} &#10003;</span>` : BUILDINGS[gate.type].name);
+  return `<br><span class="age-gates">Build ${need} of (${done}/${need}): ${names.join(' &middot; ')}</span>`;
+}
+
+function describe(entity, player, touch, game) {
   const enemyTag = entity.owner != null && entity.owner !== 0 ? ` <small class="lose">(${TEAMS[entity.owner].name})</small>` : '';
   let html = `<h3>${nameOf(entity)}${enemyTag}</h3>` + hpBar(entity) + `HP ${Math.ceil(entity.hp)}/${entity.maxHp}`;
   if (entity.kind === 'unit') html += unitDetails(entity);
@@ -123,7 +135,7 @@ function describe(entity, player, touch) {
   const next = AGES[ageIndex(player.age) + 1];
   if (touch && entity.type === 'town_center' && entity.owner === 0 && entity.constructed && next) {
     const cost = AGE_COST[next].cost;
-    html += `<br>${ageTitle(next)}: ${costHtml(cost, shortOf(player, cost), true)}`;
+    html += `<br>${ageTitle(next)}: ${costHtml(cost, shortOf(player, cost), true)}` + ageGatesHtml(game, player);
   }
   return html;
 }
@@ -365,9 +377,9 @@ export function createHud(ui) {
     + ' wheel zooms. Esc pauses.</small>';
   const infoHtml = (game, player, selected) => {
     const round = game.rules, inspected = ui.inspect && game.entities.get(ui.inspect.id);
-    if (selected.length === 1) return describe(selected[0], player, ui.touch);
+    if (selected.length === 1) return describe(selected[0], player, ui.touch, game);
     if (selected.length) return selectionSummary(selected);
-    if (inspected) return describe(inspected, player, ui.touch);
+    if (inspected) return describe(inspected, player, ui.touch, game);
     if (ui.inspect && ui.inspect.kind === 'resource') return `<h3>${ui.inspect.type}</h3>`;
     return `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}` + DESKTOP_HELP;
   };
@@ -391,8 +403,10 @@ export function createHud(ui) {
   const commandKey = (player, ferry, deletable, hasVillagers, building) => {
     const researchLeft = building && building.research ? 'R' + secondsLeft(building.research.remaining, building) : '';
     const queue = building ? building.id + ':' + building.queue.length : '';
+    // The Town Center's Advance tile also changes as the current Age's gate buildings are finished.
+    const gates = building?.type === 'town_center' ? 'G' + ageGateStatus(ui.game, 0).filter(gate => gate.done).length : '';
     return `${ferry ? 'U' + ferry.id + ':' + ferry.cargo.length : ''}`
-      + `${deletable ? 'D' + deletable.id : ''}${hasVillagers ? 'V' : ''}${queue}`
+      + `${deletable ? 'D' + deletable.id : ''}${hasVillagers ? 'V' : ''}${queue}${gates}`
       + `${researchLeft}${player.techs.size}${player.age}${player.ageUp ? 'a' : ''}`
       + `${RES.map(resource => Math.floor(player.res[resource] / 25)).join(',')}`
       + `${canAfford(player, BUILDINGS.wall.cost) ? 'W' : ''}${player.pop >= player.popCap ? 'P' : ''}${ui.placing || ''}`;
@@ -448,7 +462,9 @@ export function createHud(ui) {
     const next = AGES[ageIndex(player.age) + 1];
     if (!next) return;
     const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
-    const need = why === 'needs buildings' ? ageUpNeed(player.age) : 0;
+    // How many more finished gate buildings advancing needs (not the total), so the tile counts down as they go up.
+    const need = why === 'needs buildings'
+      ? ageUpNeed(player.age) - ageGateStatus(ui.game, 0).filter(gate => gate.done).length : 0;
     const extra = why === 'needs buildings' ? `<span class="c">+${need} bldg${need > 1 ? 's' : ''}</span>` : '';
     tiles.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age',
       ok: !why, short: shortOf(player, cost), notes: why ? [reasonText(why)] : [], extra, extraClass: ' age' }));
