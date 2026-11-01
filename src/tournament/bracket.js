@@ -11,7 +11,7 @@ const BOT_DIFFICULTIES = ['easy', 'medium', 'hard'];
 // Difficulty of the opponent the human faces in each round, per chosen level. 'normal' is the original ramp.
 export const LEVELS = {
   relaxed: ['relaxed', 'relaxed', 'relaxed', 'relaxed', 'relaxed'],
-  normal: ['easy', 'easy', 'medium', 'medium', 'hard'],
+  normal: ['easy', 'easy', 'easy', 'easy', 'medium'],
   hard: ['medium', 'medium', 'hard', 'hard', 'hard'],
 };
 export const LEVEL_NAME = { relaxed: 'Relaxed', normal: 'Normal', hard: 'Hard' };

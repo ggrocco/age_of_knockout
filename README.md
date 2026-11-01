@@ -39,7 +39,7 @@ The difficulty sets the opponent for each of your five rounds:
 | Level | Round 1 | Round 2 | Round 3 | Round 4 | Round 5 |
 | --- | --- | --- | --- | --- | --- |
 | Relaxed | relaxed | relaxed | relaxed | relaxed | relaxed |
-| Normal | easy | easy | medium | medium | hard |
+| Normal | easy | easy | easy | easy | medium |
 | Hard | medium | medium | hard | hard | hard |
 
 Relaxed opponents work at half your speed and wait 30 minutes, and until the Bronze Age, before attacking.
