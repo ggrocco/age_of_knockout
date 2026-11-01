@@ -6,7 +6,7 @@ import globals from 'globals';
 const headless = ['src/sim/**', 'src/ai/**', 'src/rounds/**', 'src/data/**', 'src/tournament/**', 'src/gallery/rows.js'];
 
 export default [
-  { ignores: ['node_modules/', 'reports/', 'shots/', '_site/'] },
+  { ignores: ['node_modules/', 'reports/', 'shots/', '_site/', 'phone-shots/'] },
   js.configs.recommended,
   {
     languageOptions: { ecmaVersion: 2024, sourceType: 'module' },

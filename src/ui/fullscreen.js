@@ -33,3 +33,9 @@ export async function toggleFullscreen(doc = globalThis.document) {
 
 // The full-screen button's label.
 export const fullscreenLabel = on => on ? 'Exit full screen' : 'Play full screen';
+
+// The iOS 26 Home Screen bug: under a black-translucent status bar the page is drawn under the status bar (a top
+// inset) yet the viewport stops short of the screen's bottom edge by about that inset. An opaque status bar has no top
+// inset and a viewport that is honestly shorter than the screen, so it never matches.
+export const shortViewport = ({ standalone, innerHeight, screenHeight, insetTop }) =>
+  !!standalone && insetTop > 0 && innerHeight < screenHeight - 1;
