@@ -8,19 +8,29 @@ import { lineTiles } from '../sim/util.js';
 export const isIdleWorker = unit => unit.owner === 0 && (unit.type === 'villager' || unit.type === 'fishing_ship')
   && unit.order.type === 'idle' && !unit.aboard;
 
-// The ghost line for a wall: ok[i] is canPlace for tiles[i], the per-tile check the wall command uses; a repeated tile is listed
-// (and counted) once. Placement only: stone is not checked here, the command's 'resources' toast covers that. DOM-free.
+// The ghost line for a wall: ok[i] is canPlace for tiles[i], the per-tile check the wall command uses, with the line's earlier
+// placeable tiles already counted as foundations (as the command places them in order, a tile that would close a pocket
+// with them is red); a repeated tile is listed (and counted) once. Placement only: stone is not checked here, the
+// command's 'resources' toast covers that. DOM-free; the game is left as it was.
 export function wallPlan(game, pid, tiles) {
-  const seen = new Set(), uniqueTiles = [], ok = [];
+  const seen = new Set(), uniqueTiles = [], ok = [], held = [], n = game.map.size;
   let count = 0;
-  for (const tile of tiles) {
-    const key = `${tile.x},${tile.y}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const placeable = canPlace(game, pid, 'wall', tile.x, tile.y);
-    if (placeable) count++;
-    uniqueTiles.push(tile);
-    ok.push(placeable);
+  try {
+    for (const tile of tiles) {
+      const key = `${tile.x},${tile.y}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const placeable = canPlace(game, pid, 'wall', tile.x, tile.y);
+      if (placeable) {
+        count++;
+        held.push(tile.y * n + tile.x);
+        game.reserved.add(tile.y * n + tile.x);
+      }
+      uniqueTiles.push(tile);
+      ok.push(placeable);
+    }
+  } finally {
+    for (const i of held) game.reserved.delete(i);
   }
   return { tiles: uniqueTiles, ok, count };
 }

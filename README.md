@@ -163,6 +163,9 @@ every Farm you already have grows to the new size and keeps its share of food le
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
 where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
+Walls may run right up to the map's edge (other buildings keep one tile off it), so a line can close the gap along the
+border. No building or wall may be placed where it would shut in a small pocket of open ground (under 25 tiles), so a
+villager can never get stuck between buildings; the ghost shows such a tile red. A walled base is far bigger than that.
 The opponent puts a short wall line in front of each of its towers, on the side facing you, so attackers walk round it
 under fire or stop to break it; it never walls in its own base, and it rebuilds lost sections. It also repairs damaged
 buildings, finishes foundations its builders left, and rebuilds a lost Town Center.
