@@ -2,7 +2,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
-import { secs, RES_KIND, WATER, passable, landMasses } from './util.js';
+import { secs, RES_KIND, WATER, passable, landMasses, flood4 } from './util.js';
 import { formationSlots, nearestOpen, landingNear } from './formation.js';
 import { isKingdoms, sheltered, eliminateKingdom, updateTerritory } from './kingdoms.js';
 
@@ -38,15 +38,65 @@ function buildOrder(unit, target, queue, type = 'build') {
   return order;
 }
 
+// Buildings keep off the map's outermost row and column, except walls: a wall line has to reach the edge to close a gap
+// there, or units would walk round its end along the border.
 export function canPlace(game, pid, type, x, y) {
   const def = BUILDINGS[type], n = game.map.size, player = game.players[pid];
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-  if (x < 1 || y < 1 || x + def.size > n - 1 || y + def.size > n - 1) return false;
+  const border = def.defence === 'wall' ? 0 : 1;
+  if (x < border || y < border || x + def.size > n - border || y + def.size > n - border) return false;
   const patch = def.ore ? game.patchAt[y * n + x] : 0;
   if (def.ore && !(game.patches.get(patch)?.reserve > 0)) return false;
   if (!footprintFits(game, player, def, x, y, patch)) return false;
   if (def.naval && !atShore(game, x, y, def.size)) return false;
-  return !hasLooseRelic(game, x, y, def.size);
+  if (hasLooseRelic(game, x, y, def.size)) return false;
+  return def.naval || !sealsPocket(game, x, y, def.size);
+}
+
+// Open ground cut off from the rest of the map in a region smaller than this is a pocket: a building may not close one,
+// or a villager standing (or pushed) there is stuck between buildings for good. A walled-in base is far bigger.
+export const POCKET_TILES = 25;
+
+// True when a size x size building at (x, y) would close off a pocket of open land (not water, not occupied, not a wall
+// foundation, which becomes a wall) next to it. The open tiles of the ring round the footprint fall into runs; with one
+// run nothing was split. Otherwise each run touching a side of the footprint (a run of corner tiles alone never touched
+// it, so is no more shut in than before) is flood-filled (4-way: paths never cut corners) until it proves big.
+function sealsPocket(game, x, y, size) {
+  const n = game.map.size, ring = ringTiles(x, y, size);
+  const inside = (i, j) => i >= x && i < x + size && j >= y && j < y + size;
+  const open = ([i, j]) => i >= 0 && j >= 0 && i < n && j < n && !inside(i, j) && game.map.tiles[j * n + i] !== WATER
+    && !game.occAt(i, j) && !game.reserved.has(j * n + i);
+  const corner = ([i, j]) => (i === x - 1 || i === x + size) && (j === y - 1 || j === y + size);
+  const first = ring.findIndex(tile => !open(tile));
+  if (first < 0) return false; // open all round
+  const runs = [];
+  for (let k = 1, run = null; k <= ring.length; k++) { // from just past a closed tile, so no run wraps round the end
+    const tile = ring[(first + k) % ring.length];
+    if (!open(tile)) { run = null; continue; }
+    if (!run) runs.push(run = { start: tile[1] * n + tile[0], side: false });
+    run.side ||= !corner(tile);
+  }
+  if (runs.length < 2) return false;
+  return runs.some(run => {
+    if (!run.side) return false;
+    const seen = new Set([run.start]);
+    flood4(n, run.start, j => {
+      if (seen.size >= POCKET_TILES || seen.has(j) || !open([j % n, (j / n) | 0])) return false;
+      seen.add(j);
+      return true;
+    });
+    return seen.size < POCKET_TILES;
+  });
+}
+
+// The tiles just outside a size x size square at (x, y), in order round it (each 4-adjacent to the next).
+function ringTiles(x, y, size) {
+  const out = [], x0 = x - 1, y0 = y - 1, x1 = x + size, y1 = y + size;
+  for (let i = x0; i < x1; i++) out.push([i, y0]);
+  for (let j = y0; j < y1; j++) out.push([x1, j]);
+  for (let i = x1; i > x0; i--) out.push([i, y1]);
+  for (let j = y1; j > y0; j--) out.push([x0, j]);
+  return out;
 }
 
 // A Mine goes wholly on one patch (`patch`) that still holds ore, a Dock wholly on deep water; everything else only on
