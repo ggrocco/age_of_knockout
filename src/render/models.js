@@ -584,37 +584,72 @@ function berry(variant) {
   }
   return b.geometry();
 }
-// A shoal: silver fish with dark backs just under the surface, a few bubbles, and one leaping.
-function fishShoal(variant) {
-  const random = rng(variant + 91), b = new B();
-  for (let i = 0; i < 7; i++) {
-    const heading = i * 0.9 + random() * 0.6, distance = 0.1 + random() * 0.24;
-    const x = Math.cos(heading) * distance, z = Math.sin(heading) * distance, color = i % 2 ? 0xc4d2da : 0xa9bcc7;
-    b.add(unit.sph, color, x, 0.05, z, 0.06, 0.035, 0.15, 0, heading, 0)
-      .add(unit.sph, 0x41545e, x, 0.075, z, 0.03, 0.015, 0.11, 0, heading, 0)
-      .add(unit.box, color, x - Math.sin(heading) * 0.16, 0.05, z - Math.cos(heading) * 0.16, 0.08, 0.05, 0.02, 0, heading, 0);
+// One fish (head towards +z) at (x, z), turned to `heading`: silver body, dark back, tail fin.
+function addFish(b, x, y, z, heading, size = 1, color = 0xc4d2da) {
+  const back = -0.16 * size;
+  return b.add(unit.sph, color, x, y, z, 0.06 * size, 0.035 * size, 0.15 * size, 0, heading, 0)
+    .add(unit.sph, 0x41545e, x, y + 0.025 * size, z, 0.03 * size, 0.015 * size, 0.11 * size, 0, heading, 0)
+    .add(unit.box, color, x + Math.sin(heading) * back, y, z + Math.cos(heading) * back,
+      0.1 * size, 0.06 * size, 0.02 * size, 0, heading, 0);
+}
+// A ring of fish round the shoal's centre, each nose to tail along the circle, so spinning the ring about its
+// origin (the shader's SPIN, positive `direction` = counter-clockwise from above) swims them forwards.
+function fishRing(count, radius, direction, start) {
+  const b = new B();
+  for (let i = 0; i < count; i++) {
+    const angle = start + i / count * Math.PI * 2;
+    addFish(b, Math.sin(angle) * radius, 0.04, Math.cos(angle) * radius, angle + direction * Math.PI / 2, 1,
+      i % 2 ? 0xc4d2da : 0xa9bcc7);
   }
-  for (let i = 0; i < 4; i++) b.sph(0.025, 0xe8f4f6, (random() - 0.5) * 0.5, 0.05, (random() - 0.5) * 0.5);
-  return b.add(unit.sph, 0xd4e0e6, 0.05, 0.3, -0.05, 0.06, 0.04, 0.15, -0.6, 0.4, 0)
-    .add(unit.sph, 0xe8f4f6, 0.12, 0.05, 0.05, 0.08, 0.02, 0.08);
+  return b.geometry();
+}
+const shoalGeometry = variant => {
+  const random = rng(variant + 91), b = new B();
+  // a dark patch of fish deeper down, seen through the water, and a few bubbles
+  for (let i = 0; i < 5; i++) {
+    b.add(unit.sph, 0x274a4f, (random() - 0.5) * 0.45, -0.03, (random() - 0.5) * 0.45, 0.2, 0.01, 0.2);
+  }
+  for (let i = 0; i < 4; i++) b.sph(0.025, 0xe8f4f6, (random() - 0.5) * 0.5, 0.045, (random() - 0.5) * 0.5);
+  return b.geometry();
+};
+// A leaping fish centred on its own origin (the shader arcs it up and forwards along +z).
+const leaperGeometry = () => addFish(new B(), 0, 0, 0, 0, 1.15, 0xd4e0e6).geometry();
+// A flat full ring lying on the water, radius 0.4 at full spread.
+const rippleGeometry = () => new B()
+  .add(new THREE.TorusGeometry(0.4, 0.025, 4, 28), 0xe8f4f6, 0, 0.04, 0, 1, 1, 1, Math.PI / 2, 0, 0).geometry();
+// A shoal: fish circling just under the surface (two rings, opposite ways), one leaping out now and then with a
+// ripple where it leaves the water and where it lands, and a slow ripple over the shoal. The motion is drawn by the
+// cosmetics shader (anim.fish lists it); without it (headless tests) the parts simply stand still.
+function fishShoal(variant) {
+  const random = rng(variant + 191), shoal = new THREE.Group();
+  const part = (key, build) => { const m = mesh(cached(`r:fish:${key}`, build)); shoal.add(m); return m; };
+  part(`patch:${variant}`, () => shoalGeometry(variant));
+  const outer = part(`outer:${variant % 3}`, () => fishRing(5, 0.32, 1, variant % 3));
+  const inner = part(`inner:${variant % 3}`, () => fishRing(3, 0.15, -1, variant % 3 + 1));
+  const leaper = part('leaper', leaperGeometry), heading = random() * Math.PI * 2;
+  // The leap travels 0.3 either side of the leaper's spot, so it leaves the water at one end and lands at the other.
+  const dx = Math.sin(heading) * 0.3, dz = Math.cos(heading) * 0.3;
+  leaper.position.set(0, 0.03, 0); leaper.rotation.y = heading;
+  const ripples = [part('ripple', rippleGeometry), part('ripple', rippleGeometry), part('ripple', rippleGeometry)];
+  ripples[0].position.set(-dx, 0, -dz); ripples[1].position.set(dx, 0, dz);
+  return { shoal, fish: { rings: [{ p: outer, speed: 0.7 }, { p: inner, speed: -1.1 }], leaper, ripples } };
 }
 function resourceGeometry(type, variant) {
   if (type === 'tree') return tree(variant);
   if (type === 'berry') return berry(variant);
-  if (type === 'fish') return fishShoal(variant).geometry();
   return rockPile(type, variant);
 }
 // One of six shape variants per resource type, turned and sized at random (seeded by the entity id).
 function resourceModel(e) {
   const variant = e.id % 6, root = new THREE.Group(), random = rng(e.id);
-  const geometry = cached(`r:${e.type}:${variant}`, () => resourceGeometry(e.type, variant));
-  const model = mesh(geometry);
+  const shoal = e.type === 'fish' ? fishShoal(variant) : null;
+  const model = shoal ? shoal.shoal : mesh(cached(`r:${e.type}:${variant}`, () => resourceGeometry(e.type, variant)));
   model.rotation.y = random() * 6.28;
   model.userData.baseScale = 0.9 + random() * 0.25;
   root.add(model);
   if (e.type === 'tree') model.rotation.z = (random() - 0.5) * 0.08;
   const shadow = e.type === 'tree' ? 0.5 : e.type === 'fish' ? 0.1 : 0.4;
-  return { root, anim: { type: 'res', mesh: model }, shadow };
+  return { root, anim: { type: 'res', mesh: model, fish: shoal?.fish }, shadow };
 }
 const relicGeometry = () => {
   const b = new B();
