@@ -131,7 +131,9 @@ async function check(browser, label, path, run, contextOptions = {}) {
 }
 
 for (const name of browsers) {
-  const browser = await playwright[name].launch();
+  // CI runners have no GPU, and Firefox's blocklist then refuses WebGL2 ("AllowWebgl2:false"); force its software
+  // WebGL on, as Chromium and WebKit use theirs.
+  const browser = await playwright[name].launch(name === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true } } : {});
   console.log(`${name} ${browser.version()}`);
   for (const [label, path, run, options] of CHECKS) await check(browser, label, path, run, options);
   await browser.close();
