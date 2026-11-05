@@ -21,6 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     # a hung step must not hold the Pages deploy queue for the 6-hour default
     timeout-minutes: 30
+    # Microsoft's Playwright image already holds the three browsers and every system library they need, so nothing
+    # is fetched from the runner's apt mirror (which has crawled at ~30 KB/s, 114 MB, for up to an hour). Its tag must
+    # match the exact "playwright" version in package.json. --user 1001 is the runner's own user (checkout and npm write
+    # the workspace as it); --ipc=host as Playwright recommends for Chromium.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001 --ipc=host
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -32,8 +39,6 @@ jobs:
       # The same files as the Dockerfile's nginx stage, game files under v/<content hash>/ (see the script)
       - run: bash scripts/build-site.sh _site
       # Never deploy a site that does not start: the browser smoke test CI runs on pull requests, on these files
-      # Playwright's browsers and Mesa's software GL, with time limits and retries against a slow apt mirror
-      - run: bash scripts/install-browsers.sh
       - run: xvfb-run -a node test/tools/browser-smoke.js _site
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
