@@ -261,7 +261,18 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const viewportEl = document.getElementById('viewport');
   viewportEl.innerHTML = '';
-  const view = createView(viewportEl, game);
+  let view;
+  try {
+    view = createView(viewportEl, game);
+  } catch (error) {
+    // Without WebGL (hardware acceleration off, GPU blocklisted, a privacy setting) three.js throws here; say so
+    // instead of leaving the player on a screen whose button seems to do nothing.
+    console.error('Could not start the 3D view', error);
+    document.body.classList.remove('ingame');
+    viewportEl.innerHTML = '';
+    showWebglError();
+    return;
+  }
   view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) {
     gpuWarned = true;
@@ -414,6 +425,13 @@ function showProgress(done, total) {
   if (text) text.textContent = `${done} / ${total} matches`;
 }
 // The bracket is untouched until every match has a result, so the same round can be simulated again.
+function showWebglError() {
+  show('<div class="card"><h2>3D graphics are unavailable</h2><p>Your browser could not start WebGL, which the game'
+    + ' needs to draw the map. Turn on hardware acceleration (graphics acceleration) in the browser settings, update'
+    + ' the browser, or check that WebGL is not blocked by a privacy setting or extension, then reload the page.</p>'
+    + '<button class="btn" id="webgl-back">Back to menu</button></div>');
+  document.getElementById('webgl-back').onclick = menu;
+}
 function showSimulationError(error, won) {
   console.error('Bracket simulation failed', error);
   show('<div class="card"><h2>Unable to finish the bracket</h2><p>The other matches of this round could not be simulated.'
