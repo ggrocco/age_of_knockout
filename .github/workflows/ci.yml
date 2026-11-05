@@ -41,9 +41,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
-      # Mesa's software OpenGL, for Firefox's WebGL in the virtual X display below
-      - run: sudo apt-get install -y --no-install-recommends libgl1-mesa-dri libegl-mesa0 libglx-mesa0
+      # Playwright's browsers and Mesa's software GL, with time limits and retries against a slow apt mirror
+      - run: bash scripts/install-browsers.sh
       - run: bash scripts/build-site.sh _site
       - run: xvfb-run -a node test/tools/browser-smoke.js _site
         env:
