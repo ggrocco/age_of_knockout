@@ -9,7 +9,7 @@ import { TEAMS } from '../data/teams.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
 import { HUD_ICONS } from './icons.js';
-import { toggleFullscreen } from './fullscreen.js';
+import { toggleFullscreen } from './screen-mode.js';
 import { onInstallChange, openInstallGuide, promptInstall, screenControlsHtml } from './install.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';

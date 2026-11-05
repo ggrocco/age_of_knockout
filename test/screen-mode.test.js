@@ -1,5 +1,5 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
-import { fullscreenMode, fullscreenLabel, isFullscreen, shortViewport, toggleFullscreen } from '../src/ui/fullscreen.js';
+import { fullscreenMode, fullscreenLabel, isFullscreen, shortViewport, toggleFullscreen } from '../src/ui/screen-mode.js';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148';
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36';

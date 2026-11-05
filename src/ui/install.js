@@ -1,6 +1,6 @@
 // Installing the game as a Home Screen app, and sizing it right once installed.
 import { INSTALL_GUIDES, guideFor, installGuideHtml } from './install-guide.js';
-import { fullscreenLabel, fullscreenMode, isFullscreen, shortViewport } from './fullscreen.js';
+import { fullscreenLabel, fullscreenMode, isFullscreen, shortViewport } from './screen-mode.js';
 
 // Chrome (Android and desktop) offers its own install prompt through beforeinstallprompt; keep the event so a menu
 // button can show the prompt. Safari and every iPhone browser never fire it: there the guide explains the steps.
