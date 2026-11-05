@@ -131,9 +131,12 @@ async function check(browser, label, path, run, contextOptions = {}) {
 }
 
 for (const name of browsers) {
-  // CI runners have no GPU, and Firefox's blocklist then refuses WebGL2 ("AllowWebgl2:false"); force its software
-  // WebGL on, as Chromium and WebKit use theirs.
-  const browser = await playwright[name].launch(name === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true } } : {});
+  // Headless Firefox on a GPU-less Linux runner finds no GL driver at all, so with an X display (CI runs this under
+  // xvfb-run) it opens a real window and draws through Mesa's software OpenGL; webgl.force-enabled gets it past the
+  // blocklist, which refuses WebGL2 on such a driver. Chromium and WebKit bring their own software renderers.
+  const firefox = name === 'firefox';
+  const browser = await playwright[name].launch(firefox
+    ? { headless: !process.env.DISPLAY, firefoxUserPrefs: { 'webgl.force-enabled': true } } : {});
   console.log(`${name} ${browser.version()}`);
   for (const [label, path, run, options] of CHECKS) await check(browser, label, path, run, options);
   await browser.close();
