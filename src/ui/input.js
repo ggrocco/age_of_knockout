@@ -48,6 +48,21 @@ export function requestBuildingDeletion(ui, id) {
   });
 }
 
+// How far (in tiles) from where the player clicks water a shoal still counts as clicked: shoals are small, and a
+// Fishing Ship sent just beside one should fish it, not park next to it.
+export const FISH_SNAP = 1.6;
+// The nearest known, unfished-out shoal within FISH_SNAP of a ground point, or null. DOM-free.
+export function fishNear(game, point, playerId = 0, radius = FISH_SNAP) {
+  if (!point) return null;
+  let best = null, bestDistance = radius;
+  for (const resource of game.knownResources(playerId)) {
+    if (resource.type !== 'fish' || !(resource.amount > 0)) continue;
+    const distance = Math.hypot(resource.x - point.x, resource.y - point.y);
+    if (distance <= bestDistance) { best = resource; bestDistance = distance; }
+  }
+  return best;
+}
+
 // Own, finished and damaged: villagers ordered onto it repair it (a Farm or Mine is gathered from instead).
 const repairable = target => target && target.kind === 'building' && target.owner === 0 && target.constructed
   && !target.gatherType && target.hp < target.maxHp;
@@ -69,6 +84,10 @@ export function createInput(ui) {
     return entity.type === 'villager' || UNITS[entity.type].capacity;
   };
   const isLoadedTransport = id => game().entities.get(id).cargo?.length;
+  const fishes = id => {
+    const entity = game().entities.get(id);
+    return entity.naval && UNITS[entity.type].capacity;
+  };
   const selectedUnitIds = () => [...ui.sel].filter(id => game().entities.get(id)?.kind === 'unit');
   const selectedVillagerIds = () => selectedUnitIds().filter(isVillager);
   const setSelection = ids => {
@@ -149,6 +168,15 @@ export function createInput(ui) {
   function orderAt(target, ground, ids) {
     const command = target ? contextCommand(target, ids) : null;
     if (command) return ui.cmd(command);
+    // Water clicked near a shoal with Fishing Ships selected: they fish it, the rest of the selection moves there.
+    const fishers = ids.filter(fishes), shoal = fishers.length ? fishNear(game(), ground) : null;
+    if (shoal) {
+      const result = ui.cmd({ type: 'gather', ids: fishers, resourceId: shoal.id });
+      const rest = ids.filter(id => !fishers.includes(id));
+      if (rest.length) ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true });
+      // a copy (commands share one OK object): the marker shows which shoal was picked
+      return result?.ok ? { ...result, markAt: { x: shoal.x, y: shoal.y } } : result;
+    }
     const loaded = ids.filter(isLoadedTransport);
     if (ground && loaded.length && !isDeepWater(ground)) return unloadAt(ground, ids, loaded);
     // Walkers sent to another island are ferried over by the free Transport Ships (commands.js ferryPlan).
@@ -157,8 +185,8 @@ export function createInput(ui) {
   }
   // Orders the selected units at a screen point and drops a marker on the ground when the order took.
   function orderAtPoint(entity, ground, ids) {
-    const result = orderAt(entity, ground, ids);
-    if (result && result.ok && ground) ui.marker(ground.x, ground.y);
+    const result = orderAt(entity, ground, ids), at = result?.markAt ?? ground;
+    if (result && result.ok && at) ui.marker(at.x, at.y);
   }
   function boxSelect(x0, y0, x1, y1, additive) {
     const left = Math.min(x0, x1), right = Math.max(x0, x1), top = Math.min(y0, y1), bottom = Math.max(y0, y1);
@@ -325,8 +353,8 @@ export function createInput(ui) {
     const ids = selectedUnitIds();
     if (!ids.length) return;
     const result = orderAt(ui.view.pickEntity(e.clientX, e.clientY), ui.view.pickGround(e.clientX, e.clientY), ids);
-    const ground = ui.view.pickGround(e.clientX, e.clientY);
-    if (result && result.ok && ground) ui.marker(ground.x, ground.y);
+    const at = result?.markAt ?? ui.view.pickGround(e.clientX, e.clientY);
+    if (result && result.ok && at) ui.marker(at.x, at.y);
   });
   viewportEl.addEventListener('wheel', e => {
     e.preventDefault();

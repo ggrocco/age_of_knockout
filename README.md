@@ -220,7 +220,7 @@ map the opponent ferries its attack waves to your island and sends squads to fet
 
 ### Controls (desktop)
 
-Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic ·
+Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic (with Fishing Ships selected, a right click on the water near a shoal fishes it) ·
 WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager or Fishing Ship, `H` Town Center · hold Space and drag
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
@@ -250,7 +250,7 @@ siege, and villagers at the back.
 <img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with resource chips, population, Age and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
-tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
+tree/mine/farm = gather, fish (or the water within about a tile and a half of a shoal) = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
 Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode. The panel at the bottom
