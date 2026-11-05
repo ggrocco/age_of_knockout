@@ -440,8 +440,9 @@ builds the same image.
 ## Deploy (GitHub Pages)
 
 `.github/workflows/pages.yml` publishes the game to https://ggrocco.github.io/age_of_knockout/ on every push to `main` (or
-by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image and deploys them with
-GitHub's Pages actions. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
+by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image (`scripts/build-site.sh`),
+checks they start in Chromium, Firefox and WebKit (`test/tools/browser-smoke.js`) and deploys them with GitHub's Pages
+actions, so a build that does not start in a browser is never published. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
 or on a plan that allows Pages for private repositories). Pages caches files for 10 minutes, so the workflow serves
 `styles.css` and `src/` from `v/<content hash>/`, as the Docker image does; a new deploy reaches players within
 about 10 minutes and never mixes old and new modules.
@@ -451,6 +452,11 @@ about 10 minutes and never mixes old and new modules.
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`:
 
 - **Tests**: `npm test` and the `test/bot-sim.js 12` bot-vs-bot check.
+- **Browser**: `test/tools/browser-smoke.js` loads the site exactly as Pages serves it (sub-path and all) in Chromium,
+  Firefox and WebKit (Safari's engine). It plays into a tournament round, wins it so the bracket is simulated in the
+  Worker, starts a quick match, Kingdom Conquest, an islands map and the touch layout, opens both design pages, and
+  fails on any console error, uncaught error or missing file. Locally:
+  `bash scripts/build-site.sh _site && node test/tools/browser-smoke.js _site chromium`.
 - **Lint**: `npm run lint` (ESLint, `eslint.config.js`).
 - **Security**: `npm audit` (fails on moderate or worse) and `npm audit signatures`; on pull requests, GitHub's
   dependency review blocks newly added vulnerable dependencies.

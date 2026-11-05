@@ -29,6 +29,26 @@ jobs:
       # 12 seeds x 5 rounds of bot vs bot: every match must end cleanly within its tick cap
       - run: node test/bot-sim.js 12
 
+  browser:
+    # Loads the site exactly as Pages serves it in Chromium, Firefox and WebKit (Safari's engine) and fails on any
+    # console error, missing file, or match / bracket simulation that does not run (test/tools/browser-smoke.js).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      # Mesa's software OpenGL, for Firefox's WebGL in the virtual X display below
+      - run: sudo apt-get install -y --no-install-recommends libgl1-mesa-dri libegl-mesa0 libglx-mesa0
+      - run: bash scripts/build-site.sh _site
+      - run: xvfb-run -a node test/tools/browser-smoke.js _site
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
