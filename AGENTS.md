@@ -220,6 +220,8 @@ smoke test (`browser-smoke.js` on the assembled Pages site in Chromium, Firefox 
 round with the bracket simulated in the Worker, quick match, Kingdom Conquest, islands, touch layout, both design pages,
 and the no-WebGL message; it fails on any console error, uncaught error or missing file), `npm run lint`,
 `npm audit` (fails at moderate or above) with `npm audit signatures`, and on pull requests GitHub's dependency review.
+The `browser` job (and the Pages build job) run in the `mcr.microsoft.com/playwright:v<version>-noble` container, whose
+tag must equal the exact `playwright` version in `package.json`: bump the two together.
 `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) on the JavaScript and the workflows, on the same events
 and weekly. Keep `npm run lint` clean before pushing; the sim/AI/rounds/data/tournament folders are linted without
 browser globals, so a `window` or `document` there is a lint error.
