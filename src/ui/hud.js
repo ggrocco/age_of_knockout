@@ -287,6 +287,11 @@ export function createHud(ui) {
     const clockLabel = round ? (game.capTicks === Infinity ? ' / no time limit' : ' / time limit') : '';
     const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}"></span>`;
     if (ui.spectating) {
+      if (ui.touch) {
+        return '<div class="hud-resources"><span class="hud-spectating">Spectating</span></div>'
+          + '<div class="hud-status"><span class="hud-age">Kingdom Conquest</span>' + clockHtml + '</div>'
+          + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
+      }
       return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
         + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}">${speed}x</button>`).join('')
           + `<button data-pause="1">${ui.paused ? 'Resume' : 'Pause'}</button>`)
@@ -294,10 +299,20 @@ export function createHud(ui) {
     }
     const popTitle = `title="Population (${ageTitle(player.age)} limit ${popLimit(player.age)})"`;
     if (ui.touch) {
-      return resourcesHtml + `<span class="res" ${popTitle}>&#9823;${player.pop}/${player.popCap}</span>`
-        + `<span class="res">${ageLabel(player.age)}${player.ageUp ? '&hellip;' : ''}</span>`
-        + `<span style="flex:1"></span>${clockHtml}`
-        + '<button data-menu="open" aria-label="Menu">&#9776;</button>';
+      const resources = RES.map(resource => {
+        const amount = Math.floor(player.res[resource]);
+        const value = amount >= 1000000 ? (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
+          : amount >= 100000 ? Math.floor(amount / 1000) + 'k'
+            : amount >= 10000 ? (amount / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : amount;
+        return `<span class="res" data-resource="${resource}" title="${capitalize(resource)}: ${amount}" aria-label="${capitalize(resource)}: ${amount}">`
+          + icon(resource) + `<span><small>${capitalize(resource)}</small><b>${value}</b></span></span>`;
+      }).join('');
+      return `<div class="hud-resources" aria-label="Resources">${resources}</div>`
+        + '<div class="hud-status">'
+        + `<span class="hud-age" title="${ageTitle(player.age)}${player.ageUp ? ' (advancing)' : ''}">${ageTitle(player.age)}${player.ageUp ? '&hellip;' : ''}</span>`
+        + `<span class="res hud-pop" ${popTitle} aria-label="Population: ${player.pop} of ${player.popCap}">${icon('villager')}${player.pop}/${player.popCap}</span>`
+        + clockHtml + '</div>'
+        + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
     }
     return resourcesHtml
       + `<span class="res" ${popTitle}>Pop ${player.pop}/${player.popCap}</span>`
