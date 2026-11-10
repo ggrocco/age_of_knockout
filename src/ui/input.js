@@ -120,6 +120,25 @@ export function createInput(ui) {
   const keepPlacing = () => shiftDown && !ui.touch;
 
   // ----- shared logic -----
+  // Let go of villagers after assigning a task, so the next tap cannot redirect them. Shift-placement keeps them
+  // available for the next foundation; failed orders keep the selection so the player can retry.
+  function issueOrder(command, keepSelection = false) {
+    const villagers = (command.ids || []).map(id => game().entities.get(id))
+      .filter(unit => unit?.type === 'villager').map(unit => ({ unit, order: unit.order }));
+    const result = ui.cmd(command);
+    if (result?.ok && !keepSelection) {
+      for (const { unit, order } of villagers) {
+        // Commands assign fresh orders only to their recipients; repeating construct/repair keeps the matching job.
+        const sameJob = order.target === command.targetId && ((command.type === 'construct' && order.type === 'build')
+          || (command.type === 'repair' && order.type === 'repair'));
+        if (unit.order === order && !sameJob) continue;
+        if (!ui.sel.delete(unit.id)) continue;
+        ui.inspect = null;
+        lastClick = { t: 0, id: -1 };
+      }
+    }
+    return result;
+  }
   // Left-click / tap on an own entity: select, double-click selects all of that type on screen.
   function selectOwn(entity, additive) {
     const now = performance.now();
@@ -156,9 +175,9 @@ export function createInput(ui) {
   // Loaded transports sent onto ground land everyone there (the rest of the selection moves as usual).
   function unloadAt(ground, ids, loaded) {
     let result = null;
-    for (const id of loaded) result = ui.cmd({ type: 'unload', transportId: id, x: ground.x, y: ground.y });
+    for (const id of loaded) result = issueOrder({ type: 'unload', transportId: id, x: ground.x, y: ground.y });
     const rest = ids.filter(id => !loaded.includes(id));
-    return rest.length ? ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true }) : result;
+    return rest.length ? issueOrder({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true }) : result;
   }
   const isDeepWater = ground => {
     const map = game().map;
@@ -167,20 +186,20 @@ export function createInput(ui) {
   // Right-click / tap-with-selection: the context order for whatever is under the pointer.
   function orderAt(target, ground, ids) {
     const command = target ? contextCommand(target, ids) : null;
-    if (command) return ui.cmd(command);
+    if (command) return issueOrder(command);
     // Water clicked near a shoal with Fishing Ships selected: they fish it, the rest of the selection moves there.
     const fishers = ids.filter(fishes), shoal = fishers.length ? fishNear(game(), ground) : null;
     if (shoal) {
-      const result = ui.cmd({ type: 'gather', ids: fishers, resourceId: shoal.id });
+      const result = issueOrder({ type: 'gather', ids: fishers, resourceId: shoal.id });
       const rest = ids.filter(id => !fishers.includes(id));
-      if (rest.length) ui.cmd({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true });
+      if (rest.length) issueOrder({ type: 'move', ids: rest, x: ground.x, y: ground.y, ferry: true });
       // a copy (commands share one OK object): the marker shows which shoal was picked
       return result?.ok ? { ...result, markAt: { x: shoal.x, y: shoal.y } } : result;
     }
     const loaded = ids.filter(isLoadedTransport);
     if (ground && loaded.length && !isDeepWater(ground)) return unloadAt(ground, ids, loaded);
     // Walkers sent to another island are ferried over by the free Transport Ships (commands.js ferryPlan).
-    if (ground) return ui.cmd({ type: 'move', ids, x: ground.x, y: ground.y, ferry: true });
+    if (ground) return issueOrder({ type: 'move', ids, x: ground.x, y: ground.y, ferry: true });
     return null;
   }
   // Orders the selected units at a screen point and drops a marker on the ground when the order took.
@@ -204,13 +223,13 @@ export function createInput(ui) {
   }
   function place(tile) {
     if (!tile) return;
-    const result = ui.cmd({ type: 'build', ids: selectedVillagerIds(), building: ui.placing, x: tile.x, y: tile.y });
+    const result = issueOrder({ type: 'build', ids: selectedVillagerIds(), building: ui.placing, x: tile.x, y: tile.y }, keepPlacing());
     if (result.ok && !keepPlacing()) ui.stopPlacing();
   }
   // Issue a wall line from tile `from` to tile `to`; toasts the placed count and stone spent (ui.cmd toasts a failure's reason).
   function placeWall(from, to) {
     const tiles = lineTiles(from, to);
-    const result = ui.cmd({ type: 'wall', ids: selectedVillagerIds(), tiles });
+    const result = issueOrder({ type: 'wall', ids: selectedVillagerIds(), tiles }, keepPlacing());
     if (result.ok) {
       const placed = result.placed < tiles.length ? `${result.placed} of ${tiles.length}` : result.placed;
       const stone = result.placed * BUILDINGS.wall.cost.stone;
@@ -412,7 +431,7 @@ export function createInput(ui) {
     if (e.button === 0) ui.view.centerOn(world.x, world.y);
     else if (e.button === 2) { // right-click on the minimap moves the selected units there (by sea, if need be)
       const ids = selectedUnitIds();
-      if (ids.length) ui.cmd({ type: 'move', ids, x: world.x, y: world.y, ferry: true });
+      if (ids.length) issueOrder({ type: 'move', ids, x: world.x, y: world.y, ferry: true });
     }
   });
   minimapEl.addEventListener('contextmenu', e => e.preventDefault());
