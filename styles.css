@@ -331,7 +331,8 @@ body.touch #toast { bottom: calc(var(--sab) + 110px); font-size: 13px; max-width
 #gamemenu h2 { margin:0; font-size:26px; letter-spacing:.1em; text-transform:uppercase; }
 #gamemenu .menu-status { margin:0 0 12px; font-size:13px; font-style:italic; color:#a9997a; }
 #gamemenu .btn { margin:0; min-height:44px; font-size:16px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-#gamemenu .btn.primary { display:block; width:100%; font-size:18px; color:var(--ink); border-color:#f6e2a8; border-radius:4px; background:linear-gradient(#e6c679,#c49a48 55%,#a37a33); box-shadow:0 3px 12px #0009, inset 0 1px 0 #fff8; }
+#gamemenu .btn.primary { display:flex; align-items:center; justify-content:center; gap:.35em; width:100%; font-size:18px; color:var(--ink); border-color:#f6e2a8; border-radius:4px; background:linear-gradient(#e6c679,#c49a48 55%,#a37a33); box-shadow:0 3px 12px #0009, inset 0 1px 0 #fff8; }
+#gamemenu .btn.primary .ico { width:1em; height:1em; flex:none; }
 #gamemenu .btn.primary:hover { background:linear-gradient(#f6dc9a,#d4a754 55%,#b3873a); }
 #gamemenu .menu-set { margin:16px 0 0; padding:0; border:0; text-align:left; }
 #gamemenu .menu-set legend { padding:0 0 6px; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--bronze); }

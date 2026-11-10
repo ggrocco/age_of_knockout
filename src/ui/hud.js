@@ -584,7 +584,7 @@ export function createHud(ui) {
     const qualities = Object.entries(QUALITY).map(([id, option]) => ['quality', id, option.label, ui.view?.quality === id]);
     const armed = (on, text, armedText) => on ? `<b>${armedText}</b>` : text;
     return '<div class="card"><h2>Menu</h2><p class="menu-status">Game paused</p>'
-      + '<button class="btn primary" data-menu="close">&#9654; Resume game</button>'
+      + `<button class="btn primary" data-menu="close">${icon('play')} Resume game</button>`
       + segHtml('menu-speed', 'Game speed', speeds)
       + segHtml('menu-quality', 'Graphics quality', qualities,
         'High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.')
