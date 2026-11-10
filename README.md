@@ -225,9 +225,10 @@ WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (ba
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
 
-Villagers automatically deselect after a successful order or building placement, so your next click or tap leaves
-them working. Failed orders and villagers that receive no task keep their selection. Hold Shift on desktop to keep villagers selected
-while placing several buildings or wall lines; other unit types stay selected after orders.
+Villagers automatically deselect only after a successful gathering order: food, wood, gold or stone, including
+Farms and Mines. Moving, building, wall placement and other orders keep them selected. Failed orders and villagers
+that receive no task also keep their selection. Hold Shift on desktop to place several buildings or wall lines;
+other unit types stay selected after orders.
 
 **Villagers go back to work.** Order a villager that is gathering or building to build something else and, once the
 new building is done, it returns to what it was doing: the unfinished building first (several interruptions unwind
@@ -255,7 +256,8 @@ siege, and villagers at the back.
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
 tree/mine/farm = gather, fish (or the water within about a tile and a half of a shoal) = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up).
-Villagers deselect after a successful task, leaving the next tap free to select or inspect something else.
+Villagers deselect after a successful food, wood, gold or stone gathering order, leaving the next tap free to select
+or inspect something else. Moving, building and other tasks keep villagers selected.
 One finger drags the map, two fingers pinch-zoom and pan.
 
 Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode. The panel at the bottom

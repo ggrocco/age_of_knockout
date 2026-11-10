@@ -58,9 +58,10 @@ any difference is a behaviour change.
 
 `window.__app` exposes the live app; `window.__app.match.game` is the running sim.
 
-Villagers deselect after successful orders and building/wall placement on desktop and touch, including minimap
-moves. Failed orders and villagers skipped by a partial group order preserve selection; desktop Shift-placement
-keeps villagers selected for further foundations.
+Villagers deselect only after successful gathering orders (food, wood, gold or stone, including Farms and Mines)
+on desktop and touch. Moving (including minimap orders), building/wall placement and all other tasks keep villagers
+selected. Failed orders and villagers skipped by a partial group order preserve selection; desktop Shift-placement
+keeps placement active for further foundations.
 Other unit types stay selected. `issueOrder` inside `src/ui/input.js` applies this input-only selection rule.
 
 Building deletion (Delete tile and Delete/Backspace shortcuts) always opens an explicit Cancel/Delete dialog on

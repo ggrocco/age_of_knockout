@@ -120,18 +120,16 @@ export function createInput(ui) {
   const keepPlacing = () => shiftDown && !ui.touch;
 
   // ----- shared logic -----
-  // Let go of villagers after assigning a task, so the next tap cannot redirect them. Shift-placement keeps them
-  // available for the next foundation; failed orders keep the selection so the player can retry.
-  function issueOrder(command, keepSelection = false) {
+  // Let go of villagers assigned to gather, so the next tap cannot redirect them. Other tasks keep selection.
+  function issueOrder(command) {
+    if (command.type !== 'gather') return ui.cmd(command);
     const villagers = (command.ids || []).map(id => game().entities.get(id))
       .filter(unit => unit?.type === 'villager').map(unit => ({ unit, order: unit.order }));
     const result = ui.cmd(command);
-    if (result?.ok && !keepSelection) {
+    if (result?.ok) {
       for (const { unit, order } of villagers) {
-        // Commands assign fresh orders only to their recipients; repeating construct/repair keeps the matching job.
-        const sameJob = order.target === command.targetId && ((command.type === 'construct' && order.type === 'build')
-          || (command.type === 'repair' && order.type === 'repair'));
-        if (unit.order === order && !sameJob) continue;
+        // Gathering assigns fresh orders only to its recipients; failed or skipped villagers stay selected.
+        if (unit.order === order) continue;
         if (!ui.sel.delete(unit.id)) continue;
         ui.inspect = null;
         lastClick = { t: 0, id: -1 };
@@ -223,13 +221,13 @@ export function createInput(ui) {
   }
   function place(tile) {
     if (!tile) return;
-    const result = issueOrder({ type: 'build', ids: selectedVillagerIds(), building: ui.placing, x: tile.x, y: tile.y }, keepPlacing());
+    const result = issueOrder({ type: 'build', ids: selectedVillagerIds(), building: ui.placing, x: tile.x, y: tile.y });
     if (result.ok && !keepPlacing()) ui.stopPlacing();
   }
   // Issue a wall line from tile `from` to tile `to`; toasts the placed count and stone spent (ui.cmd toasts a failure's reason).
   function placeWall(from, to) {
     const tiles = lineTiles(from, to);
-    const result = issueOrder({ type: 'wall', ids: selectedVillagerIds(), tiles }, keepPlacing());
+    const result = issueOrder({ type: 'wall', ids: selectedVillagerIds(), tiles });
     if (result.ok) {
       const placed = result.placed < tiles.length ? `${result.placed} of ${tiles.length}` : result.placed;
       const stone = result.placed * BUILDINGS.wall.cost.stone;
