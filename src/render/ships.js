@@ -36,10 +36,11 @@ function frigateRigging(b) {
   }
 }
 
+// Native deck tops must sit above their hulls; flush top faces z-fight as the ship rolls.
 const parts = {
   fishing_ship(team) { return eraShipParts('fishing_ship', team, 'stone'); },
   transport_ship(team) { // a broad, deep-bellied cargo cog: a hold amidships, a square team sail, a ramp at the bow
-    const t = TEAM[team], b = hull(new B(), 0.66, 1.6, 0.3, C.wood, t), person = new B();
+    const t = TEAM[team], b = hull(new B(), 0.66, 1.6, 0.28, C.wood, t), person = new B();
     b.box(0.58, 0.02, 1.1, DECK, 0, 0.28, -0.12).box(0.62, 0.22, 0.3, C.woodD, 0, 0.28, -0.62)
       .box(0.64, 0.03, 0.32, t, 0, 0.5, -0.62);
     for (const side of [-1, 1]) b.box(0.03, 0.1, 1.1, C.woodD, side * 0.31, 0.3, -0.12);
@@ -50,7 +51,7 @@ const parts = {
     return { body: b.geometry(), person: person.geometry() };
   },
   war_galley(team) { // a Bronze Age bireme: long low hull, a bronze ram, a painted eye, a square team sail and the stern curl
-    const t = TEAM[team], td = TEAM_DARK[team], b = hull(new B(), 0.5, 1.7, 0.22, HULL, OCHRE), oar = new B();
+    const t = TEAM[team], td = TEAM_DARK[team], b = hull(new B(), 0.5, 1.7, 0.2, HULL, OCHRE), oar = new B();
     b.box(0.42, 0.02, 1.2, DECK, 0, 0.2, -0.18).add(unit.cyl, C.bronze, 0, 0.06, 0.92, 0.05, 0.22, 0.05, HALF_TURN, 0, 0);
     for (const side of [-1, 1]) b.sph(0.035, 0xf2efe6, side * 0.15, 0.17, 0.66).sph(0.018, BLACK, side * 0.165, 0.17, 0.68);
     b.add(unit.tor, HULL, 0, 0.3, -0.78, 0.14, 0.14, 0.14, 0, HALF_TURN, 0);
@@ -61,7 +62,7 @@ const parts = {
     return { body: b.geometry(), oar: oar.geometry() };
   },
   frigate(team) { // an Age of Sail frigate: black hull with an ochre band and gun ports, three masts of square sails, a bowsprit
-    const t = TEAM[team], b = hull(new B(), 0.6, 1.9, 0.34, BLACK, OCHRE), guns = new B();
+    const t = TEAM[team], b = hull(new B(), 0.6, 1.9, 0.32, BLACK, OCHRE), guns = new B();
     b.box(0.52, 0.02, 1.38, DECK, 0, 0.32, -0.2).box(0.56, 0.16, 0.36, BLACK, 0, 0.32, -0.74)
       .box(0.58, 0.03, 0.38, OCHRE, 0, 0.48, -0.74);
     b.add(unit.cyl, C.woodD, 0, 0.42, 1.02, 0.02, 0.5, 0.02, 1.2, 0, 0);
