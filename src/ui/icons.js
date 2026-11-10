@@ -71,6 +71,11 @@ export const ICONS = {
   destroyer: svg(`<path d="M1.5 15.5h21l-3.6 4.5H4.2z" ${DUOTONE}/><path d="M7.5 15.5v-3.5h7v3.5M10 12V8.5h3V12M11.5 8.5V4.5"/><path d="M14.5 13.5h5M4 14.5l3.5-1"/>`),
   king: svg(`<path d="M4.2 18.6 3.6 8.2l4.9 4.3L12 5.8l3.5 6.7 4.9-4.3-.6 10.4z" ${DUOTONE}/><path d="M4.4 20.8h15.2"/><circle cx="3.6" cy="7.6" r="1.1" ${SOLID}/><circle cx="12" cy="5" r="1.1" ${SOLID}/><circle cx="20.4" cy="7.6" r="1.1" ${SOLID}/>`),
   // ui
+  food: svg(`<path d="M7 21 17 3M10 15c-5 0-6-3-6-3 4-1 6 0 6 3ZM13 10c-5 0-6-3-6-3 4-1 6 0 6 3ZM11 16c5 0 7-3 7-3-4-1-7 0-7 3ZM14 11c5 0 7-3 7-3-4-1-7 0-7 3Z" ${DUOTONE}/>`),
+  wood: svg(`<path d="m5 10 10-6c4-2 8 5 4 7L9 17" ${DUOTONE}/><ellipse cx="7" cy="14" rx="4" ry="5" transform="rotate(-30 7 14)"/><path d="m11 12 7-4M5.5 13c2-1 4 2 2 3"/>`),
+  gold: svg(`<path d="m9 4-3 6h12l-3-6Zm-5 9-3 7h11l-2-7Zm11 0-2 7h10l-3-7Z" ${DUOTONE}/><path d="M9 7h5M4 17h4M16 17h4"/>`),
+  stone: svg(`<path d="m3 15 3-8 7-4 7 6 1 9-9 3Z" ${DUOTONE}/><path d="m6 7 7 5 7-3M13 12l-1 9M3 15l7-1"/>`),
+  menu: svg('<path d="M4 6h16M4 12h16M4 18h16"/>'),
   age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${DUOTONE}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
   lock: svg(`<path d="M7.6 11V8.4a4.4 4.4 0 0 1 8.8 0V11"/><rect x="5.5" y="11" width="13" height="9.5" rx="2" ${DUOTONE}/><circle cx="12" cy="15.2" r="1.3" ${SOLID}/>`),
   delete: svg(`<path d="M6.3 7.2l1 13.3h9.4l1-13.3z" ${DUOTONE}/><path d="M4 7.2h16"/><path d="M9.4 7.2V4.4a.9.9 0 0 1 .9-.9h3.4a.9.9 0 0 1 .9.9v2.8"/><path d="M10 10.6v6.6M14 10.6v6.6"/>`),

@@ -111,6 +111,8 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   module Worker (`worker.js`, managed by `async-sim.js`); no live match state crosses threads.
 - `src/render`, `src/ui`, `src/main.js`: Three.js view, HUD, desktop + touch input, tournament flow. Reads sim state;
   never mutates it except via commands.
+  - The touch header separates resources and status in portrait and uses one row in landscape. Its `--hud-height`
+    (82px portrait, 52px landscape, plus safe-area padding) also anchors the objective, minimap, standings and command panel.
   - Every mesh using `MODEL_MATERIAL` is drawn through one `BatchedMesh` (`render/batch.js`). Layer-1 proxies retain
     picking and CPU pose updates; stationary resource proxies stay outside the scene hierarchy. Unchanged matrices
     are cached, and contact shadows use stable `InstancedMesh` slots. `render/cosmetics.js` animates building effects

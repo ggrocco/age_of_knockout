@@ -68,11 +68,11 @@ html, body { margin:0; height:100%; background:#0b0d09; overflow:hidden; font-fa
 .kingdom-row.fallen { opacity:.5; }
 .kingdom-final { max-width:420px; margin:18px auto; text-align:left; }
 body:not(.ingame) #kingdoms-standings { visibility:hidden; }
-body.touch #kingdoms-standings { top:calc(72px + var(--sat)); left:calc(8px + var(--sal)); width:174px; padding:6px 8px; font-size:10px; }
+body.touch #kingdoms-standings { top:calc(var(--hud-height) + 34px + var(--sat)); left:calc(8px + var(--sal)); width:174px; padding:6px 8px; font-size:10px; }
 body.touch #kingdoms-standings .kingdom-row { padding:3px 0; gap:1px 3px; }
 body.touch #kingdoms-standings .kingdom-heading { margin-bottom:3px; }
 @media (orientation:landscape) and (max-height:500px) {
-  body.touch #kingdoms-standings { width:166px; top:calc(65px + var(--sat)); left:calc(68px + var(--sal)); }
+  body.touch #kingdoms-standings { width:166px; left:calc(68px + var(--sal)); }
 }
 #topbar .match-clock { white-space:nowrap; }
 #topbar button, .btn { background:linear-gradient(#5a4327,#3a2a16); color:var(--parch); border:1px solid var(--bronze); border-radius:3px; padding:4px 10px; font:inherit; cursor:pointer; }
@@ -275,17 +275,32 @@ body.touch #app { position: fixed; inset: 0; height: 100dvh; touch-action: none;
 /* An old iPhone Home Screen install whose viewport stops above the home indicator (install.js): no bottom margin. */
 body.short-viewport { --sab: 0px; }
 body.touch #viewport { touch-action: none; }
-body.touch #topbar { height: calc(36px + var(--sat)); padding: var(--sat) calc(var(--sar) + 8px) 0 calc(var(--sal) + 8px); gap: 10px; font-size: 14px; }
-/* iOS 26 Safari lays a soft blur-and-dim fade ("scroll edge effect") under the status bar that reaches the first row
-   of counters, unless a fixed bar with a solid background touches the top edge: then it extends that bar's colour
-   into the status bar instead. So on phones the top bar is fixed and opaque (the theme colour), not smoked glass. */
-body.touch #topbar { position: fixed; background: #231a11; -webkit-backdrop-filter: none; backdrop-filter: none; }
-body.touch #topbar .res-group { gap: 4px; }
-body.touch #topbar .res-group .chip { min-width: 0; }
-body.touch #topbar .chip { height: 26px; gap: 4px; padding: 0 8px 0 5px; }
-body.touch #topbar .hico { width: 15px; height: 15px; }
-body.touch #topbar button { min-width: 44px; height: 32px; font-size: 18px; padding: 0 8px; }
-body.touch #objective { display: block; position: absolute; left: 50%; transform: translateX(-50%); top: calc(40px + var(--sat)); max-width: min(92vw, 640px); padding: 3px 12px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--edge), 0 2px 8px rgb(0 0 0 / .35); border: 1px solid #c8a05266; border-radius: 12px; font-size: 12px; text-align: center; z-index: 4; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: var(--legible); }
+/* Keep the phone header fixed, opaque and free of backdrop blur: iOS 26 Safari otherwise softens the first row. */
+body.touch { --hud-height: 52px; --hud-text: #f4ead3; --hud-muted: #c6b89b; --hud-line: #c8a05233; }
+body.touch #topbar { position: fixed; height: calc(var(--hud-height) + var(--sat)); padding: calc(var(--sat) + 4px) calc(var(--sar) + 10px) 4px calc(var(--sal) + 10px); display: grid; grid-template-columns: minmax(240px, 1fr) minmax(230px, 1fr) 44px; grid-template-areas: 'resources status menu'; gap: 16px; background: #231a11; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; text-shadow: none; border-bottom: 1px solid #c8a05266; color: var(--hud-text); font: 13px/1.2 'Trebuchet MS', Verdana, sans-serif; }
+body.touch #topbar .res { min-width: 0; gap: 5px; white-space: nowrap; }
+body.touch #topbar .ico { width: 20px; height: 20px; flex: none; }
+.hud-resources { grid-area: resources; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.hud-spectating { grid-column: 1 / -1; align-self: center; color: var(--hud-muted); }
+.hud-resources .res > span { display: flex; flex-direction: column; min-width: 0; }
+.hud-resources small { color: var(--hud-muted); font-size: 10px; line-height: 14px; }
+.hud-resources b { font-size: 16px; line-height: 19px; font-weight: 600; }
+.hud-resources [data-resource=food] > .ico { color: #ee9b78; }
+.hud-resources [data-resource=wood] > .ico { color: #d3b58a; }
+.hud-resources [data-resource=gold] > .ico { color: #edce71; }
+.hud-resources [data-resource=stone] > .ico { color: #b8c5cb; }
+.hud-status { grid-area: status; min-width: 0; display: flex; align-items: center; gap: 14px; font-variant-numeric: tabular-nums; }
+.hud-age { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e3c78d; }
+body.touch #topbar .hud-pop { flex: none; }
+body.touch #topbar .hud-pop.full { color: #ff8a7a; }
+body.touch #topbar .hud-pop.full .ico { color: inherit; }
+body.touch #topbar .hud-pop .ico { width: 16px; height: 16px; color: var(--hud-muted); }
+body.touch #topbar .match-clock { flex: none; height: auto; gap: 4px; padding: 0; border-radius: 0; background: none; box-shadow: none; color: var(--hud-muted); }
+body.touch #topbar .match-clock .hico { display: none; }
+body.touch #topbar button { grid-area: menu; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--hud-line); border-radius: 8px; background: #ffffff08; color: var(--hud-text); }
+body.touch #topbar button:active { background: #c8a05233; }
+body.touch #topbar button:focus-visible { outline: 2px solid var(--parch); outline-offset: 1px; }
+body.touch #objective { display: block; position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--hud-height) + 6px + var(--sat)); max-width: min(92vw, 640px); padding: 4px 10px; background: #181b13e6; border: 1px solid var(--hud-line); border-radius: 5px; color: var(--hud-text); font-size: 12px; text-align: center; z-index: 4; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body.touch #bottom { position: absolute; inset: 0; height: auto; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; pointer-events: none; }
 body.touch #bottom > * { pointer-events: auto; }
 body.touch #minimap-wrap { position: absolute; left: calc(var(--sal) + 8px); bottom: calc(var(--sab) + 8px); width: 150px; height: 92px; border-width: 1px; opacity: .92; }
@@ -293,7 +308,7 @@ body.touch #minimap { width: 100%; height: 100%; touch-action: none; }
 body.touch #info { position: absolute; left: calc(var(--sal) + 168px); bottom: calc(var(--sab) + 8px); width: min(36vw, 250px); min-width: 0; max-height: min(160px, 40vh); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 6px 9px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border: 1px solid #c8a05299; border-radius: 8px; box-shadow: var(--edge), 0 3px 12px rgb(0 0 0 / .4); font-size: 12px; line-height: 1.3; }
 body.touch #info h3 { font-size: 14px; margin: 0 0 2px; } body.touch #info .bar { width: 100%; height: 6px; margin: 2px 0 3px; } body.touch #info small { display: none; }
 /* Tile counts are data-driven (13 buildings, 10 Barracks units): the panel grows up from the bottom and scrolls from its top, so no tile is pushed out of reach. */
-body.touch #cmds { position: absolute; right: calc(var(--sar) + 8px); bottom: calc(var(--sab) + 8px); top: auto; max-height: calc(100% - 84px - var(--sat) - var(--sab)); width: 246px; grid-template-columns: 1fr 1fr; grid-auto-rows: 48px; gap: 6px; align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+body.touch #cmds { position: absolute; right: calc(var(--sar) + 8px); bottom: calc(var(--sab) + 8px); top: auto; max-height: calc(100% - var(--hud-height) - 40px - var(--sat) - var(--sab)); width: 246px; grid-template-columns: 1fr 1fr; grid-auto-rows: 48px; gap: 6px; align-content: start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 body.touch #cmds:empty { display: none; }
 body.touch #cmds .tile { height: 48px; min-width: 0; padding: 4px 6px 4px 5px; }
 body.touch #touchbar { display: flex; flex-direction: column; gap: 8px; position: absolute; left: calc(var(--sal) + 8px); bottom: calc(var(--sab) + 108px); z-index: 5; }
@@ -347,7 +362,10 @@ body.touch .card.menu .quick { min-height: 44px; } body.touch .ladder li { width
 body.touch .ladder li + li::before { width: 10px; }
 /* portrait: commands become a bottom strip, minimap moves top-right */
 @media (orientation: portrait) {
-  body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(96px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
+  body.touch { --hud-height: 82px; }
+  body.touch #topbar { grid-template-columns: minmax(0, 1fr) 44px; grid-template-rows: 44px 24px; grid-template-areas: 'resources menu' 'status status'; column-gap: 8px; row-gap: 4px; }
+  body.touch #topbar .hud-status { align-self: stretch; border-top: 1px solid var(--hud-line); padding-top: 4px; }
+  body.touch #minimap-wrap { left: auto; right: calc(var(--sar) + 8px); top: calc(var(--hud-height) + 34px + var(--sat)); bottom: auto; width: 120px; height: 74px; }
   body.touch #objective { font-size: 11px; }
   body.touch #info { left: calc(var(--sal) + 8px); right: calc(var(--sar) + 72px); width: auto; bottom: calc(var(--sab) + 8px); max-height: 132px; }
   body.touch.has-cmds #info { bottom: calc(var(--sab) + 70px); }
@@ -360,6 +378,18 @@ body.touch .ladder li + li::before { width: 10px; }
   body.touch.has-cmds #touchbar { bottom: calc(var(--sab) + 76px); }
   body.touch #toast { bottom: calc(var(--sab) + 150px); }
   body.touch #placebar { bottom: calc(var(--sab) + 84px); }
+}
+@media (max-width: 374px), (max-width: 740px) and (orientation: landscape) {
+  body.touch #topbar .hud-resources .ico { width: 16px; height: 16px; }
+  body.touch #topbar .hud-resources .res { gap: 3px; }
+  body.touch #topbar .hud-resources b { font-size: 14px; }
+}
+/* A vertical action stack reaches into the header on older, short landscape phones. */
+@media (orientation: landscape) and (max-height: 360px) {
+  body.touch #touchbar { display: grid; grid-template-columns: repeat(2, 48px); }
+  body.touch #kingdoms-standings { left: calc(128px + var(--sal)); }
+  body.touch #kingdoms-standings .kingdom-row { padding-top: 2px; padding-bottom: 2px; }
+  body.touch #kingdoms-standings .kingdom-row > small { display: none; }
 }
 /* short landscape phones: compact menus */
 @media (max-height: 500px) {
@@ -376,26 +406,9 @@ body.touch .ladder li + li::before { width: 10px; }
 body.touch.placing #info { display: none; }
 body.touch #placebar .btn { min-width: 116px; }
 body:not(.ingame) #topbar, body:not(.ingame) #bottom, body:not(.ingame) #touchbar, body:not(.ingame) #objective, body:not(.ingame) #placebar { visibility: hidden; }
-body.touch #topbar .spacer { flex: 1; }
-/* Portrait phones are too narrow for one row: the four resources share the first row with the menu button, each chip
-   an equal quarter so a five-digit stockpile still fits; population, Age and clock take the second row. */
-@media (orientation: portrait) {
-  body.touch #topbar { flex-wrap: wrap; align-content: center; height: calc(66px + var(--sat)); gap: 4px 6px; font-size: 13px;
-    padding: calc(var(--sat) + 3px) calc(var(--sar) + 6px) 3px calc(var(--sal) + 6px); }
-  body.touch #topbar > * { order: 2; }
-  body.touch #topbar .res-group { order: 0; flex: 1 1 calc(100% - 60px); gap: 4px; }
-  body.touch #topbar .res-group .chip { flex: 1 1 0; justify-content: center; }
-  body.touch #topbar > [data-menu] { order: 1; height: 28px; }
-  body.touch #topbar .chip { height: 26px; }
-  body.touch #objective { top: calc(70px + var(--sat)); }
-  body.touch #kingdoms-standings { top: calc(98px + var(--sat)); }
-}
 /* Full screen and Install: the row under the main menu's title on phones. */
 .screen-row { display:flex; justify-content:center; margin:-8px 0 16px; }
 .card.menu .screen-btn { margin:0; min-height:44px; padding:6px 18px; font-size:16px; border-radius:6px; }
-/* Phone menu button: a glass pill like the chips beside it. */
-body.touch #topbar > [data-menu] { height: 28px; min-width: 46px; border-radius: 14px; font-size: 17px; line-height: 1; border-color: rgb(200 160 82 / .55);
-  background: linear-gradient(rgb(255 255 255 / .1), rgb(0 0 0 / .25)), rgb(0 0 0 / .25); }
 /* Phone info panel: only for a selection, with a small x to let go of it. */
 body.touch.no-info #info { display: none; }
 body.touch #info { padding-right: 38px; }

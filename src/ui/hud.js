@@ -308,6 +308,11 @@ export function createHud(ui) {
     const clockHtml = `<span class="res chip match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}">`
       + `${HUD_ICONS.clock}<b class="clock-now"></b><small class="clock-cap"></small></span>`;
     if (ui.spectating) {
+      if (ui.touch) {
+        return '<div class="hud-resources"><span class="hud-spectating">Spectating</span></div>'
+          + '<div class="hud-status"><span class="hud-age">Kingdom Conquest</span>' + clockHtml + '</div>'
+          + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
+      }
       return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
         + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}" class="${ui.speed === speed ? 'on' : ''}">${speed}x</button>`).join('')
           + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`)
@@ -321,9 +326,20 @@ export function createHud(ui) {
     const ageHtml = `<span class="res chip age${player.ageUp ? ' rising' : ''}" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">`
       + `${HUD_ICONS.age}<b>${ui.touch ? ageLabel(player.age) : ageTitle(player.age)}</b>${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`;
     if (ui.touch) {
-      return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
-        + `<span class="spacer"></span>${clockHtml}`
-        + '<button data-menu="open" aria-label="Menu">&#9776;</button>';
+      const resources = RES.map(resource => {
+        const amount = Math.floor(player.res[resource]);
+        const value = amount >= 1000000 ? (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
+          : amount >= 100000 ? Math.floor(amount / 1000) + 'k'
+            : amount >= 10000 ? (amount / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : amount;
+        return `<span class="res" role="group" data-resource="${resource}" title="${capitalize(resource)}: ${amount}" aria-label="${capitalize(resource)}: ${amount}">`
+          + icon(resource) + `<span aria-hidden="true"><small>${capitalize(resource)}</small><b>${value}</b></span></span>`;
+      }).join('');
+      return `<div class="hud-resources" role="group" aria-label="Resources">${resources}</div>`
+        + '<div class="hud-status">'
+        + `<span class="hud-age age" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">${ageTitle(player.age)}${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`
+        + `<span class="res hud-pop${full ? ' full' : ''}" ${popAttrs}>${icon('villager')}${player.pop}/${player.popCap}</span>`
+        + clockHtml + '</div>'
+        + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
     }
     return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${objective}</span></span>`

@@ -247,7 +247,7 @@ siege, and villagers at the back.
 
 ### Controls (phone / touch)
 
-<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with resource chips, population, Age and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
+<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with labeled resources, Age, population and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
 tree/mine/farm = gather, fish (or the water within about a tile and a half of a shoal) = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
@@ -258,9 +258,10 @@ shows what is selected; its **&#x2715;** deselects, and it hides when nothing is
 to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, install,
 resign and quit.
 
-The top bar shows each resource as a chip with its icon, then population (red when full: build a House or advance),
-the Age (a green arrow while advancing) and the match clock. In portrait it takes two rows: resources first, then
-population, Age and clock.
+The top bar shows labeled resources with icons and larger counters, followed by the Age (a green arrow while advancing),
+population (red when full: build a House or advance) and the match clock. In portrait it takes two rows: resources first,
+then Age, population and clock; landscape keeps them in one row. Large resource totals use compact notation (for example,
+20k), with the exact total in the accessible label.
 
 **Full screen:** on Android (and on iPads and desktops) the main menu and the in-game menu have a **Play full screen**
 button. For the whole screen with no browser bars at all, install the game as an app (below).
@@ -380,8 +381,11 @@ performance guarantees on those devices. Use `&quality=balanced|high|ultra` to o
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Bloom | Grass clumps | Fire, smoke and dust |
 | --- | --- | --- | --- | --- | --- | --- |
 | Balanced | 1.5 / 2 million | 1024 | Off | Off | 2,500 | Half as many, up to 600 at once |
-| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
-| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+| High | 3 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
+| Ultra | 3 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+
+High and Ultra render at native resolution on 3× phones when the pixel budget allows it, avoiding enlargement of a
+lower-resolution canvas. Larger screens still obey the same pixel budgets; Balanced retains its lower resolution.
 
 Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
 own light, so they stay bright in shadow. On Ultra a bloom pass adds a halo around them (sun glints on gold and
