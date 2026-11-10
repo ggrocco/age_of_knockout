@@ -19,6 +19,9 @@ node test/bot-sim.js 12                     # bot-vs-bot termination check (12 s
 node test/bot-sim.js 12 medium,medium islands   # the same on island maps (transports and ferries)
 node test/kingdom-sim.js 12                 # four bots, both map types (optional third arg: rivers or islands)
 node test/era-reach.js 12 deathmatch        # measurement, not a test: how far bots climb the eras
+node test/tools/phone-shots.js              # iPhone screenshots into phone-shots/ (needs npm start; see below)
+bash scripts/build-site.sh _site            # assemble the GitHub Pages site (what pages.yml deploys) into _site/
+node test/tools/browser-smoke.js _site chromium   # browser smoke test of that site (CI: chromium,firefox,webkit)
 docker compose up -d --build                # nginx image, served on :8080
 docker build --target test -t aoe-knockout-test . && docker run --rm aoe-knockout-test   # tests in Docker
 ```
@@ -90,7 +93,13 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   `src/sim/map-four.js`. `node test/kingdom-sim.js 12` exercises four bots on both maps. Captured population may
   exceed the age ceiling; do not delete captured units or treat that overflow as a sim invariant failure.
 - `src/ai/bot.js`: the bot, tiers `relaxed`/`easy`/`medium`/`hard`. It is given the enemy start location. `relaxed`
-  waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Also
+  waits 30 minutes and Bronze Age before attacking and plays at half speed via `createGame({ workRate })`. Medium and
+  hard (`vary` in `DIFF`) give each attack wave one of the `STRATEGIES` (assault, raid, siege, pincer), drawn from the
+  bot's own seeded RNG (never the game's) and never the previous wave's plan; easy and relaxed always assault. A land
+  wave first marches (`bot.march`: a rally point by home, then a staging point short of the enemy base), ends early
+  when the fight turns against it (`power`), and is recalled by a big attack on home (`defendHome`); villagers flee
+  enemy soldiers (`flee`/`hiding`), and soldiers leave pop room for lost villagers. Docks only go on water bodies of
+  `OPEN_WATER` tiles (`bigWater`), never ponds; `test/bot-survival.test.js` covers all of this. Also
   drives `?autoplay`. It uses every building, unit, upgrade and command: wall screens in front of its towers (never
   sealing its own ground: `keepsGroundOpen`), repair, re-staffing or deleting abandoned foundations, a rebuilt Town
   Center, a Dock with Fishing Ships and a fleet of the newest warship, and Transport Ship ferries (`ferryWork`: attack
@@ -150,7 +159,8 @@ headlessly (Node test runner). The DOM, HUD, browser event handling, shaders and
 
 - New or changed URL param, control, or game rule the player sees: `README.md` and the table above.
 - Import map or static assets in `index.html` / `buildings.html` / `ages.html`, or a new page: the `Dockerfile` `COPY` lines, the smoke-test
-  paths in `Jenkinsfile` and the "Assemble site" step in `.github/workflows/pages.yml`.
+  paths in `Jenkinsfile` and `scripts/build-site.sh` (the Pages site; a new page also wants a check in
+  `test/tools/browser-smoke.js`).
 - Any building, building stat, upgrade (tech), trained unit, era or building look: the `buildings.html` design page,
   and the `ages.html` Age Ladder for anything about Ages (unlocks, gates, age-up costs, what grows on arrival).
   It reads the data tables, so new rows and cells appear on their own, but a new kind of fact (as "Trains" and
@@ -185,11 +195,16 @@ Shortcuts:
   `const p = __app.match.game.players[0]; p.age = 'future'; p.res = {food: 9999, wood: 9999, gold: 9999, stone: 9999};`
   then use the real UI (train, build, age-up button) and read the HUD.
 - Phone layout: `?touch=1` at 402x874 and 874x402. Touch input needs dispatched `TouchEvent`s.
+- **Check the iPhone layout after every change**, not only phone work (the owner plays on an iPhone from the Home
+  Screen): with the server running, `node test/tools/phone-shots.js` writes four screenshots to `phone-shots/`
+  (Safari portrait, Home Screen portrait, the short iOS 26 Home Screen viewport, landscape) with the iPhone's safe-area
+  insets faked, and exits non-zero on a console error or a control cut off by the screen or the build strip. Open every
+  PNG and look at it; pass a URL as the second argument to shoot another round or state.
 - Whole flow: `?autotour=1` should reach a champion/eliminated screen with no console errors.
 
 ## Deployment
 
-`Dockerfile` copies only `index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/` and the two three.js
+`Dockerfile` copies only `index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `manifest.webmanifest`, `icons/`, `src/` and the two three.js
 folders the import map references (`node_modules/three/build`, `.../examples/jsm`) into nginx. Its `test` stage
 (node, runs `test/`) must stay before the nginx stage, which has to remain the last (default) target.
 
@@ -198,11 +213,17 @@ it, then builds the nginx image and smoke-tests it from inside the container. It
 agent; it never pushes or deploys.
 
 `.github/workflows/pages.yml` deploys the same file set to GitHub Pages (https://ggrocco.github.io/age_of_knockout/) on
-every push to `main`, after `npm test`. Pages serves from a `/age_of_knockout/` sub-path, so page and module URLs must
+every push to `main`, after `npm test`. `scripts/build-site.sh` assembles the site, and `test/tools/browser-smoke.js`
+must pass on it before it is uploaded. Pages serves from a `/age_of_knockout/` sub-path, so page and module URLs must
 stay relative.
 
-`.github/workflows/ci.yml` runs on every pull request and push to `main`: `npm test` plus `bot-sim.js 12`, `npm run lint`,
+`.github/workflows/ci.yml` runs on every pull request and push to `main`: `npm test` plus `bot-sim.js 12`, the browser
+smoke test (`browser-smoke.js` on the assembled Pages site in Chromium, Firefox and WebKit: menu, a won tournament
+round with the bracket simulated in the Worker, quick match, Kingdom Conquest, islands, touch layout, both design pages,
+and the no-WebGL message; it fails on any console error, uncaught error or missing file), `npm run lint`,
 `npm audit` (fails at moderate or above) with `npm audit signatures`, and on pull requests GitHub's dependency review.
+The `browser` job (and the Pages build job) run in the `mcr.microsoft.com/playwright:v<version>-noble` container, whose
+tag must equal the exact `playwright` version in `package.json`: bump the two together.
 `.github/workflows/codeql.yml` runs CodeQL (`security-extended`) on the JavaScript and the workflows, on the same events
 and weekly. Keep `npm run lint` clean before pushing; the sim/AI/rounds/data/tournament folders are linted without
 browser globals, so a `window` or `document` there is a lint error.

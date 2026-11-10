@@ -2,14 +2,18 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS, repairCost, workSpeed } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, ageLabel, ageTitle, popLimit } from '../data/ages.js';
-import { canAfford, ageUpProblem, ageUpNeed, popFullReason } from '../sim/commands.js';
+import { canAfford, ageUpProblem, ageUpNeed, ageGateStatus, popFullReason } from '../sim/commands.js';
 import { ROUNDS, KINGDOMS, WONDER_TICKS, RELIC_TICKS } from '../rounds/index.js';
 import { kingdomStandingsHtml } from './kingdoms.js';
 import { TEAMS } from '../data/teams.js';
 import { icon } from './icons.js';
 import { COLORS, RES, costHtml, tipHtml, roundTipHtml, queueText } from './tips.js';
+import { HUD_ICONS } from './icons.js';
+import { toggleFullscreen } from './screen-mode.js';
+import { onInstallChange, openInstallGuide, promptInstall, screenControlsHtml } from './install.js';
 import { QUALITY } from '../render/quality.js';
 import { isIdleWorker } from './input.js';
+import { morphHtml } from './morph.js';
 
 const REASONS = {
   defeated: 'Your civilization has been conquered',
@@ -109,7 +113,19 @@ const needsRepair = (entity) => entity.kind === 'building' && entity.owner === 0
   && !entity.gatherType && entity.hp < entity.maxHp;
 
 // The info panel for one entity, selected or inspected.
-function describe(entity, player, touch) {
+// Phones have no tooltips, so the Town Center lists which current-Age buildings advancing still needs (finished ones
+// ticked), as "Build 2 of: Barracks ✓ · Granary · ...". Empty once enough are finished or while advancing.
+function ageGatesHtml(game, player) {
+  const need = ageUpNeed(player.age);
+  if (!need || player.ageUp) return '';
+  const gates = ageGateStatus(game, 0), done = gates.filter(gate => gate.done).length;
+  if (done >= need) return '';
+  const names = gates.map(gate => gate.done
+    ? `<span class="win">${BUILDINGS[gate.type].name} &#10003;</span>` : BUILDINGS[gate.type].name);
+  return `<br><span class="age-gates">Build ${need} of (${done}/${need}): ${names.join(' &middot; ')}</span>`;
+}
+
+function describe(entity, player, touch, game) {
   const enemyTag = entity.owner != null && entity.owner !== 0 ? ` <small class="lose">(${TEAMS[entity.owner].name})</small>` : '';
   let html = `<h3>${nameOf(entity)}${enemyTag}</h3>` + hpBar(entity) + `HP ${Math.ceil(entity.hp)}/${entity.maxHp}`;
   if (entity.kind === 'unit') html += unitDetails(entity);
@@ -119,7 +135,7 @@ function describe(entity, player, touch) {
   const next = AGES[ageIndex(player.age) + 1];
   if (touch && entity.type === 'town_center' && entity.owner === 0 && entity.constructed && next) {
     const cost = AGE_COST[next].cost;
-    html += `<br>${ageTitle(next)}: ${costHtml(cost, shortOf(player, cost), true)}`;
+    html += `<br>${ageTitle(next)}: ${costHtml(cost, shortOf(player, cost), true)}` + ageGatesHtml(game, player);
   }
   return html;
 }
@@ -279,13 +295,18 @@ export function createHud(ui) {
     + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`
     + `<button data-resign="1" class="${ui.resignArmed ? 'on' : ''}">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`;
 
+  // Each count is a chip: the resource's glyph in its colour, then the number in a lining, tabular face so the digits
+  // line up and read at a glance (the serif's old-style figures bob up and down).
+  const RES_NAME = { food: 'Food', wood: 'Wood', gold: 'Gold', stone: 'Stone' };
+  const chip = (cls, glyph, body, attrs = '') => `<span class="res chip ${cls}" ${attrs}>${glyph}<b>${body}</b></span>`;
   const topBarHtml = (game, player, objective) => {
     const round = game.rules;
-    const resourcesHtml = RES.map(resource => `<span class="res"><i class="dot" style="background:${COLORS[resource]}"></i>`
-      + `${Math.floor(player.res[resource])}</span>`).join('');
+    const resourcesHtml = RES.map(resource => chip(`r-${resource}`, HUD_ICONS[resource], Math.floor(player.res[resource]),
+      `style="--rc:${COLORS[resource]}" title="${RES_NAME[resource]}" aria-label="${RES_NAME[resource]} ${Math.floor(player.res[resource])}"`)).join('');
     const roundAttrs = round ? `data-tip="round:${round.id}" aria-describedby="tip" tabindex="0"` : '';
     const clockLabel = round ? (game.capTicks === Infinity ? ' / no time limit' : ' / time limit') : '';
-    const clockHtml = `<span class="res match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}"></span>`;
+    const clockHtml = `<span class="res chip match-clock" ${roundAttrs} aria-label="Elapsed game time${clockLabel}">`
+      + `${HUD_ICONS.clock}<b class="clock-now"></b><small class="clock-cap"></small></span>`;
     if (ui.spectating) {
       if (ui.touch) {
         return '<div class="hud-resources"><span class="hud-spectating">Spectating</span></div>'
@@ -293,11 +314,17 @@ export function createHud(ui) {
           + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
       }
       return '<span class="res">Spectating</span><span class="grow">Kingdom Conquest</span>' + clockHtml
-        + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}">${speed}x</button>`).join('')
-          + `<button data-pause="1">${ui.paused ? 'Resume' : 'Pause'}</button>`)
+        + (ui.touch ? '' : SPEEDS.map(speed => `<button data-speed="${speed}" class="${ui.speed === speed ? 'on' : ''}">${speed}x</button>`).join('')
+          + `<button data-pause="1" class="${ui.paused ? 'on' : ''}">${ui.paused ? 'Resume' : 'Pause'}</button>`)
         + '<button data-menu="open" aria-label="Game settings">Menu</button>';
     }
-    const popTitle = `title="Population (${ageTitle(player.age)} limit ${popLimit(player.age)})"`;
+    // The population chip turns red when it is full: nothing more can be trained until a House (or the next Age).
+    const full = player.pop >= player.popCap;
+    const popAttrs = `title="Population${full ? ' full' : ''} (${ageTitle(player.age)} limit ${popLimit(player.age)})"`
+      + ` aria-label="Population ${player.pop} of ${player.popCap}${full ? ', full' : ''}"`;
+    const popHtml = chip(`pop${full ? ' full' : ''}`, HUD_ICONS.pop, `${player.pop}<small>/${player.popCap}</small>`, popAttrs);
+    const ageHtml = `<span class="res chip age${player.ageUp ? ' rising' : ''}" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">`
+      + `${HUD_ICONS.age}<b>${ui.touch ? ageLabel(player.age) : ageTitle(player.age)}</b>${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`;
     if (ui.touch) {
       const resources = RES.map(resource => {
         const amount = Math.floor(player.res[resource]);
@@ -309,14 +336,12 @@ export function createHud(ui) {
       }).join('');
       return `<div class="hud-resources" role="group" aria-label="Resources">${resources}</div>`
         + '<div class="hud-status">'
-        + `<span class="hud-age" title="${ageTitle(player.age)}${player.ageUp ? ' (advancing)' : ''}">${ageTitle(player.age)}${player.ageUp ? '&hellip;' : ''}</span>`
-        + `<span class="res hud-pop" ${popTitle} aria-label="Population: ${player.pop} of ${player.popCap}">${icon('villager')}${player.pop}/${player.popCap}</span>`
+        + `<span class="hud-age age" title="${player.ageUp ? `Advancing to ${ageTitle(player.ageUp.to)}` : ageTitle(player.age)}">${ageTitle(player.age)}${player.ageUp ? '<i aria-hidden="true">&#9650;</i>' : ''}</span>`
+        + `<span class="res hud-pop${full ? ' full' : ''}" ${popAttrs}>${icon('villager')}${player.pop}/${player.popCap}</span>`
         + clockHtml + '</div>'
         + `<button data-menu="open" aria-label="Game settings">${icon('menu')}</button>`;
     }
-    return resourcesHtml
-      + `<span class="res" ${popTitle}>Pop ${player.pop}/${player.popCap}</span>`
-      + `<span class="res">${player.ageUp ? 'Advancing... ' : ''}${ageTitle(player.age)}</span>`
+    return `<span class="res-group">${resourcesHtml}</span>${popHtml}${ageHtml}`
       + `<span class="grow" ${roundAttrs}><b>${round ? round.name : 'Match'}</b> - <span class="obj">${objective}</span></span>`
       + clockHtml
       + topBarControlsHtml()
@@ -349,7 +374,7 @@ export function createHud(ui) {
     const active = document.activeElement, focusedTip = top.contains(active) && active.matches('[data-tip]');
     const focusSelector = focusedTip ? (active.classList.contains('match-clock') ? '.match-clock' : '.grow') : null;
     const tipWasShown = tipEl.classList.contains('show');
-    top.innerHTML = html;
+    morphHtml(top, html); // in place: the buttons stay the same nodes (see morph.js)
     top._html = html;
     if (!focusSelector) return;
     top.querySelector(focusSelector)?.focus({ preventScroll: true });
@@ -358,26 +383,33 @@ export function createHud(ui) {
 
   const updateClock = game => {
     const clock = top.querySelector('.match-clock');
-    const limit = game.rules ? ` / ${game.capTicks === Infinity ? '∞' : fmtTime(game.capTicks)}` : '';
-    const clockText = fmtTime(game.time) + limit;
-    if (clock.textContent !== clockText) clock.textContent = clockText;
+    const now = fmtTime(game.time), cap = game.rules ? `/${game.capTicks === Infinity ? '∞' : fmtTime(game.capTicks)}` : '';
+    const nowEl = clock.querySelector('.clock-now'), capEl = clock.querySelector('.clock-cap');
+    if (nowEl.textContent !== now) nowEl.textContent = now;
+    if (capEl.textContent !== cap) capEl.textContent = cap;
   };
 
   const DESKTOP_HELP = '<br><br><small>Left-click / drag to select. Right-click to order. WASD or Space + drag pans,'
     + ' wheel zooms. Esc pauses.</small>';
   const infoHtml = (game, player, selected) => {
     const round = game.rules, inspected = ui.inspect && game.entities.get(ui.inspect.id);
-    if (selected.length === 1) return describe(selected[0], player, ui.touch);
+    if (selected.length === 1) return describe(selected[0], player, ui.touch, game);
     if (selected.length) return selectionSummary(selected);
-    if (inspected) return describe(inspected, player, ui.touch);
+    if (inspected) return describe(inspected, player, ui.touch, game);
     if (ui.inspect && ui.inspect.kind === 'resource') return `<h3>${ui.inspect.type}</h3>`;
     return `<h3>${round ? round.name : ''}</h3>${round ? round.desc : ''}` + DESKTOP_HELP;
   };
+  // On a phone the panel shows only what is selected or inspected, with a small x to let go of it; with nothing
+  // chosen it hides, since the objective pill already names the round.
+  const DESELECT = '<button class="info-close" data-act="clear" aria-label="Deselect">&#x2715;</button>';
+  const hasFocus = (game, selected) => selected.length > 0 || !!(ui.inspect && (ui.inspect.kind === 'resource' || game.entities.get(ui.inspect.id)));
 
   const updateInfo = (game, player, selected) => {
-    const html = infoHtml(game, player, selected);
+    const focused = hasFocus(game, selected);
+    if (ui.touch) document.body.classList.toggle('no-info', !focused);
+    const html = (ui.touch && focused ? DESELECT : '') + infoHtml(game, player, selected);
     if (html === infoKey) return;
-    info.innerHTML = html;
+    morphHtml(info, html); // keeps the deselect button the same node while the text changes
     infoKey = html;
   };
 
@@ -387,8 +419,10 @@ export function createHud(ui) {
   const commandKey = (player, ferry, deletable, hasVillagers, building) => {
     const researchLeft = building && building.research ? 'R' + secondsLeft(building.research.remaining, building) : '';
     const queue = building ? building.id + ':' + building.queue.length : '';
+    // The Town Center's Advance tile also changes as the current Age's gate buildings are finished.
+    const gates = building?.type === 'town_center' ? 'G' + ageGateStatus(ui.game, 0).filter(gate => gate.done).length : '';
     return `${ferry ? 'U' + ferry.id + ':' + ferry.cargo.length : ''}`
-      + `${deletable ? 'D' + deletable.id : ''}${hasVillagers ? 'V' : ''}${queue}`
+      + `${deletable ? 'D' + deletable.id : ''}${hasVillagers ? 'V' : ''}${queue}${gates}`
       + `${researchLeft}${player.techs.size}${player.age}${player.ageUp ? 'a' : ''}`
       + `${RES.map(resource => Math.floor(player.res[resource] / 25)).join(',')}`
       + `${canAfford(player, BUILDINGS.wall.cost) ? 'W' : ''}${player.pop >= player.popCap ? 'P' : ''}${ui.placing || ''}`;
@@ -444,7 +478,9 @@ export function createHud(ui) {
     const next = AGES[ageIndex(player.age) + 1];
     if (!next) return;
     const why = ageUpProblem(ui.game, 0), cost = AGE_COST[next].cost;
-    const need = why === 'needs buildings' ? ageUpNeed(player.age) : 0;
+    // How many more finished gate buildings advancing needs (not the total), so the tile counts down as they go up.
+    const need = why === 'needs buildings'
+      ? ageUpNeed(player.age) - ageGateStatus(ui.game, 0).filter(gate => gate.done).length : 0;
     const extra = why === 'needs buildings' ? `<span class="c">+${need} bldg${need > 1 ? 's' : ''}</span>` : '';
     tiles.push(tile('data-age="1"', { kind: 'age', id: 'age', next, name: 'Advance: ' + ageLabel(next), cost, tint: 't-age',
       ok: !why, short: shortOf(player, cost), notes: why ? [reasonText(why)] : [], extra, extraClass: ' age' }));
@@ -473,14 +509,14 @@ export function createHud(ui) {
   const renderCommands = tiles => {
     const structure = tiles.map(entry => entry.key).join('|');
     if (structure !== cmds._struct) {
-      cmds.innerHTML = tiles.map(entry => entry.html).join('');
+      morphHtml(cmds, tiles.map(entry => entry.html).join('')); // tiles in the same place stay the same nodes
       cmds._struct = structure;
     } else {
       for (let i = 0; i < tiles.length; i++) {
         const entry = tiles[i], tileEl = cmds.children[i], small = tileEl.querySelector('small');
         tileEl.classList.toggle('off', entry.off);
         tileEl.setAttribute('aria-disabled', entry.off);
-        if (small.innerHTML !== entry.small) small.innerHTML = entry.small;
+        morphHtml(small, entry.small); // touches only the text and attributes that changed
       }
     }
     if (!tipKey || roundTips.has(tipKey)) return;
@@ -532,21 +568,31 @@ export function createHud(ui) {
   };
 
   // ----- settings menu -----
-  const graphicsHtml = () => {
-    const options = Object.entries(QUALITY).map(([id, option]) => {
-      const on = ui.view?.quality === id;
-      return `<button class="btn ${on ? 'on' : ''}" data-quality="${id}" aria-pressed="${on}">${option.label}</button>`;
-    });
-    return `<fieldset class="graphics"><legend>Graphics quality</legend><div class="quality-options">${options.join('')}</div>`
-      + '<p>High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.</p></fieldset>';
+  // A labelled segmented control: the chosen option is filled gold and announced through aria-pressed.
+  const segHtml = (id, label, options, note = '') =>
+    `<fieldset class="menu-set"><legend id="${id}-label">${label}</legend>`
+    + `<div class="seg" role="group" aria-labelledby="${id}-label">${options.map(([attr, value, text, on]) =>
+      `<button class="btn ${on ? 'on' : ''}" data-${attr}="${value}" aria-pressed="${on}">${text}</button>`).join('')}</div>`
+    + (note ? `<p>${note}</p>` : '') + '</fieldset>';
+  // Full screen and Install as an app (see install.js); nothing once running from the Home Screen.
+  const screenSetHtml = () => {
+    const buttons = screenControlsHtml(ui.touch);
+    return buttons ? `<fieldset class="menu-set"><legend>Screen</legend><div class="screen-btns">${buttons}</div></fieldset>` : '';
   };
   const menuHtml = () => {
-    const speeds = SPEEDS.map(speed =>
-      `<button class="btn ${ui.speed === speed ? 'on' : ''}" data-speed="${speed}">${speed}x</button>`);
-    return `<div class="card"><h2>Menu</h2><button class="btn" data-menu="close">Resume game</button>`
-      + `<div class="row">${speeds.join('')}</div>`
-      + `<button class="btn" data-resign="1">${ui.resignArmed ? 'Confirm resign?' : 'Resign'}</button>`
-      + `<button class="btn" data-quit="1">${ui.quitArmed ? 'Confirm quit?' : 'Quit to menu'}</button></div>`;
+    const speeds = SPEEDS.map(speed => ['speed', speed, `${speed}x`, ui.speed === speed]);
+    const qualities = Object.entries(QUALITY).map(([id, option]) => ['quality', id, option.label, ui.view?.quality === id]);
+    const armed = (on, text, armedText) => on ? `<b>${armedText}</b>` : text;
+    return '<div class="card"><h2>Menu</h2><p class="menu-status">Game paused</p>'
+      + '<button class="btn primary" data-menu="close">&#9654; Resume game</button>'
+      + segHtml('menu-speed', 'Game speed', speeds)
+      + segHtml('menu-quality', 'Graphics quality', qualities,
+        'High adds richer lighting and grass. Ultra sharpens shadows and detail. Balanced uses less power.')
+      + screenSetHtml()
+      + '<div class="menu-exit">'
+      + `<button class="btn ${ui.resignArmed ? 'armed' : ''}" data-resign="1">${armed(ui.resignArmed, 'Resign', 'Confirm resign?')}</button>`
+      + `<button class="btn ${ui.quitArmed ? 'armed' : ''}" data-quit="1">${armed(ui.quitArmed, 'Quit to menu', 'Confirm quit?')}</button>`
+      + '</div></div>';
   };
   // Opens the menu, or re-renders it in place when it is already open (after a speed / quality / arming click).
   hud.openMenu = () => {
@@ -557,7 +603,6 @@ export function createHud(ui) {
       ui.paused = true;
     }
     menuEl.innerHTML = menuHtml();
-    menuEl.querySelector('.card').insertAdjacentHTML('beforeend', graphicsHtml());
     menuEl.setAttribute('role', 'dialog');
     menuEl.setAttribute('aria-modal', 'true');
     menuEl.setAttribute('aria-label', 'Game settings');
@@ -589,16 +634,33 @@ export function createHud(ui) {
     }
   });
 
+  // Leaving full screen with the browser's own gesture or Esc relabels the open menu's button.
+  for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, () => refreshMenu('[data-fullscreen]'));
+  onInstallChange(() => refreshMenu());
+
   // ----- button clicks -----
   // Quit and Resign ask twice: the first click arms the button for 3 seconds.
   const arm = field => {
     ui[field] = true;
-    setTimeout(() => { ui[field] = false; }, 3000);
+    setTimeout(() => {
+      if (!ui[field]) return;
+      ui[field] = false;
+      refreshMenu();
+    }, 3000);
+  };
+  // Re-renders the open menu so the chosen option lights up, keeping focus on it.
+  const refreshMenu = selector => {
+    if (menuHidden()) return;
+    hud.openMenu();
+    if (selector) $('gamemenu').querySelector(selector)?.focus({ preventScroll: true });
   };
   const onQuality = quality => {
     ui.view?.setQuality(quality);
-    hud.openMenu();
-    $('gamemenu').querySelector(`[data-quality="${ui.view.quality}"]`)?.focus();
+    refreshMenu(`[data-quality="${ui.view?.quality}"]`);
+  };
+  const onSpeed = speed => {
+    ui.setSpeed(speed);
+    refreshMenu(`[data-speed="${speed}"]`);
   };
   const onQuit = () => {
     if (ui.quitArmed) {
@@ -641,14 +703,16 @@ export function createHud(ui) {
   };
   document.addEventListener('click', e => {
     const button = e.target.closest('button');
-    if (!button || button.classList.contains('off')) return;
+    if (!button || button.classList.contains('off') || button.closest('#install-guide')) return;
     const data = button.dataset;
     if (data.menu === 'open') return hud.openMenu();
     if (data.menu === 'close') return hud.closeMenu();
     if (data.quality) return onQuality(data.quality);
+    if (data.fullscreen) return void toggleFullscreen().then(() => refreshMenu('[data-fullscreen]'));
+    if (data.install) return void (data.install === 'prompt' ? promptInstall() : openInstallGuide());
     if (data.act) return ui.actions?.[data.act]?.();
     if (data.quit) return onQuit();
-    if (data.speed) ui.setSpeed(+data.speed);
+    if (data.speed) onSpeed(+data.speed);
     else if (data.pause) ui.togglePause();
     else if (data.resign) onResign();
     else onTileClick(button, e);

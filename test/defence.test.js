@@ -301,9 +301,11 @@ const finish = (g, walls) => {
   assert.ok(walls.every(w => w.constructed), 'the walls finish');
 };
 // A diamond of four diagonal wall lines around (cx, cy); the four corners are listed twice (end of one line, start of the next).
-const diamond = (cx, cy) => [[-2, 0, 0, -2], [0, -2, 2, 0], [2, 0, 0, 2], [0, 2, -2, 0]]
+// A diamond of wall round (cx, cy), radius r: 4r tiles, the 2r^2 - 2r + 1 inside (25 at r = 4) big enough not to be a
+// pocket (commands.js POCKET_TILES), so the closing tile may be placed.
+const diamond = (cx, cy, r = 4) => [[-r, 0, 0, -r], [0, -r, r, 0], [r, 0, 0, r], [0, r, -r, 0]]
   .flatMap(([ax, ay, bx, by]) => lineTiles({ x: cx + ax, y: cy + ay }, { x: cx + bx, y: cy + by }));
-const outside = (cx, cy) => (x, y) => Math.max(Math.abs(x - cx), Math.abs(y - cy)) >= 3;
+const outside = (cx, cy, r = 4) => (x, y) => Math.max(Math.abs(x - cx), Math.abs(y - cy)) > r;
 
 test('lineTiles snaps a drag to a horizontal, vertical or diagonal line, both ends included, at most 64 tiles', () => {
   const xy = ts => ts.map(t => [t.x, t.y]);
@@ -393,37 +395,37 @@ test('a builder whose segment is deleted moves on to the rest of its line', () =
 });
 
 test('wall foundations do not block movement', () => {
-  const g = wallGame(), p = g.players[0], vs = villagers(g), { x, y } = clearBlock(g, 5, 5), cx = x + 2, cy = y + 2;
-  assert.ok(canPlace(g, 0, 'house', cx - 2, cy - 1), 'control: a house fits there before the wall');
-  assert.deepEqual(g.command(0, { type: 'wall', ids: vs.map(v => v.id), tiles: diamond(cx, cy) }), { ok: true, placed: 8 }, 'each shared corner is placed once');
-  assert.equal(p.res.stone, 500 - 8 * 5, 'and paid for once');
+  const g = wallGame(), p = g.players[0], vs = villagers(g), { x, y } = clearBlock(g, 11, 9), cx = x + 4, cy = y + 4;
+  assert.ok(canPlace(g, 0, 'house', cx - 4, cy - 1), 'control: a house fits there before the wall');
+  assert.deepEqual(g.command(0, { type: 'wall', ids: vs.map(v => v.id), tiles: diamond(cx, cy) }), { ok: true, placed: 16 }, 'each shared corner is placed once');
+  assert.equal(p.res.stone, 500 - 16 * 5, 'and paid for once');
   for (const v of vs) v.order = { type: 'idle' }; // nobody builds: they stay foundations
   for (const w of wallsOf(g)) {
     assert.equal(g.blocked(w.x, w.y), false, 'a foundation is walkable'); assert.ok(g.reserved.has(idx(g, w.x, w.y)), 'but reserves its tile');
     assert.equal(canPlace(g, 0, 'wall', w.x, w.y), false); assert.equal(canPlace(g, 1, 'wall', w.x, w.y), false, 'for either player');
   }
-  assert.equal(canPlace(g, 0, 'house', cx - 2, cy - 1), false, 'nor can any other building overlap a foundation');
-  assert.ok(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 3, y: cy }, outside(cx, cy)), 'a path leads out across the foundations');
+  assert.equal(canPlace(g, 0, 'house', cx - 4, cy - 1), false, 'nor can any other building overlap a foundation');
+  assert.ok(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 5, y: cy }, outside(cx, cy)), 'a path leads out across the foundations');
   const u = g.spawnUnit('villager', 1, cx + 0.5, cy + 0.5);
-  g.command(1, { type: 'move', ids: [u.id], x: cx + 4.5, y: cy + 0.5 });
+  g.command(1, { type: 'move', ids: [u.id], x: cx + 6.5, y: cy + 0.5 });
   for (let i = 0; i < 200 && u.order.type === 'move'; i++) g.tick();
-  assert.deepEqual([Math.floor(u.x), Math.floor(u.y)], [cx + 4, cy], 'a unit walks straight out over a foundation');
+  assert.deepEqual([Math.floor(u.x), Math.floor(u.y)], [cx + 6, cy], 'a unit walks straight out over a foundation');
 });
 
 test('a finished wall blocks pathing', () => {
-  const g = wallGame(), vs = villagers(g), { x, y } = clearBlock(g, 5, 5), cx = x + 2, cy = y + 2;
+  const g = wallGame(), vs = villagers(g), { x, y } = clearBlock(g, 11, 9), cx = x + 4, cy = y + 4;
   g.command(0, { type: 'wall', ids: vs.map(v => v.id), tiles: diamond(cx, cy) });
   for (const v of vs) v.order = { type: 'idle' };
-  const walls = wallsOf(g); assert.equal(walls.length, 8);
+  const walls = wallsOf(g); assert.equal(walls.length, 16);
   finish(g, walls);
   for (const w of walls) {
     assert.equal(g.blocked(w.x, w.y), true); assert.equal(g.occAt(w.x, w.y), w.id, 'the finished wall occupies its tile');
     assert.equal(g.reserved.has(idx(g, w.x, w.y)), false, 'and no longer just reserves it');
   }
-  assert.equal(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 3, y: cy }, outside(cx, cy)), null, 'sealed in: the diagonal sides cannot be slipped through');
-  const gap = walls.find(w => w.x === cx + 2 && w.y === cy); g.remove(gap);
-  assert.equal(g.blocked(cx + 2, cy), false, 'removing a segment frees its tile');
-  assert.ok(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 3, y: cy }, outside(cx, cy)), 'and opens a gap');
+  assert.equal(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 5, y: cy }, outside(cx, cy)), null, 'sealed in: the diagonal sides cannot be slipped through');
+  const gap = walls.find(w => w.x === cx + 4 && w.y === cy); g.remove(gap);
+  assert.equal(g.blocked(cx + 4, cy), false, 'removing a segment frees its tile');
+  assert.ok(findPath(g.map, g.blocked, { x: cx, y: cy }, { x: cx + 5, y: cy }, outside(cx, cy)), 'and opens a gap');
 });
 
 test('Review Focus 2: a unit standing on a wall tile when it completes is moved to the nearest free tile', () => {

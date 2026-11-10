@@ -4,9 +4,10 @@ import { createBot } from '../src/ai/bot.js';
 import { roundById } from '../src/rounds/index.js';
 import { ageIndex } from '../src/data/ages.js';
 import { UNITS } from '../src/data/units.js';
-import { THINK_EVERY, DIFF, matchOptions } from '../src/ai/bot.js';
+import { THINK_EVERY, DIFF, STRATEGIES, matchOptions } from '../src/ai/bot.js';
 import { updateVision } from '../src/sim/vision.js';
 import { findPath } from '../src/sim/path.js';
+import { canPlace } from '../src/sim/commands.js';
 import { centerOf, distPoint, tileOf, RES_KIND } from '../src/sim/util.js';
 // Runs one bot against an idle opponent; returns the tick of its first attack wave and the tick it reached each age.
 function firstWave(roundId, diff, seed = 1) {
@@ -423,4 +424,82 @@ test('a bot never puts a Mine on a gold patch it cannot walk to', () => {
     });
   assert.ok(home.reserve > 0, 'control: the moated patch still holds gold');
   assert.deepEqual([...g.buildings.values()].filter(x => x.type === 'mine' && x.owner === 1).map(m => m.patch), [], 'no Mine on the unreachable patch');
+});
+
+// ---- attack plans (medium and hard bots vary them wave to wave) ----
+// A bot playing `strategy` against an idle opponent, run until its first wave starts (null if none in 20 min).
+function waveWith(strategy, diff = 'medium', seed = 1) {
+  const g = createGame({ seed, rules: roundById('conquest') }), b = createBot(g, 1, diff), ev = THINK_EVERY[diff];
+  b.strategy = strategy;
+  const soldiers = () => [...g.units.values()].filter(u => u.owner === 1 && u.cls !== 'civ' && u.type !== 'king' && !u.naval);
+  while (!b.waveActive && g.time < 24000) { g.tick(); if (g.time % ev === 3 % ev) b.think(); }
+  return b.waveActive ? { g, b, ev, soldiers, size: soldiers().length } : null;
+}
+test('medium and hard bots pick varied attack plans; easy and relaxed always assault', () => {
+  const first = diff => [1, 2, 3, 4, 5, 6, 7, 8].map(seed => createBot(createGame({ seed }), 1, diff).strategy);
+  for (const diff of ['medium', 'hard']) {
+    const picks = first(diff);
+    assert.ok(new Set(picks).size >= 3, `${diff} first plans over 8 seeds: ${picks}`);
+    assert.ok(picks.every(p => p in STRATEGIES));
+    assert.deepEqual(first(diff), picks, 'the same seed gives the same plan');
+  }
+  for (const diff of ['easy', 'relaxed']) assert.deepEqual([...new Set(first(diff))], ['assault']);
+  const pair = seed => [0, 1].map(pid => createBot(createGame({ seed }), pid, 'hard').strategy).join();
+  assert.ok([1, 2, 3, 4, 5, 6].some(seed => pair(seed).split(',')[0] !== pair(seed).split(',')[1]),
+    'the two bots of a match draw their plans independently');
+});
+test('a raid goes early for the villagers, then pulls back home and the next wave takes another plan', () => {
+  const r = waveWith('raid');
+  assert.ok(r, 'the raid started');
+  assert.ok(r.size >= 5 && r.size < DIFF.medium.wave, `a raid waits for a smaller army: ${r.size}`);
+  const { g, b, ev, soldiers } = r, targets = [], party = new Set(soldiers().map(u => u.id)), home = g.map.starts[1];
+  // The idle opponent's buildings can't fall, so the raid outlives its villagers and has to pull back.
+  for (const x of g.buildings.values()) if (x.owner === 0) x.hp = x.maxHp = 1e9;
+  while (b.waveActive && g.time - b.waveAt < 2 * STRATEGIES.raid.retreat) {
+    g.tick(); if (g.time % ev === 3 % ev) b.think();
+    for (const u of soldiers()) if (u.order.type === 'attack' && !u.order.auto) targets.push(g.entities.get(u.order.target)?.type);
+  }
+  assert.equal(targets.filter(Boolean)[0], 'villager', 'villagers are the first commanded target');
+  assert.ok(!b.waveActive, 'the raid pulled back');
+  assert.ok(g.time - b.waveAt >= STRATEGIES.raid.retreat && g.time - b.killAt >= 1200, 'only once it stopped getting kills');
+  const raiders = soldiers().filter(u => party.has(u.id)), guard = soldiers().filter(u => !party.has(u.id));
+  assert.ok(raiders.length && raiders.every(u => u.order.type === 'move' || Math.hypot(u.x - home.x, u.y - home.y) <= 8), 'the raiders head home');
+  assert.ok(guard.length && guard.every(u => Math.hypot(u.x - home.x, u.y - home.y) < 20), 'soldiers trained during the raid stayed home');
+  assert.notEqual(b.strategy, 'raid', 'the next wave has a different plan');
+  assert.deepEqual(b.waves, ['raid']);
+});
+// The first commanded target of a wave with `strategy` when the idle opponent has a Tower and a soldier by its Town Center.
+function firstTargetWith(strategy) {
+  const r = waveWith(strategy), { g, b, ev, soldiers } = r, t = g.map.starts[0];
+  let tower = null;
+  for (let ring = 3; ring < 9 && !tower; ring++) for (const [dx, dy] of [[ring, 0], [-ring, 0], [0, ring], [0, -ring]]) {
+    if (!tower && canPlace(g, 0, 'tower', t.x + dx, t.y + dy)) tower = g.addBuilding('tower', 0, t.x + dx, t.y + dy, true);
+  }
+  g.spawnUnit('clubman', 0, t.x + 2, t.y + 3);
+  while (b.waveActive && !g.result && g.time - b.waveAt < 4000) {
+    g.tick(); if (g.time % ev === 3 % ev) b.think();
+    const hit = soldiers().find(u => u.cls !== 'siege' && u.order.type === 'attack' && !u.order.auto);
+    if (hit) return { size: r.size, target: g.entities.get(hit.order.target), tower };
+  }
+  return { size: r.size, target: null, tower };
+}
+test('a siege wave waits for a bigger army and knocks down the towers first; an assault goes for the soldiers', () => {
+  const siege = firstTargetWith('siege'), assault = firstTargetWith('assault');
+  assert.ok(siege.tower, 'a Tower was placed');
+  assert.ok(siege.size >= Math.round(DIFF.medium.wave * STRATEGIES.siege.size) && siege.size > assault.size,
+    `siege wave ${siege.size} vs assault ${assault.size}`);
+  assert.equal(siege.target?.type, 'tower');
+  assert.equal(assault.target?.type, 'clubman');
+});
+test('a pincer forms up, then sends half the army round the side of the enemy base', () => {
+  const { g, b, ev, soldiers } = waveWith('pincer');
+  assert.ok(b.march && !b.flank, 'the whole army marches together first');
+  while (b.march && g.time - b.waveAt < 4000) { g.tick(); if (g.time % ev === 3 % ev) b.think(); }
+  const size = soldiers().filter(u => u.cls !== 'siege').length, flank = b.flank, enemy = g.map.starts[0], home = g.map.starts[1];
+  assert.ok(flank && flank.ids.size === Math.floor(size / 2), `half of ${size} on the flank: ${flank?.ids.size}`);
+  // The flank point sits off the straight line between the bases.
+  const lx = enemy.x - home.x, ly = enemy.y - home.y, off = Math.abs(lx * (flank.y - home.y) - ly * (flank.x - home.x)) / Math.hypot(lx, ly);
+  assert.ok(off > 8, `flank point ${off.toFixed(1)} tiles off the line`);
+  const movers = [...flank.ids].map(id => g.units.get(id)).filter(u => u.order.type === 'move');
+  assert.equal(movers.length, flank.ids.size, 'the flank group is on its way');
 });

@@ -2,7 +2,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { TECHS } from '../data/techs.js';
 import { AGES, AGE_COST, ageIndex, popLimit } from '../data/ages.js';
-import { secs, RES_KIND, WATER, passable } from './util.js';
+import { secs, RES_KIND, WATER, passable, landMasses, flood4 } from './util.js';
 import { formationSlots, nearestOpen, landingNear } from './formation.js';
 import { isKingdoms, sheltered, eliminateKingdom, updateTerritory } from './kingdoms.js';
 
@@ -38,15 +38,65 @@ function buildOrder(unit, target, queue, type = 'build') {
   return order;
 }
 
+// Buildings keep off the map's outermost row and column, except walls: a wall line has to reach the edge to close a gap
+// there, or units would walk round its end along the border.
 export function canPlace(game, pid, type, x, y) {
   const def = BUILDINGS[type], n = game.map.size, player = game.players[pid];
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-  if (x < 1 || y < 1 || x + def.size > n - 1 || y + def.size > n - 1) return false;
+  const border = def.defence === 'wall' ? 0 : 1;
+  if (x < border || y < border || x + def.size > n - border || y + def.size > n - border) return false;
   const patch = def.ore ? game.patchAt[y * n + x] : 0;
   if (def.ore && !(game.patches.get(patch)?.reserve > 0)) return false;
   if (!footprintFits(game, player, def, x, y, patch)) return false;
   if (def.naval && !atShore(game, x, y, def.size)) return false;
-  return !hasLooseRelic(game, x, y, def.size);
+  if (hasLooseRelic(game, x, y, def.size)) return false;
+  return def.naval || !sealsPocket(game, x, y, def.size);
+}
+
+// Open ground cut off from the rest of the map in a region smaller than this is a pocket: a building may not close one,
+// or a villager standing (or pushed) there is stuck between buildings for good. A walled-in base is far bigger.
+export const POCKET_TILES = 25;
+
+// True when a size x size building at (x, y) would close off a pocket of open land (not water, not occupied, not a wall
+// foundation, which becomes a wall) next to it. The open tiles of the ring round the footprint fall into runs; with one
+// run nothing was split. Otherwise each run touching a side of the footprint (a run of corner tiles alone never touched
+// it, so is no more shut in than before) is flood-filled (4-way: paths never cut corners) until it proves big.
+function sealsPocket(game, x, y, size) {
+  const n = game.map.size, ring = ringTiles(x, y, size);
+  const inside = (i, j) => i >= x && i < x + size && j >= y && j < y + size;
+  const open = ([i, j]) => i >= 0 && j >= 0 && i < n && j < n && !inside(i, j) && game.map.tiles[j * n + i] !== WATER
+    && !game.occAt(i, j) && !game.reserved.has(j * n + i);
+  const corner = ([i, j]) => (i === x - 1 || i === x + size) && (j === y - 1 || j === y + size);
+  const first = ring.findIndex(tile => !open(tile));
+  if (first < 0) return false; // open all round
+  const runs = [];
+  for (let k = 1, run = null; k <= ring.length; k++) { // from just past a closed tile, so no run wraps round the end
+    const tile = ring[(first + k) % ring.length];
+    if (!open(tile)) { run = null; continue; }
+    if (!run) runs.push(run = { start: tile[1] * n + tile[0], side: false });
+    run.side ||= !corner(tile);
+  }
+  if (runs.length < 2) return false;
+  return runs.some(run => {
+    if (!run.side) return false;
+    const seen = new Set([run.start]);
+    flood4(n, run.start, j => {
+      if (seen.size >= POCKET_TILES || seen.has(j) || !open([j % n, (j / n) | 0])) return false;
+      seen.add(j);
+      return true;
+    });
+    return seen.size < POCKET_TILES;
+  });
+}
+
+// The tiles just outside a size x size square at (x, y), in order round it (each 4-adjacent to the next).
+function ringTiles(x, y, size) {
+  const out = [], x0 = x - 1, y0 = y - 1, x1 = x + size, y1 = y + size;
+  for (let i = x0; i < x1; i++) out.push([i, y0]);
+  for (let j = y0; j < y1; j++) out.push([x1, j]);
+  for (let i = x1; i > x0; i--) out.push([i, y1]);
+  for (let j = y1; j > y0; j--) out.push([x0, j]);
+  return out;
 }
 
 // A Mine goes wholly on one patch (`patch`) that still holds ore, a Dock wholly on deep water; everything else only on
@@ -111,7 +161,13 @@ function finishedGates(game, pid, age) {
     if (building.type === 'town_center') hasTownCenter = true;
     if (counted.has(building.type)) owned.add(building.type);
   }
-  return { hasTownCenter, gates: owned.size };
+  return { hasTownCenter, gates: owned.size, owned };
+}
+
+// The buildings of the player's current Age that count towards advancing, each with whether one is finished.
+export function ageGateStatus(game, pid) {
+  const age = game.players[pid].age, { owned } = finishedGates(game, pid, age);
+  return ageBuildings(age).map(type => ({ type, done: owned.has(type) }));
 }
 
 export function execute(game, pid, cmd) {
@@ -142,12 +198,99 @@ function moveUnits(game, pid, cmd) {
   const units = ownUnits(game, pid, cmd.ids);
   if (!units.length) return fail('no units');
   if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('bad target');
-  // A group spreads out instead of piling onto one tile; soldiers and ships each form up on their own ground, and
-  // ships sent onto land head for the nearest water.
-  for (const group of [units.filter(unit => !unit.naval), units.filter(unit => unit.naval)]) {
-    if (group.length) moveGroup(game, group, cmd);
+  const walkers = units.filter(unit => !unit.naval), ships = units.filter(unit => unit.naval);
+  const plan = cmd.ferry && walkers.length ? ferryPlan(game, pid, walkers, ships, cmd) : null;
+  if (!plan) {
+    // A group spreads out instead of piling onto one tile; soldiers and ships each form up on their own ground, and
+    // ships sent onto land head for the nearest water.
+    for (const group of [walkers, ships]) if (group.length) moveGroup(game, group, cmd);
+    return OK;
   }
+  // Some of the walkers are sent to another island: those go by sea (startFerries), the rest walk; all of them form up
+  // together at the point.
+  const slots = walkers.length > 1 ? formationSlots(game, walkers, cmd.x, cmd.y) : null;
+  const slotOf = unit => slots ? slots.get(unit.id) : { x: cmd.x, y: cmd.y };
+  for (const unit of walkers) {
+    if (!plan.riders.has(unit.id)) giveOrder(unit, { type: 'move', x: slotOf(unit).x, y: slotOf(unit).y, slack: 0 });
+  }
+  startFerries(game, plan, cmd, slotOf);
+  const sailing = ships.filter(ship => !plan.boats.has(ship.id));
+  if (sailing.length) moveGroup(game, sailing, cmd);
   return OK;
+}
+
+// ---- ferries ----
+// Land masses of a map (util.js landMasses): deep water, which parts them, never changes during a match.
+const MASSES = new WeakMap();
+function massesOf(map) {
+  if (!MASSES.has(map)) MASSES.set(map, landMasses(map));
+  return MASSES.get(map);
+}
+// An empty Transport Ship of the player's that is free to take a ferry job: idle or just moving.
+const freeTransport = (unit, pid) => unit.cargo && !unit.dead && unit.owner === pid && !unit.aboard && !unit.cargo.length
+  && (unit.order.type === 'idle' || unit.order.type === 'move');
+
+// With `ferry` set (the player's own orders; the bot runs its own ferries), walkers sent to ground on another land mass
+// than their own go by sea, if the player has free Transport Ships: the
+// selected ones, else any. Riders are grouped by the land mass they stand on; each group gets the nearest transports it
+// needs (at least one) while any are left, and a landing where they can walk to the shore. Returns
+// { riders: Set of ids, boats: Set of ids, jobs: [{ boats, units, pickup }], drop }, or null when nobody goes by sea.
+function ferryPlan(game, pid, walkers, ships, cmd) {
+  const map = game.map, n = map.size, mass = massesOf(map), tx = Math.floor(cmd.x), ty = Math.floor(cmd.y);
+  if (tx < 0 || ty < 0 || tx >= n || ty >= n || mass[ty * n + tx] < 0) return null; // off the map or on deep water
+  const massOf = unit => mass[Math.floor(unit.y) * n + Math.floor(unit.x)], destMass = mass[ty * n + tx];
+  const groups = new Map();
+  for (const unit of walkers) {
+    const from = massOf(unit);
+    if (from < 0 || from === destMass) continue;
+    if (!groups.has(from)) groups.set(from, []);
+    groups.get(from).push(unit);
+  }
+  if (!groups.size) return null;
+  // A shore on the point's land mass, one they can walk to the point from where there is one (the point itself may be
+  // a building).
+  const foot = nearestOpen(game, cmd.x, cmd.y, false);
+  const drop = (foot && massOf(foot) === destMass && landingNear(game, cmd.x, cmd.y, foot)) || landingNear(game, cmd.x, cmd.y);
+  if (!drop || massOf(drop.shore) !== destMass) return null;
+  const selected = ships.filter(ship => freeTransport(ship, pid));
+  const pool = selected.length ? selected : [...game.units.values()].filter(unit => freeTransport(unit, pid));
+  const plan = { riders: new Set(), boats: new Set(), jobs: [], drop };
+  // Biggest group first; a tie goes to the one met first in the selection.
+  for (const units of [...groups.values()].sort((a, b) => b.length - a.length)) {
+    if (!pool.length) break;
+    const centre = centroid(units), pickup = landingNear(game, centre.x, centre.y, units[0]);
+    if (!pickup) continue;
+    const near = boat => Math.hypot(boat.x - pickup.sea.x, boat.y - pickup.sea.y);
+    pool.sort((a, b) => near(a) - near(b) || a.id - b.id);
+    const boats = pool.splice(0, Math.ceil(units.length / UNITS[pool[0].type].carries));
+    plan.jobs.push({ boats, units, pickup });
+    for (const unit of units) plan.riders.add(unit.id);
+    for (const boat of boats) plan.boats.add(boat.id);
+  }
+  return plan.jobs.length ? plan : null;
+}
+
+// Each transport of a job takes its share of the riders (a boatload each in turn), and shuttles them from the pickup
+// landing to the drop landing until all are across (orders.js doFerry); the riders wait for it at the pickup and board.
+function startFerries(game, plan, cmd, slotOf) {
+  const { drop } = plan;
+  for (const { boats, units, pickup } of plan.jobs) {
+    const shares = boats.map(() => []), carries = UNITS[boats[0].type].carries;
+    units.forEach((unit, k) => shares[Math.floor(k / carries) % boats.length].push(unit));
+    boats.forEach((boat, k) => {
+      const slots = {};
+      for (const unit of shares[k]) {
+        slots[unit.id] = slotOf(unit);
+        giveOrder(unit, { type: 'ferry', transport: boat.id, fails: 0 });
+      }
+      giveOrder(boat, {
+        type: 'ferry', phase: 'load', ids: shares[k].map(unit => unit.id), slots,
+        px: pickup.sea.x, py: pickup.sea.y, psx: pickup.shore.x, psy: pickup.shore.y,
+        x: drop.sea.x, y: drop.sea.y, sx: drop.shore.x, sy: drop.shore.y, to: { x: cmd.x, y: cmd.y },
+        docked: false, since: game.time, held: 0, slack: 0,
+      });
+    });
+  }
 }
 
 function moveGroup(game, group, cmd) {

@@ -105,6 +105,7 @@ export function updateUnit(game, unit) {
     case 'relic': return doRelic(game, unit, order);
     case 'board': return doBoard(game, unit, order);
     case 'unload': return doUnload(game, unit, order);
+    case 'ferry': return unit.cargo ? doFerry(game, unit, order) : doRide(game, unit, order);
     case 'shelter': return doShelter(game, unit, order);
   }
 }
@@ -553,29 +554,37 @@ function callTransport(game, unit, transport) {
   }
 }
 
+// Sail to the water tile (x, y): within `near` of it is there (a tile for unloading; a ferry taking people on comes onto
+// the tile itself, so they can reach it from the shore). A way that fails is tried once more for anywhere within a tile of
+// it (order.slack 1); 'fail' only after that. 'arrived' | 'moving' | 'wait' | 'fail'.
+function sailTo(game, unit, order, x, y, near = 1) {
+  if (Math.hypot(x - unit.x, y - unit.y) <= near) return 'arrived';
+  const to = { x: Math.floor(x), y: Math.floor(y) };
+  const status = travel(game, unit, (i, j) => Math.abs(i - to.x) <= order.slack && Math.abs(j - to.y) <= order.slack, to);
+  if (status !== 'fail' || order.slack >= 1) return status;
+  order.slack = 1;
+  unit.retry = 0;
+  return 'moving';
+}
+
 // Unload: sail to the landing (order.x, order.y), a water tile beside the shore tile (order.sx, order.sy), and put every
 // passenger ashore on the free ground nearest it. Passengers carrying a relic take it on to a Town Center; the rest walk on
 // to order.to, if given.
 function doUnload(game, unit, order) {
   if (!unit.cargo?.length) return stop(unit);
-  const to = { x: Math.floor(order.x), y: Math.floor(order.y) };
-  const status = Math.hypot(order.x - unit.x, order.y - unit.y) <= 1
-    ? 'arrived'
-    : travel(game, unit, (x, y) => Math.abs(x - to.x) <= order.slack && Math.abs(y - to.y) <= order.slack, to);
-  if (status === 'fail') { // can't reach the landing: try for within a tile of it once, then give up
-    if (order.slack < 1) {
-      order.slack = 1;
-      unit.retry = 0;
-    } else stop(unit);
-    return;
+  const status = sailTo(game, unit, order, order.x, order.y);
+  if (status === 'fail') return stop(unit); // can't reach the landing, even within a tile of it: give up
+  if (status === 'arrived') {
+    landPassengers(game, unit, order);
+    stop(unit);
   }
-  if (status === 'arrived') putAshore(game, unit, order);
 }
 
-function putAshore(game, transport, order) {
+// Everyone aboard goes ashore beside the shore tile (order.sx, order.sy); false (and all stay aboard) when the shore is full.
+function landPassengers(game, transport, order) {
   const passengers = transport.cargo.map(id => game.entities.get(id)).filter(Boolean);
   const spots = landingTiles(game, order.sx, order.sy, passengers.length);
-  if (!spots.length) return stop(transport); // the shore is full: keep them aboard
+  if (!spots.length) return false;
   passengers.forEach((passenger, i) => {
     const spot = spots[Math.min(i, spots.length - 1)];
     passenger.aboard = null;
@@ -586,9 +595,83 @@ function putAshore(game, transport, order) {
     passenger.order = orderAshore(passenger, order);
   });
   transport.cargo = [];
-  stop(transport);
+  return true;
 }
 
-const orderAshore = (passenger, order) => passenger.relic !== null
-  ? { type: 'relic', relic: passenger.relic, phase: 'store', fails: 0 }
-  : order.to ? { type: 'move', x: order.to.x, y: order.to.y, slack: 0 } : IDLE();
+// A ferried passenger walks on to its own place in the group's formation (order.slots), others to order.to.
+function orderAshore(passenger, order) {
+  if (passenger.relic !== null) return { type: 'relic', relic: passenger.relic, phase: 'store', fails: 0 };
+  const to = order.slots?.[passenger.id] || order.to;
+  return to ? { type: 'move', x: to.x, y: to.y, slack: 0 } : IDLE();
+}
+
+// ---- ferries (commands.js startFerries) ----
+// A ferry shuttles its riders (order.ids) across the sea: 'load' sails to the pickup landing (order.px, order.py) and waits
+// there while they board, 'carry' sails to the drop landing (order.x, order.y) and puts them ashore, then it goes back for
+// the next boatload until nobody is left. It sails as soon as it is full or everyone left is aboard, or with whoever is
+// aboard once nobody has boarded for FERRY_WAIT ticks; with nobody aboard by then it gives up. The wait starts over whenever someone boards or a rider is still walking up. Riders who die or take
+// another order drop out of the job.
+const FERRY_WAIT = 600;
+function doFerry(game, boat, order) {
+  order.ids = order.ids.filter(id => {
+    const rider = game.entities.get(id);
+    return rider && !rider.dead && (rider.aboard === boat.id || (rider.order.type === 'ferry' && rider.order.transport === boat.id));
+  });
+  if (order.phase === 'load') loadFerry(game, boat, order);
+  else carryFerry(game, boat, order);
+}
+
+function loadFerry(game, boat, order) {
+  const waiting = order.ids.map(id => game.entities.get(id)).filter(rider => !rider.aboard), aboard = boat.cargo.length;
+  if (!waiting.length && !aboard) return stop(boat);
+  if (aboard !== order.held || waiting.some(rider => rider.path)) { // someone boarded, or is still on the way
+    order.held = aboard;
+    order.since = game.time;
+  }
+  const stalled = order.docked && game.time - order.since > FERRY_WAIT;
+  if (aboard && (!waiting.length || aboard >= UNITS[boat.type].carries || stalled)) return setSail(boat, order, 'carry');
+  if (stalled) return stop(boat);
+  if (order.docked) return;
+  const status = sailTo(game, boat, order, order.px, order.py, 0.3);
+  if (status === 'fail') return stop(boat);
+  if (status === 'arrived') {
+    order.docked = true;
+    order.since = game.time;
+    boat.path = null;
+  }
+}
+
+function carryFerry(game, boat, order) {
+  if (!boat.cargo.length) return setSail(boat, order, 'load');
+  const status = sailTo(game, boat, order, order.x, order.y);
+  if (status === 'fail') return stop(boat); // the landing can't be reached: they stay aboard, as after a failed unload
+  if (status !== 'arrived') return;
+  if (!landPassengers(game, boat, order)) return stop(boat); // the shore is full: keep them aboard
+  setSail(boat, order, 'load');
+}
+
+function setSail(boat, order, phase) {
+  order.phase = phase;
+  order.docked = false;
+  order.slack = 0;
+  boat.path = null;
+  boat.retry = 0;
+}
+
+// A rider waits on the shore by the pickup landing (walking there first) and steps aboard once its ferry lies there taking
+// people on and has room. A ferry that is gone or has dropped the job, or a shore it can't walk to, ends the order.
+function doRide(game, unit, order) {
+  const boat = game.entities.get(order.transport), job = boat?.order;
+  if (!boat || boat.dead || boat.owner !== unit.owner || job.type !== 'ferry' || !job.ids.includes(unit.id)) return stop(unit);
+  const at = job.docked ? boat : { x: job.px, y: job.py };
+  if (Math.hypot(at.x - unit.x, at.y - unit.y) <= BOARD_REACH) {
+    unit.path = null;
+    if (job.docked && boat.cargo.length < UNITS[boat.type].carries) stepAboard(unit, boat);
+    return;
+  }
+  const tile = { x: Math.floor(at.x), y: Math.floor(at.y) }, tileKey = tile.x + ',' + tile.y;
+  if (unit.path && order.last !== tileKey) unit.path = null; // the ferry came in a little off the landing: head for it
+  order.last = tileKey;
+  const beside = (x, y) => Math.hypot(x + 0.5 - at.x, y + 0.5 - at.y) <= BOARD_REACH - 0.1;
+  if (travel(game, unit, beside, tile) === 'fail' && ++order.fails > 8) stop(unit);
+}

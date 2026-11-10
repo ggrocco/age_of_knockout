@@ -1,0 +1,17 @@
+{
+  "name": "Age of Knockout",
+  "short_name": "Knockout",
+  "description": "A five-round elimination tournament of 1v1 real-time strategy matches against AI empires.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0b0d09",
+  "theme_color": "#231a11",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -19,32 +19,34 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # a hung step must not hold the Pages deploy queue for the 6-hour default
+    timeout-minutes: 30
+    # Microsoft's Playwright image already holds the three browsers and every system library they need, so nothing
+    # is fetched from the runner's apt mirror (which has crawled at ~30 KB/s, 114 MB, for up to an hour). Its tag must
+    # match the exact "playwright" version in package.json. --user 1001 is the runner's own user (checkout and npm write
+    # the workspace as it); --ipc=host as Playwright recommends for Chromium.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001 --ipc=host
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
-      - name: Assemble site
-        run: |
-          set -eu
-          # Pages caches every file for 10 minutes. Serve the game's own files from v/<content hash>/ so a fresh
-          # page never mixes old and new modules (the Dockerfile does the same through an nginx rewrite).
-          v=$(find index.html buildings.html ages.html styles.css src -type f | sort | xargs cat | md5sum | cut -c1-12)
-          mkdir -p _site/v/$v _site/node_modules/three/examples
-          cp index.html buildings.html ages.html favicon.svg _site/
-          cp -r styles.css src _site/v/$v/
-          sed -i "s#href=\"styles.css\"#href=\"v/$v/styles.css\"#; s#src=\"src/#src=\"v/$v/src/#" \
-            _site/index.html _site/buildings.html _site/ages.html
-          # index.html's (and the design pages') import map points at these two three.js paths
-          cp -r node_modules/three/build _site/node_modules/three/
-          cp -r node_modules/three/examples/jsm _site/node_modules/three/examples/
-          touch _site/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
+      # The same files as the Dockerfile's nginx stage, game files under v/<content hash>/ (see the script)
+      - run: bash scripts/build-site.sh _site
+      # Never deploy a site that does not start: the browser smoke test CI runs on pull requests, on these files
+      - run: xvfb-run -a node test/tools/browser-smoke.js _site
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+          # v4+ leaves dotfiles out by default; keep .nojekyll in the site
+          include-hidden-files: true
 
   deploy:
     needs: build
@@ -54,4 +56,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

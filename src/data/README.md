@@ -215,6 +215,11 @@ towers and walls are not modelled and nothing here comes from the openage data. 
   tile is paid for and placed in order, tiles you cannot build on (a tree, a building, another foundation, water, fog) are
   skipped without charge, and the line stops at the first segment you cannot pay for. An unfinished segment (foundation) does not block movement, it only
   reserves its tile; a finished one does, and a unit standing on it is moved to the nearest free tile.
+  Walls (only) may stand on the map's outermost row and column, so a line can reach the edge and close it; every other
+  building keeps one tile off it.
+- **No pockets** (invented; AoE1 lets you trap units): no building or wall may be placed where it would cut off a region of
+  open ground under `POCKET_TILES` = 25 tiles (`sealsPocket` in `sim/commands.js`; a wall foundation counts as the wall it
+  becomes), so a unit can never be boxed in between buildings. Larger enclosures, like a walled base, are allowed.
 - **`extra: true`** on both (like the Farm and Wonder): neither counts toward the age-up building requirement.
 - **Elimination and score.** Neither trains units, so neither keeps a side alive (`isEliminated` ignores them). A finished Tower
   adds to the building score like any building; Wall segments do not, so spamming walls cannot win a time-cap tiebreak.

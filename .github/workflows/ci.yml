@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -29,12 +29,36 @@ jobs:
       # 12 seeds x 5 rounds of bot vs bot: every match must end cleanly within its tick cap
       - run: node test/bot-sim.js 12
 
+  browser:
+    # Loads the site exactly as Pages serves it in Chromium, Firefox and WebKit (Safari's engine) and fails on any
+    # console error, missing file, or match / bracket simulation that does not run (test/tools/browser-smoke.js).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Microsoft's Playwright image already holds the three browsers and every system library they need, so nothing
+    # is fetched from the runner's apt mirror (which has crawled at ~30 KB/s, 114 MB, for up to an hour). Its tag must
+    # match the exact "playwright" version in package.json. --user 1001 is the runner's own user (checkout and npm write
+    # the workspace as it); --ipc=host as Playwright recommends for Chromium.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001 --ipc=host
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: bash scripts/build-site.sh _site
+      - run: xvfb-run -a node test/tools/browser-smoke.js _site
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -45,8 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -61,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate

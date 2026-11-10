@@ -9,11 +9,13 @@ import { createView } from './render/view.js';
 import { createMinimap } from './render/minimap.js';
 import { createHud, reasonText } from './ui/hud.js';
 import { createInput } from './ui/input.js';
+import { installTapActivation } from './ui/tap.js';
 import { BUILDINGS } from './data/buildings.js';
 import { canPlace } from './sim/commands.js';
 import { roundLimitText, TIME_LIMIT_RULE, NO_TIME_LIMIT_RULE } from './ui/tips.js';
 import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
 import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
+import { onInstallChange, screenControlsHtml } from './ui/install.js';
 
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
@@ -25,7 +27,7 @@ window.__app = app;
 let gpuWarned = false;
 // Tournament difficulty level: ?level= wins, else the last pick (browser storage may be unavailable), else Normal.
 const LEVEL_DESC = {
-  relaxed: 'A long peaceful start: opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking.',
+  relaxed: 'A gentle ramp: rounds 1-2 opponents work at half your speed and wait 30 minutes, and until Bronze Age, before attacking; then easy, easy, medium.',
   normal: 'The standard ramp, from easy to hard opponents.',
   hard: 'Tough opponents from the first round.',
 };
@@ -119,6 +121,7 @@ const ui = app.ui = {
 };
 window.addEventListener('orientationchange', () => setTimeout(() => app.onResize?.(), 250));
 const hud = createHud(ui), input = createInput(ui);
+installTapActivation();
 ui.toast = hud.toast;
 ui.confirmDelete = hud.confirmDelete;
 ui.quit = () => {
@@ -258,7 +261,18 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   ui.roundCaps = { ...ui.roundCaps, [roundId]: game.capTicks };
   const viewportEl = document.getElementById('viewport');
   viewportEl.innerHTML = '';
-  const view = createView(viewportEl, game);
+  let view;
+  try {
+    view = createView(viewportEl, game);
+  } catch (error) {
+    // Without WebGL (hardware acceleration off, GPU blocklisted, a privacy setting) three.js throws here; say so
+    // instead of leaving the player on a screen whose button seems to do nothing.
+    console.error('Could not start the 3D view', error);
+    document.body.classList.remove('ingame');
+    viewportEl.innerHTML = '';
+    showWebglError();
+    return;
+  }
   view.selection = ui.sel;
   if (view.softwareGpu && !gpuWarned) {
     gpuWarned = true;
@@ -411,6 +425,13 @@ function showProgress(done, total) {
   if (text) text.textContent = `${done} / ${total} matches`;
 }
 // The bracket is untouched until every match has a result, so the same round can be simulated again.
+function showWebglError() {
+  show('<div class="card"><h2>3D graphics are unavailable</h2><p>Your browser could not start WebGL, which the game'
+    + ' needs to draw the map. Turn on hardware acceleration (graphics acceleration) in the browser settings, update'
+    + ' the browser, or check that WebGL is not blocked by a privacy setting or extension, then reload the page.</p>'
+    + '<button class="btn" id="webgl-back">Back to menu</button></div>');
+  document.getElementById('webgl-back').onclick = menu;
+}
 function showSimulationError(error, won) {
   console.error('Bracket simulation failed', error);
   show('<div class="card"><h2>Unable to finish the bracket</h2><p>The other matches of this round could not be simulated.'
@@ -479,9 +500,14 @@ const CREST = '<svg class="crest" viewBox="0 0 64 64" aria-hidden="true" fill="n
   + ` stroke-linecap="round" stroke-linejoin="round">${SWORD}<g transform="matrix(-1 0 0 1 64 0)">${SWORD}</g>`
   + '<path d="M32 12 48 17v13c0 11-7 19-16 23-9-4-16-12-16-23V17Z" fill="#2a1f13"/>'
   + '<path d="M32 18 43 21.5V30c0 8-5 13.5-11 16.5-6-3-11-8.5-11-16.5v-8.5Z" opacity=".5"/><path d="M27 33l5-6 5 6-5 6Z" fill="currentColor"/></svg>';
+// On a phone the main menu offers full screen and Install as an app before the first match.
+function screenRowHtml() {
+  const buttons = TOUCH ? screenControlsHtml(true) : '';
+  return buttons ? `<div class="screen-row">${buttons}</div>` : '';
+}
 const menuHtml = () => `<div class="card menu">
   <header class="menu-head">${CREST}<h1>Age of Knockout</h1>
-  <p class="tagline"><span>A five-round elimination tournament in the spirit of Age of Empires (1997)</span></p></header>
+  <p class="tagline"><span>A five-round elimination tournament in the spirit of Age of Empires (1997)</span></p></header>${screenRowHtml()}
   <div class="menu-grid">
   <section class="panel rules" aria-labelledby="rules-title"><h3 class="panel-title" id="rules-title">Rules</h3>
     <div class="setting level"><span class="setting-name" id="level-label">Difficulty</span>
@@ -517,6 +543,14 @@ const menuHtml = () => `<div class="card menu">
   <footer class="project"><a class="repo" href="${REPO_URL}" target="_blank" rel="noopener">${GITHUB_ICON}<span>View on GitHub</span></a>
   <h3>Contributing</h3>
   <p>Issues, ideas and pull requests are welcome and much appreciated! Age of Knockout is a one-person project made just for fun, so please expect slow replies and reviews.</p></footer></div>`;
+
+// The full-screen button (clicks go through the HUD's button handler) relabels itself when the page enters or leaves.
+const refreshScreenRow = () => {
+  const row = screenEl.querySelector('.screen-row');
+  if (row) row.outerHTML = screenRowHtml();
+};
+for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, refreshScreenRow);
+onInstallChange(refreshScreenRow);
 
 // A new level or time limit changes every round's cap, so the Quick buttons' time labels follow.
 function refreshQuickLabels() {

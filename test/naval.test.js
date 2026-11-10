@@ -178,6 +178,53 @@ test('a Transport Ship carries soldiers across the sea: they board out of sight,
   assert.ok(army.every(u => u.order.type === 'move'), 'and walking on to where they were sent');
 });
 
+test('a move to another island ferries the walkers over: the transport comes, carries a boatload, and goes back for the rest', () => {
+  const g = islandGame(), s = g.map.starts[0], e = g.map.starts[1];
+  const army = Array.from({ length: 12 }, (_, k) => g.spawnUnit(k % 3 ? 'swordsman' : 'villager', 0, s.x - 5.5 + k, s.y + 3.5));
+  const homebody = g.spawnUnit('clubman', 0, s.x + 0.5, s.y + 5.5);
+  const dock = dockFor(g), sp = g.findSpawn(dock, true), t = g.spawnUnit('transport_ship', 0, sp.x, sp.y);
+  // No transport selected: the free one is used; a soldier sent along on the same island just walks.
+  assert.equal(g.command(0, { type: 'move', ids: army.map(u => u.id), x: e.x + 0.5, y: e.y + 0.5, ferry: true }).ok, true);
+  assert.ok(army.every(u => u.order.type === 'ferry' && u.order.transport === t.id));
+  assert.equal(t.order.type, 'ferry'); assert.equal(t.order.ids.length, 12);
+  const slots = Object.values(t.order.slots);
+  assert.equal(new Set(slots.map(p => p.x + ',' + p.y)).size, 12, 'each has its own place in the formation over there');
+  assert.ok(slots.every(p => sameIsland(g, p, e) && Math.hypot(p.x - e.x, p.y - e.y) < 10));
+  let trips = 0, wasLoaded = false;
+  for (let i = 0; i < 20 * 600 && t.order.type === 'ferry'; i++) {
+    g.tick();
+    if (t.cargo.length) wasLoaded = true;
+    else if (wasLoaded) { trips++; wasLoaded = false; }
+    assert.ok(t.cargo.length <= 8);
+  }
+  assert.equal(t.order.type, 'idle', 'done once everyone is over');
+  assert.ok(trips >= 2, 'two boatloads: ' + trips);
+  assert.ok(army.every(u => !u.aboard && sameIsland(g, u, e)), 'all ashore on the enemy island');
+  // Sent back home together with someone already there: two transports selected split the riders between them.
+  const t2 = g.spawnUnit('transport_ship', 0, sp.x, sp.y), riders = army.slice(0, 10);
+  assert.equal(g.command(0, { type: 'move', ids: [...riders.map(u => u.id), homebody.id, t.id, t2.id], x: s.x + 0.5, y: s.y + 0.5, ferry: true }).ok, true);
+  assert.equal(homebody.order.type, 'move', 'the one at home walks');
+  assert.deepEqual([t.order.ids.length, t2.order.ids.length].sort(), [2, 8]);
+  for (let i = 0; i < 20 * 600 && (t.order.type === 'ferry' || t2.order.type === 'ferry'); i++) g.tick();
+  assert.ok(riders.every(u => !u.aboard && sameIsland(g, u, s)), 'all home again');
+});
+
+test('a ferry rider given another order drops out; with no transport, or no `ferry` flag, a move across the sea is a plain move', () => {
+  const g = islandGame(), s = g.map.starts[0], e = g.map.starts[1];
+  const pair = [0, 1].map(k => g.spawnUnit('swordsman', 0, s.x + 0.5 + k, s.y + 3.5));
+  assert.equal(g.command(0, { type: 'move', ids: pair.map(u => u.id), x: e.x + 0.5, y: e.y + 0.5, ferry: true }).ok, true);
+  assert.ok(pair.every(u => u.order.type === 'move'), 'nothing to carry them');
+  const dock = dockFor(g), sp = g.findSpawn(dock, true), t = g.spawnUnit('transport_ship', 0, sp.x, sp.y);
+  g.command(0, { type: 'move', ids: pair.map(u => u.id), x: e.x + 0.5, y: e.y + 0.5 });
+  assert.ok(pair.every(u => u.order.type === 'move'), 'only a move with `ferry` set (the player\'s) takes the boat');
+  g.command(0, { type: 'move', ids: pair.map(u => u.id), x: e.x + 0.5, y: e.y + 0.5, ferry: true });
+  g.tick();
+  g.command(0, { type: 'move', ids: [pair[1].id], x: s.x + 0.5, y: s.y + 0.5 });
+  for (let i = 0; i < 20 * 400 && t.order.type === 'ferry'; i++) g.tick();
+  assert.ok(sameIsland(g, pair[0], e) && !pair[0].aboard, 'the first went over');
+  assert.ok(sameIsland(g, pair[1], s), 'the second stayed home');
+});
+
 test('a transport refuses more than 8, and sinking it drowns everyone aboard; a relic aboard washes ashore', () => {
   const g = islandGame(), s = g.map.starts[0];
   const nine = Array.from({ length: 9 }, (_, k) => g.spawnUnit('clubman', 0, s.x - 4.5 + k, s.y + 3.5)), t = loadedTransport(g, nine);

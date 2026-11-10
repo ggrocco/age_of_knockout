@@ -114,7 +114,7 @@ test('round tips disclose the actual game-time cap and score decision', () => {
 test('round tips use the effective time limit for each difficulty', () => {
   for (const [level, diffs] of Object.entries(LEVELS)) for (const [i, round] of ROUNDS.entries()) {
     const game = createGame({ rules: round, ...matchOptions([null, diffs[i]]) });
-    const expected = level === 'relaxed' ? 40 : round.capTicks / 1200;
+    const expected = diffs[i] === 'relaxed' ? 40 : round.capTicks / 1200;
     assert.equal(roundTimeLabel(round, game.capTicks), `${expected} minutes`, `${level} ${round.id}`);
     assert.ok(roundTipHtml(round, game.capTicks).includes(`${expected} minutes of game time`), `${level} ${round.id}`);
   }
@@ -207,4 +207,9 @@ test('queueText groups queued units by type in first-queued order', () => {
   assert.equal(queueText(q(['villager'])), 'Villager');
   assert.equal(queueText(q(['villager', 'villager', 'villager'])), 'Villager ×3');
   assert.equal(queueText(q(['clubman', 'villager', 'clubman'])), `${UNITS.clubman.name} ×2, Villager`);
+});
+
+test('the top bar has a 16px glyph for every resource, population and the clock', async () => {
+  const { HUD_ICONS } = await import('../src/ui/icons.js');
+  for (const id of ['food', 'wood', 'gold', 'stone', 'pop', 'age', 'clock']) assert.match(HUD_ICONS[id] || '', /^<svg class="hico" viewBox="0 0 16 16"/, id);
 });

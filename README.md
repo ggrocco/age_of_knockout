@@ -8,7 +8,7 @@ Or play **Kingdom Conquest**, a standalone round against three AI civilizations:
 
 **Play it in the browser: https://ggrocco.github.io/age_of_knockout/**
 
-![A Bronze Age base in Wonder Race: mud-brick houses, towers, a Temple and a Wonder under construction, with a Dock, War Galleys and a Transport Ship in the home bay](docs/screenshots/wonder.jpg)
+![A Bronze Age base in Wonder Race: mud-brick houses, towers, a market and a Wonder 90% built under scaffolding, with the resource chips in the top bar](docs/screenshots/wonder.jpg)
 
 ## Run
 
@@ -38,13 +38,24 @@ The difficulty sets the opponent for each of your five rounds:
 
 | Level | Round 1 | Round 2 | Round 3 | Round 4 | Round 5 |
 | --- | --- | --- | --- | --- | --- |
-| Relaxed | relaxed | relaxed | relaxed | relaxed | relaxed |
+| Relaxed | relaxed | relaxed | easy | easy | medium |
 | Normal | easy | easy | medium | medium | hard |
 | Hard | medium | medium | hard | hard | hard |
 
 Relaxed opponents work at half your speed and wait 30 minutes, and until the Bronze Age, before attacking.
 Easy opponents keep a smaller army than medium and hard ones, but put their economy into reaching the next age and
 quickly replace lost villagers.
+Medium and hard opponents change their attack plan from one wave to the next, so no single defence answers them all:
+a **raid** (an early, smaller party that goes for your villagers and the buildings they work from, fights off the
+soldiers that come at it, and pulls back home once it stops getting kills or loses half its men, while the soldiers
+trained meanwhile stay home on guard), a **siege** (a bigger, later wave that knocks down your Towers first, then the
+buildings that train units), a **pincer** (half the army swings round the side of your base and comes in from there)
+or a straight **assault** on your army. The plan is never the same twice in a row, and differs from match to match.
+Whatever the plan, a wave forms up first: the army gathers just outside its base, walks out as one group and gathers
+again short of yours before it attacks, so it arrives together instead of one soldier at a time. It never sets out while
+its own base is under attack, pulls back home when the fight around it turns clearly against it, and is called home
+when a big attack hits its base. Its villagers run home from your soldiers and stay off that work while they are about,
+and any villager you kill is trained again: near the population limit its soldiers leave the room for them.
 
 ![Round 1 bracket: the rules, time limit and map, you against Ramses, the other first-round pairings, and the later rounds still to play](docs/screenshots/bracket.jpg)
 
@@ -136,7 +147,9 @@ The new gate buildings each research one upgrade: Sacred Harvest (Temple, food +
 +20 HP), Torsion Engines (Siege Workshop, siege +10 attack), Masonry (University, stone +25%), Bayonets (Arsenal, ranged
 foot units +2 melee armor), Colonial Trade (Trading Company, gold +20%), Railways (Railway Station, every unit 10% faster; the station also trains the Armored Train),
 Electrification (Power Plant, all gathering +10%) and Air Support (Airfield, Tanks, Armored Trains and siege +30 HP). The Airfield also trains the Combat Drone once you reach AI Future. Farms, Mines,
-Docks, Towers, Walls and the Wonder never count. Soldiers trained in an earlier era take on
+Docks, Towers, Walls and the Wonder never count. On a phone, selecting the Town Center lists the buildings that still
+count towards the next era, with a tick on those already finished, and the Advance tile shows how many are still
+missing. Soldiers trained in an earlier era take on
 the current one's look too: uniforms and weapon finish change, horses give way to motorbikes and hoverbikes, and
 catapults and trebuchets become mortars and rocket batteries from the Age of Sail on. Villagers, the King and ships keep one look.
 Each era also raises the population limit that houses can reach: 50 in the Stone Age, then 65, 80, 100, 120, 140, 160,
@@ -145,11 +158,14 @@ Farms grow with the eras too: a Farm holds 400 food in the Stone Age, then 500, 
 1800 in AI Future, and villagers work it faster (normal speed in Stone, up to 2.4x in AI Future). When you advance,
 every Farm you already have grows to the new size and keeps its share of food left.
 
-![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with Frigates, a War Galley and Fishing Ships at the Dock](docs/screenshots/deathmatch.jpg)
+![Industrial Age Death Match base: brick houses with chimneys, a factory, a railway station and red-brick towers, with five-digit stockpiles in the top bar](docs/screenshots/deathmatch.jpg)
 
 **Towers and walls** get stronger when you advance: every existing tower and wall section re-scales to your current
 era, and the tower's weapon changes with it (arrows, cannon, machine guns, beams). Draw a wall by dragging its line (on touch: tap
 where it starts, tap where it ends, then press Place); an enemy army with no way round it attacks the wall to break through.
+Walls may run right up to the map's edge (other buildings keep one tile off it), so a line can close the gap along the
+border. No building or wall may be placed where it would shut in a small pocket of open ground (under 25 tiles), so a
+villager can never get stuck between buildings; the ghost shows such a tile red. A walled base is far bigger than that.
 The opponent puts a short wall line in front of each of its towers, on the side facing you, so attackers walk round it
 under fire or stop to break it; it never walls in its own base, and it rebuilds lost sections. It also repairs damaged
 buildings, finishes foundations its builders left, and rebuilds a lost Town Center.
@@ -190,19 +206,21 @@ fleets can meet:
 
 A ship can hit anything within its range of the water, ships first; soldiers on the bank can only hit a ship with ranged
 attacks, but a ship in the shallows can be attacked by anyone, and Towers shoot ships too. Ships alone don't keep a
-beaten side in the game (a Dock does). The opponent builds a Dock in its bay, fishes from the Medieval Age, and keeps a
+beaten side in the game (a Dock does). The opponent builds a Dock in its bay (never on a pond: only on water of 200 tiles or more), fishes from the Medieval Age, and keeps a
 small fleet that answers yours and patrols to your bay during its attacks.
 
 **Transport Ships.** Right-click your Transport Ship with soldiers or villagers selected (tap it on a phone) and they
 walk to it and board; it sails to the shore nearest them if it is out at sea. With it selected, right-click the far
 shore to land everyone there (they walk on to the spot you clicked), or press **Unload** to land them on the nearest
-shore. Passengers are out of sight and can't be attacked, but if the ship sinks everyone aboard is lost; a relic they
+shore. Or just order soldiers or villagers to a spot on another island (right-click it, or the minimap): your free
+Transport Ships (the selected ones, else the nearest empty ones) come to the nearest shore, take them across a boatload
+at a time, land them in formation and go back for the rest until everyone is over. Passengers are out of sight and can't be attacked, but if the ship sinks everyone aboard is lost; a relic they
 carried washes up on the nearest land. A relic carrier landed at home takes the relic on to a Town Center. On an island
 map the opponent ferries its attack waves to your island and sends squads to fetch the relics from the centre.
 
 ### Controls (desktop)
 
-Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic ·
+Left click / drag select (double-click: all of a type) · right click move / gather / build / repair / attack / fetch relic (with Fishing Ships selected, a right click on the water near a shoal fishes it) ·
 WASD or arrows pan, wheel zooms · `.` or the round button above the minimap (badge = count) next idle villager or Fishing Ship, `H` Town Center · hold Space and drag
 with the left mouse button to pan · Esc pauses and resumes (a Paused dialog stops everything, working villagers
 included; during a building placement Esc cancels it instead) · click the minimap to jump. Select villagers to get the build menu, select a building to train units or advance the Age.
@@ -229,25 +247,57 @@ siege, and villagers at the back.
 
 ### Controls (phone / touch)
 
-<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: compact top bar, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
+<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with resource chips, population, Age and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
-tree/mine/farm = gather, fish = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
+tree/mine/farm = gather, fish (or the water within about a tile and a half of a shoal) = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
 pinch-zoom and pan.
 
-Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode, deselect. Building placement: tap
-or drag to position the ghost, then press Place. The menu button (top right) has pause, speed, resign and quit.
+Round buttons: next idle villager or Fishing Ship (badge = count), Town Center, box-select mode. The panel at the bottom
+shows what is selected; its **&#x2715;** deselects, and it hides when nothing is selected. Building placement: tap or drag
+to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, install,
+resign and quit.
+
+The top bar shows each resource as a chip with its icon, then population (red when full: build a House or advance),
+the Age (a green arrow while advancing) and the match clock. In portrait it takes two rows: resources first, then
+population, Age and clock.
+
+**Full screen:** on Android (and on iPads and desktops) the main menu and the in-game menu have a **Play full screen**
+button. For the whole screen with no browser bars at all, install the game as an app (below).
 
 The **Delete** tile opens the same **Cancel / Delete building** confirmation as desktop, including for unfinished
 buildings, towers and walls.
 
-Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a
-real iPhone.
+Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser.
 
 The phone header separates labeled resources from the Age, population and match clock in portrait; landscape keeps
 them in one row. Large resource totals use compact notation (for example, 20k), with the exact total in the accessible label.
 
 <br clear="right">
+
+### Install on your phone (full screen, no browser bars)
+
+Added to the Home Screen, the game opens like an app: full screen, no address bar or toolbar. No web page can add itself
+to the Home Screen on an iPhone, so there it takes the steps below. On Android, Chrome may offer its own install prompt:
+when it does, the menus show an **Install app** button that opens it in one tap. Otherwise, **Install as an app** in the
+main menu (on a phone) or the in-game menu opens this same guide, with a tab for each browser.
+
+If you added the game to an iPhone Home Screen before November 2026 and a dark strip runs along the bottom of the
+screen, remove the icon and add it again: iOS keeps the status-bar style an app was installed with.
+
+**iPhone, Safari:** Share, then **Add to Home Screen**, then **Add**.
+
+![Four steps on an iPhone in Safari: tap Share in the toolbar, tap Add to Home Screen, tap Add, open Knockout from the Home Screen](docs/screenshots/install-iphone-safari.png)
+
+**iPhone, Chrome:** the Share button at the right of the address bar, then **Add to Home Screen**, then **Add**.
+
+![Four steps on an iPhone in Chrome: tap Share in the address bar, tap Add to Home Screen, tap Add, open Knockout from the Home Screen](docs/screenshots/install-iphone-chrome.png)
+
+**Android, Chrome:** the &#8942; menu, then **Add to Home screen** (or **Install app**), then **Install**.
+
+![Four steps on Android in Chrome: tap the three-dot menu, tap Add to Home screen, tap Install, open Knockout from the home screen](docs/screenshots/install-android.png)
+
+On an iPhone the installed game keeps its own settings, separate from the browser's.
 
 ## Buildings and units by era
 
@@ -389,15 +439,16 @@ For four-team play, try `?mode=kingdoms&seed=3`, or add `&map=islands&autoplay=1
 docker compose up -d --build     # nginx image on http://localhost:8080/ (AOE_PORT=9000 to change)
 ```
 
-The image is static files only (`index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `src/`, the two
+The image is static files only (`index.html`, `buildings.html`, `ages.html`, `styles.css`, `favicon.svg`, `manifest.webmanifest`, `icons/`, `src/`, the two
 three.js folders the import map uses) behind nginx, with a healthcheck. Plain `docker build -t aoe-knockout .`
 builds the same image.
 
 ## Deploy (GitHub Pages)
 
 `.github/workflows/pages.yml` publishes the game to https://ggrocco.github.io/age_of_knockout/ on every push to `main` (or
-by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image and deploys them with
-GitHub's Pages actions. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
+by hand from the Actions tab). It runs `npm test`, assembles the same files as the nginx image (`scripts/build-site.sh`),
+checks they start in Chromium, Firefox and WebKit (`test/tools/browser-smoke.js`) and deploys them with GitHub's Pages
+actions, so a build that does not start in a browser is never published. One-time setup: **Settings > Pages > Source: GitHub Actions** (the repository must be public,
 or on a plan that allows Pages for private repositories). Pages caches files for 10 minutes, so the workflow serves
 `styles.css` and `src/` from `v/<content hash>/`, as the Docker image does; a new deploy reaches players within
 about 10 minutes and never mixes old and new modules.
@@ -407,6 +458,11 @@ about 10 minutes and never mixes old and new modules.
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`:
 
 - **Tests**: `npm test` and the `test/bot-sim.js 12` bot-vs-bot check.
+- **Browser**: `test/tools/browser-smoke.js` loads the site exactly as Pages serves it (sub-path and all) in Chromium,
+  Firefox and WebKit (Safari's engine). It plays into a tournament round, wins it so the bracket is simulated in the
+  Worker, starts a quick match, Kingdom Conquest, an islands map and the touch layout, opens both design pages, and
+  fails on any console error, uncaught error or missing file. Locally:
+  `bash scripts/build-site.sh _site && node test/tools/browser-smoke.js _site chromium`.
 - **Lint**: `npm run lint` (ESLint, `eslint.config.js`).
 - **Security**: `npm audit` (fails on moderate or worse) and `npm audit signatures`; on pull requests, GitHub's
   dependency review blocks newly added vulnerable dependencies.
