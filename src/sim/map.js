@@ -4,6 +4,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { UNITS } from '../data/units.js';
 import { farmStats } from '../data/farms.js';
 import { buildFourMap } from './map-four.js';
+import { FISH_AMOUNT } from './fish.js';
 // 180-degree rotationally symmetric map so both players get identical terrain and resources.
 // type: 'rivers' (a river with land crossings between the players) or 'islands' (no way across but by ship).
 // Every random number comes from the seeded rng, in a fixed order: changing that order changes every map.
@@ -98,7 +99,7 @@ export function homeBudget(map, pid) {
 }
 
 // Generation helpers. `layout` is one generation attempt's state (newLayout); s0 is player 0's start, s1 its mirror.
-const START_AMOUNT = { tree: 100, berry: 200, gold: 800, stone: 600, fish: 300 };
+const START_AMOUNT = { tree: 100, berry: 200, gold: 800, stone: 600, fish: FISH_AMOUNT };
 const MINE_TILE = { gold: 2, stone: 3 };
 const CENTRE_SHALLOWS = 12; // the river is shallow this far either side of the map centre, where the relics are
 const mirror = (size, x, y) => ({ x: size - 1 - x, y: size - 1 - y });

@@ -295,6 +295,8 @@ none checked against the openage data (deviations from AoE1 listed where there i
   but not ships.
 - **Fish**: mirrored shoals of 300 food on open deep water (all eight neighbours wet, 3 tiles apart): 4 in each home
   bay, 3 in each estuary, up to 3 along each half of the river. AoE1 fish hold 250 (shore) to 400 (deep).
+  A fished-out shoal comes back full (300) on the same tile 120 s after it was emptied (`fish.js`; it waits while a ship
+  is on that tile), so fish never run out. Invented: AoE1 fish do not come back.
 - **Dock** (`buildings.js`): Stone Age (as in AoE1), 100 wood, 3x3, 35 s, 600 HP, sight 6, `extra: true` (never counts
   toward an age-up), `naval: true`. It stands wholly on deep water with free ground and free water along its sides
   (`atShore` in `commands.js`). It trains every ship and takes only the Fishing Ships' food; villagers never drop there.

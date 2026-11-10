@@ -10,6 +10,7 @@ import { updateTower, refreshDefences } from './defence.js';
 import { execute } from './commands.js';
 import { updateVision } from './vision.js';
 import { initOre, recordPileStart, updateRespawn, RESPAWN_EVERY } from './ore.js';
+import { fishedOut, updateFish } from './fish.js';
 import { secs, rectOf, centerOf, passable } from './util.js';
 import { isKingdoms, sheltered, kingRemoved, releaseKing, updateShelters } from './kingdoms.js';
 
@@ -270,7 +271,11 @@ function addRemovalMethods(game, { n, occupancy, reserved, tilesOf, freeTileNear
     dropRelics(entity, dropX, isBuilding ? Math.min(n - 1, entity.y + entity.size + 0.5) : centre.y);
     kingRemoved(game, entity, attacker);
   };
-  game.depleted = resource => { if (resource.kind === 'resource' || resource.gatherType) game.remove(resource); };
+  game.depleted = resource => {
+    if (resource.kind !== 'resource' && !resource.gatherType) return;
+    game.remove(resource);
+    fishedOut(game, resource);
+  };
   game.damage = (target, amount, attacker) => {
     if (target.dead || sheltered(target)) return;
     target.hp -= amount;
@@ -383,6 +388,7 @@ function tick(game) {
     if (building.type === 'tower') updateTower(game, building);
   }
   if (game.time % RESPAWN_EVERY === 0) updateRespawn(game);
+  updateFish(game);
   for (const player of game.players) {
     if (player.ageUp && (player.ageUp.remaining -= player.workRate) <= 0) finishAgeUp(game, player);
   }

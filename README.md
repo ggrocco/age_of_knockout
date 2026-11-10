@@ -198,7 +198,7 @@ fleets can meet:
 
 | Ship | Age | Cost | Role |
 | --- | --- | --- | --- |
-| Fishing Ship | Stone | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock |
+| Fishing Ship | Stone | 75 wood | Fishes the shoals in the bays and the river, lands the catch at a Dock; a fished-out shoal comes back after two minutes |
 | War Galley | Bronze | 135 wood, 30 gold | Oared warship, shoots arrows |
 | Transport Ship | Bronze | 150 wood | Carries 8 soldiers or villagers; unarmed |
 | Frigate | Age of Sail | 200 wood, 100 gold | Cannon broadsides that splash and batter buildings by the water |
@@ -206,7 +206,7 @@ fleets can meet:
 
 A ship can hit anything within its range of the water, ships first; soldiers on the bank can only hit a ship with ranged
 attacks, but a ship in the shallows can be attacked by anyone, and Towers shoot ships too. Ships alone don't keep a
-beaten side in the game (a Dock does). The opponent builds a Dock in its bay (never on a pond: only on water of 200 tiles or more), fishes from the Medieval Age, and keeps a
+beaten side in the game (a Dock does). The opponent builds a Dock in its bay (never on a pond: only on water of 200 tiles or more), fishes from the Stone Age, and keeps a
 small fleet that answers yours and patrols to your bay during its attacks.
 
 **Transport Ships.** Right-click your Transport Ship with soldiers or villagers selected (tap it on a phone) and they
