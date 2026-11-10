@@ -247,7 +247,7 @@ siege, and villagers at the back.
 
 ### Controls (phone / touch)
 
-<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with resource chips, population, Age and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
+<img src="docs/screenshots/phone.jpg" alt="Phone portrait layout: two-row top bar with labeled resources, Age, population and clock, minimap top right, round action buttons and the Town Center panel" width="260" align="right">
 
 Tap your unit or building to select it; with a selection, tap a target to order it (ground = move, enemy = attack,
 tree/mine/farm = gather, fish (or the water within about a tile and a half of a shoal) = fish with Fishing Ships, own Transport Ship = board, unfinished building = help build, damaged building = repair, relic = pick up). One finger drags the map, two fingers
@@ -258,9 +258,10 @@ shows what is selected; its **&#x2715;** deselects, and it hides when nothing is
 to position the ghost, then press Place. The menu button (top right) has pause, speed, graphics, full screen, install,
 resign and quit.
 
-The top bar shows each resource as a chip with its icon, then population (red when full: build a House or advance),
-the Age (a green arrow while advancing) and the match clock. In portrait it takes two rows: resources first, then
-population, Age and clock.
+The top bar shows labeled resources with icons and larger counters, followed by the Age (a green arrow while advancing),
+population (red when full: build a House or advance) and the match clock. In portrait it takes two rows: resources first,
+then Age, population and clock; landscape keeps them in one row. Large resource totals use compact notation (for example,
+20k), with the exact total in the accessible label.
 
 **Full screen:** on Android (and on iPads and desktops) the main menu and the in-game menu have a **Play full screen**
 button. For the whole screen with no browser bars at all, install the game as an app (below).
@@ -269,9 +270,6 @@ The **Delete** tile opens the same **Cancel / Delete building** confirmation as 
 buildings, towers and walls.
 
 Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser.
-
-The phone header separates labeled resources from the Age, population and match clock in portrait; landscape keeps
-them in one row. Large resource totals use compact notation (for example, 20k), with the exact total in the accessible label.
 
 <br clear="right">
 
