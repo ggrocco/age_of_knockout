@@ -33,8 +33,8 @@ test('render resolution respects pixel budgets on retina desktops and phones', (
     assert.ok(ratio > 0 && ratio <= dpr && ratio <= preset.pixelRatio);
     assert.ok(w * h * ratio * ratio <= preset.maxPixels + 1);
   }
-  assert.equal(renderPixelRatio(402, 874, 3, QUALITY.high), 2);
-  assert.equal(renderPixelRatio(402, 874, 3, QUALITY.ultra), 2.5);
+  assert.equal(renderPixelRatio(402, 874, 3, QUALITY.high), 3);
+  assert.equal(renderPixelRatio(402, 874, 3, QUALITY.ultra), 3);
   assert.ok(Number.isFinite(renderPixelRatio(0, 0, 1, QUALITY.high)));
 });
 

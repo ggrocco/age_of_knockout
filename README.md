@@ -244,6 +244,9 @@ buildings, towers and walls.
 Both orientations are supported; use `?touch=1` to force the touch layout on a desktop browser. Not yet tested on a
 real iPhone.
 
+The phone header separates labeled resources from the Age, population and match clock in portrait; landscape keeps
+them in one row. Large resource totals use compact notation (for example, 20k), with the exact total in the accessible label.
+
 <br clear="right">
 
 ## Buildings and units by era
@@ -330,8 +333,11 @@ performance guarantees on those devices. Use `&quality=balanced|high|ultra` to o
 | Preset | Maximum pixel ratio / rendered pixels | Shadow map | Ambient occlusion | Bloom | Grass clumps | Fire, smoke and dust |
 | --- | --- | --- | --- | --- | --- | --- |
 | Balanced | 1.5 / 2 million | 1024 | Off | Off | 2,500 | Half as many, up to 600 at once |
-| High | 2 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
-| Ultra | 2.5 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+| High | 3 / 4 million | 2048 | Half resolution, 12 samples | Off | 8,000 | Up to 1,500 at once |
+| Ultra | 3 / 8 million | 4096 | Three-quarter resolution, 24 samples | Three-eighths resolution | 14,000 | Up to 2,500 at once |
+
+High and Ultra render at native resolution on 3× phones when the pixel budget allows it, avoiding enlargement of a
+lower-resolution canvas. Larger screens still obey the same pixel budgets; Balanced retains its lower resolution.
 
 Lights glow: fire and braziers, lamp lenses, muzzle flashes and the AI Future's cyan and magenta neon give off their
 own light, so they stay bright in shadow. On Ultra a bloom pass adds a halo around them (sun glints on gold and
