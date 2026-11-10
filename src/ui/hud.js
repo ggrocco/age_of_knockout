@@ -304,10 +304,10 @@ export function createHud(ui) {
         const value = amount >= 1000000 ? (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'm'
           : amount >= 100000 ? Math.floor(amount / 1000) + 'k'
             : amount >= 10000 ? (amount / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : amount;
-        return `<span class="res" data-resource="${resource}" title="${capitalize(resource)}: ${amount}" aria-label="${capitalize(resource)}: ${amount}">`
-          + icon(resource) + `<span><small>${capitalize(resource)}</small><b>${value}</b></span></span>`;
+        return `<span class="res" role="group" data-resource="${resource}" title="${capitalize(resource)}: ${amount}" aria-label="${capitalize(resource)}: ${amount}">`
+          + icon(resource) + `<span aria-hidden="true"><small>${capitalize(resource)}</small><b>${value}</b></span></span>`;
       }).join('');
-      return `<div class="hud-resources" aria-label="Resources">${resources}</div>`
+      return `<div class="hud-resources" role="group" aria-label="Resources">${resources}</div>`
         + '<div class="hud-status">'
         + `<span class="hud-age" title="${ageTitle(player.age)}${player.ageUp ? ' (advancing)' : ''}">${ageTitle(player.age)}${player.ageUp ? '&hellip;' : ''}</span>`
         + `<span class="res hud-pop" ${popTitle} aria-label="Population: ${player.pop} of ${player.popCap}">${icon('villager')}${player.pop}/${player.popCap}</span>`
