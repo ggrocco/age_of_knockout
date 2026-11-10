@@ -76,6 +76,7 @@ export const ICONS = {
   gold: svg(`<path d="m9 4-3 6h12l-3-6Zm-5 9-3 7h11l-2-7Zm11 0-2 7h10l-3-7Z" ${DUOTONE}/><path d="M9 7h5M4 17h4M16 17h4"/>`),
   stone: svg(`<path d="m3 15 3-8 7-4 7 6 1 9-9 3Z" ${DUOTONE}/><path d="m6 7 7 5 7-3M13 12l-1 9M3 15l7-1"/>`),
   menu: svg('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+  play: svg(`<path d="M5 3 21 12 5 21Z" ${SOLID}/>`),
   age: svg(`<path d="M5.8 12.8 12 6.6l6.2 6.2" /><path d="M5.8 19 12 12.8l6.2 6.2" ${DUOTONE}/><path d="M19.4 2.4v4M17.4 4.4h4"/>`),
   lock: svg(`<path d="M7.6 11V8.4a4.4 4.4 0 0 1 8.8 0V11"/><rect x="5.5" y="11" width="13" height="9.5" rx="2" ${DUOTONE}/><circle cx="12" cy="15.2" r="1.3" ${SOLID}/>`),
   delete: svg(`<path d="M6.3 7.2l1 13.3h9.4l1-13.3z" ${DUOTONE}/><path d="M4 7.2h16"/><path d="M9.4 7.2V4.4a.9.9 0 0 1 .9-.9h3.4a.9.9 0 0 1 .9.9v2.8"/><path d="M10 10.6v6.6M14 10.6v6.6"/>`),
