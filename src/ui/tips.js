@@ -66,7 +66,7 @@ export const DESC = {
   drone: 'Fast Future Age skirmisher that fires from long range.',
   mech: 'Future Age walker with 200 health and heavy armor. Slow, tough and hard-hitting.',
   railgun: 'Future Age siege with the longest range and the highest damage. Shots splash nearby units.',
-  fishing_ship: 'Fishes the shoals in the bays and the river and brings the catch to a Dock. Cannot fight.',
+  fishing_ship: 'Fishes the shoals in the bays and the river and brings the catch to a Dock. A fished-out shoal comes back after two minutes. Cannot fight.',
   transport_ship: 'Carries 8 soldiers or villagers. Units sent to another island are ferried over, as many trips as it takes; or right-click it to board. Unarmed; if it sinks, all aboard are lost.',
   unload: 'Lands everyone aboard on the nearest shore.',
   war_galley: 'Bronze Age oared warship. Shoots arrows at ships and at anything near the shore; soldiers can only hit it from the bank with ranged attacks, or in the shallows.',

@@ -78,7 +78,8 @@ Regicide, Wonder Race, Capture the Relics), nine eras (Stone to AI Future), on a
   `commands.js` `execute`; per-unit behaviour is in `orders.js`. Also `map.js` (180-degree symmetric map, ring starts,
   the river with its shallows, estuaries and home bays, fish), `path.js` (A*, on land or, for ships, on water), `formation.js` (where each unit of a group move stands: fighters in front, one tile each), `vision.js` (fog), `defence.js` (tower shooting, walls, breaching, re-scaling on age-up),
   `ore.js` (ore patch state and `patchAt`, Mine draws on a patch's shared reserve, exhaustion and patch respawn, loose
-  gold/stone pile respawn, all from the seeded `game.oreRng`). Keep it DOM-free and deterministic so the headless
+  gold/stone pile respawn, all from the seeded `game.oreRng`), `fish.js` (a fished-out shoal returns on its own tile
+  after two minutes). Keep it DOM-free and deterministic so the headless
   runner and tests work.
   - Tiles: 0 land, 1 deep water, 2 gold vein, 3 quarry, 4 shallows. Soldiers walk everything but deep water; ships
     (units with `naval`) sail deep water and shallows only (`passable` in `util.js`). Only plain land takes buildings,

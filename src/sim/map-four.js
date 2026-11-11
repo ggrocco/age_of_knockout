@@ -1,4 +1,5 @@
 import { makeRng } from './rng.js';
+import { FISH_AMOUNT } from './fish.js';
 
 // Quarter turns operate on tile indices, so rotated footprints and resource centres agree exactly.
 export function rotations(size, x, y) {
@@ -84,7 +85,7 @@ export function buildFourMap(seed, size, type) {
     })) continue;
     for (const p of spots) {
       fish.push(p);
-      resources.push({ id: 'r' + resources.length, type: 'fish', x: p.x + 0.5, y: p.y + 0.5, amount: 300 });
+      resources.push({ id: 'r' + resources.length, type: 'fish', x: p.x + 0.5, y: p.y + 0.5, amount: FISH_AMOUNT });
     }
   }
   const relicSpots = rotations(size, Math.floor(mid) - 3, Math.floor(mid) - 3).map(p => ({ x: p.x + 0.5, y: p.y + 0.5 }));
