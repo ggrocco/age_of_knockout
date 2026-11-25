@@ -139,9 +139,9 @@ export const NO_TIME_LIMIT_RULE = 'Play until a victory condition is met or a pl
 // Uses the same hover-card layout as buildings; durations come from the actual round rules.
 export function roundTipHtml(round, capTicks = round.capTicks) {
   const info = ROUND_INFO[round.id];
-  const deadline = round.id === 'kingdoms'
+  const deadline = round.deadline ?? (round.id === 'kingdoms'
     ? 'Most territory wins; existing game score breaks territory ties. A remaining tie is a draw.'
-    : TIME_LIMIT_RULE + ' An exact tie goes to you.';
+    : TIME_LIMIT_RULE + ' An exact tie goes to you.');
   const endRule = capTicks === Infinity
     ? row('Match ends', NO_TIME_LIMIT_RULE, true)
     : row('At the limit', deadline, true);
@@ -149,7 +149,7 @@ export function roundTipHtml(round, capTicks = round.capTicks) {
     + `<dl>${row('Goal', info.goal, true)}${row('Time limit', roundLimitText(round, capTicks), true)}`
     + endRule
     + (info.start ? row('Starting resources', info.start, true) : '') + '</dl>'
-    + '<p>Score rewards combat, economy, exploration, research, relics and Wonders.</p>'
+    + (round.deadline ? '' : '<p>Score rewards combat, economy, exploration, research, relics and Wonders.</p>')
     + '<p>At 2x or 4x speed, game time passes faster. Pausing stops the clock.</p>';
 }
 

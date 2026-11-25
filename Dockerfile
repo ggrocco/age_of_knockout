@@ -21,6 +21,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 WORKDIR /usr/share/nginx/html
 COPY index.html buildings.html ages.html styles.css favicon.svg manifest.webmanifest ./
 COPY icons ./icons
+# src also contains the featured challenge's versioned menu image.
 COPY src ./src
 # Point the pages at /v/<content hash>/..., so every deploy that changes a file gets fresh URLs that no
 # browser or Cloudflare copy can serve stale. The modules' own imports are relative, so they inherit it.

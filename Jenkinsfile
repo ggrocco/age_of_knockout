@@ -70,6 +70,7 @@ pipeline {
           check "/eof/v/$v/src/tournament/worker.js" javascript
           check "/v/$v/src/render/terrain-bake.js" javascript
           check "/v/$v/src/render/cosmetics.js" javascript
+          check "/v/$v/src/assets/industrial-town.webp" image/webp
           check "/v/$v/styles.css" text/css
           check "/eof/v/$v/src/gallery/main.js" javascript
           check /src/gallery/main.js javascript
