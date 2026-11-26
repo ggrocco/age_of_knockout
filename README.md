@@ -27,11 +27,17 @@ The development server listens on `127.0.0.1:8000` by default. Set `PORT` (or pa
 port; set `HOST` only when your preview proxy requires a different listening interface.
 For hardware render measurements, start the dev server and open `http://localhost:8000/test/tools/render-audit.html?quality=high`. The diagnostic reports CPU and asynchronous GPU timings, restores your saved graphics preference, and is excluded from the nginx image.
 
+## Featured challenge
+
+Choose **Play the Challenge** to start **River Regicide** on a fixed Rivers map against an Easy opponent.
+You have 15 minutes of game time to defeat the enemy king and keep yours alive. The result screen shows your
+time and offers **Retry same map** and **Copy challenge link**. Everyone who follows that link gets the same setup.
+
 ## How a tournament works
 
 ![Main menu: the Rules panel (difficulty, map, time-limit slider) beside the Play panel (Begin Tournament, Kingdom Conquest), with five quick-match tiles below](docs/screenshots/menu.jpg)
 
-Pick a **difficulty**, set the **Time limit** slider, and press **Begin Tournament**, or jump straight into one
+Under **Customize matches**, pick a **difficulty** and set the **Time limit** slider. Press **Begin Tournament**, or jump straight into one
 game type with a **Quick match** tile. Both choices are saved in this browser. The keyboard and mouse (or touch)
 controls are under **Controls** at the bottom of the menu.
 The difficulty sets the opponent for each of your five rounds:
@@ -416,6 +422,7 @@ Static model and contact-shadow transforms stay on the GPU until they change. Bu
 
 | Param | Effect |
 | --- | --- |
+| `?challenge=river-regicide` | Start the featured 15-minute Regicide challenge on a fixed Rivers map against an Easy opponent |
 | `?mode=kingdoms` | Start standalone four-team Kingdom Conquest; `opp` sets all three opponents |
 | `?round=1..5` | Start that round as a quick match, skipping the menus |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent for `?round=` (default `medium`) |

@@ -17,6 +17,14 @@ import { MAX_TIME_LIMIT, readTimeLimit } from './time-limit.js';
 import { MAP_TYPES, MAP_NAME, MAP_DESC, readMapType } from './map-type.js';
 import { onInstallChange, screenControlsHtml } from './ui/install.js';
 
+// Keep this setup tied to its public challenge link.
+const FEATURED_CHALLENGE = {
+  id: 'river-regicide', name: 'River Regicide',
+  desc: 'Defeat the enemy king before the clock runs out. Keep yours alive.',
+  deadline: 'The challenge fails if the enemy king survives.',
+  match: { roundId: 'regicide', seed: 42, oppDiff: 'easy', minutes: 15, map: 'rivers' },
+};
+const MENU_IMAGE = new URL('./assets/industrial-town.webp', import.meta.url).href;
 const params = new URLSearchParams(location.search), AUTO = params.get('autotour') === '1';
 // ?seed=N replays a map; otherwise every tournament and quick match gets a fresh map and start position.
 const pickSeed = () => +params.get('seed') || 1 + Math.floor(Math.random() * 100000);
@@ -249,12 +257,13 @@ function resetUiFor(game, view) {
   ui.minimap = createMinimap(document.getElementById('minimap'), game, view);
 }
 
-function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit, map = mapType }) {
+function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit, map = mapType, challenge = null }) {
   endMatch();
   document.body.classList.add('ingame');
   // botDiff: the bot that drives player 0 in autoplay/test modes
-  const botDiff = params.get('bot') || 'hard', autoplay = params.get('autoplay') === '1' || AUTO;
-  const rules = roundById(roundId), count = rules.playerCount ?? 2;
+  const botDiff = params.get('bot') || 'hard', autoplay = !challenge && (params.get('autoplay') === '1' || AUTO);
+  const round = roundById(roundId), count = round.playerCount ?? 2;
+  const rules = challenge ? { ...round, name: challenge.name, desc: challenge.desc, deadline: challenge.deadline } : round;
   const difficulties = Array.from({ length: count }, (_, pid) => pid === 0 ? (autoplay ? botDiff : null) : oppDiff);
   const options = matchOptions(difficulties, { timeLimit: minutes });
   const game = createGame({ seed, rules, mapType: map, ...options });
@@ -283,7 +292,7 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   const diffs = difficulties;
   centreOnHome(game, view);
   const match = app.match = {
-    game, view, bots, diffs, autoplay, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd,
+    game, view, bots, diffs, autoplay, acc: 0, animT: 0, last: performance.now(), ended: false, frames: 0, next: 0, label, onEnd, challenge,
   };
   app.onResize = () => { view.resize(); };
   window.addEventListener('resize', app.onResize);
@@ -291,6 +300,10 @@ function startMatch({ roundId, seed, oppDiff, label, onEnd, minutes = timeLimit,
   match.raf = requestAnimationFrame(match.loop);
   hide();
   return match;
+}
+
+function startFeaturedChallenge() {
+  startMatch({ ...FEATURED_CHALLENGE.match, challenge: FEATURED_CHALLENGE });
 }
 
 // The result card's sentence for each way a match can end, from the player's side (`won`).
@@ -304,13 +317,15 @@ const REASON = {
   'mutual destruction': () => 'Both empires fell; decided on score.',
   'both kings fell': () => 'Both kings fell; decided on score.',
 };
+const elapsedTime = time => `${Math.floor(time / 1200)}m ${Math.floor(time / 20) % 60}s`;
 function resultStats(game) {
   const you = game.players[0];
-  return `Time ${Math.floor(game.time / 1200)}m ${Math.floor(game.time / 20) % 60}s`
+  return `Time ${elapsedTime(game.time)}`
     + ` &middot; your kills ${you.kills}, buildings destroyed ${you.bdestroyed}`
     + ` &middot; score ${scoreOf(game, 0).toFixed(0)} vs ${scoreOf(game, 1).toFixed(0)}`;
 }
 function showResult(match) {
+  if (match.challenge) return showChallengeResult(match);
   if (match.game.rules.id === 'kingdoms') return showKingdomResult(match);
   const result = match.game.result, won = result.winner === 0;
   const reason = (REASON[result.reason] || (() => result.reason))(won);
@@ -321,6 +336,44 @@ function showResult(match) {
     if (app.match === match) endMatch();
     if (match.onEnd) match.onEnd(won);
     else menu();
+  };
+}
+
+function showChallengeResult({ challenge, game }) {
+  const { winner, reason } = game.result;
+  const complete = winner === 0 && reason === 'regicide';
+  const verdict = {
+    'time cap': 'Time ran out before you defeated the enemy king.',
+    'both kings fell': 'Both kings fell. Your king must survive.',
+    resigned: winner === 0 ? 'The enemy resigned before you defeated their king.' : 'You resigned.',
+  }[reason] ?? REASON.regicide(complete);
+  show(`<div class="card challenge-result"><h1 class="${complete ? 'win' : 'lose'}">${complete ? 'Challenge complete' : 'Challenge failed'}</h1>
+    <h2>${challenge.name}</h2><p>${verdict}</p><p><small>Time ${elapsedTime(game.time)}</small></p>
+    <div class="challenge-actions"><button class="btn" id="retry-challenge">Retry same map</button>
+      <button class="btn" id="copy-challenge">Copy challenge link</button>
+      <button class="btn" id="challenge-menu">Back to menu</button></div>
+    <div class="challenge-link" id="challenge-link" hidden>
+      <label for="challenge-url">Copy this link to share the challenge</label><input id="challenge-url" type="url" readonly>
+    </div><p class="challenge-status" id="challenge-status" role="status"></p></div>`);
+  document.getElementById('retry-challenge').onclick = startFeaturedChallenge;
+  document.getElementById('challenge-menu').onclick = () => { endMatch(); menu(); };
+  const url = new URL(location.href);
+  url.search = url.hash = '';
+  url.searchParams.set('challenge', challenge.id);
+  const fallback = document.getElementById('challenge-link'), input = document.getElementById('challenge-url');
+  const status = document.getElementById('challenge-status');
+  document.getElementById('copy-challenge').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(url.href);
+      fallback.hidden = true;
+      status.textContent = 'Challenge link copied.';
+    } catch {
+      status.textContent = '';
+      fallback.hidden = false;
+      input.value = url.href;
+      input.focus();
+      input.select();
+    }
   };
 }
 
@@ -507,9 +560,31 @@ function screenRowHtml() {
 }
 const menuHtml = () => `<div class="card menu">
   <header class="menu-head">${CREST}<h1>Age of Knockout</h1>
-  <p class="tagline"><span>A five-round elimination tournament in the spirit of Age of Empires (1997)</span></p></header>${screenRowHtml()}
+  <p class="tagline"><span>Build an empire from the Stone Age to AI Future.</span></p></header>
+  <section class="featured-challenge" aria-labelledby="featured-title">
+    <div class="featured-copy">
+      <p class="featured-label">Featured challenge</p><h2 id="featured-title">${FEATURED_CHALLENGE.name}</h2>
+      <p>${FEATURED_CHALLENGE.desc}</p><p class="featured-limit">${FEATURED_CHALLENGE.match.minutes} minutes of game time</p>
+      <button class="btn primary" id="start-challenge">Play the Challenge</button>
+    </div>
+    <img src="${MENU_IMAGE}" width="840" height="507" alt="An Industrial Age town with factories, towers, and blue troops" decoding="async">
+  </section>${screenRowHtml()}
   <div class="menu-grid">
-  <section class="panel rules" aria-labelledby="rules-title"><h3 class="panel-title" id="rules-title">Rules</h3>
+  <section class="panel play" aria-labelledby="play-title"><h3 class="panel-title" id="play-title">Play</h3>
+    <div class="mode tournament">
+      <h4>Knockout Tournament</h4>
+      <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
+      <ol class="ladder" aria-hidden="true"><li>32</li><li>16</li><li>8</li><li>4</li><li>2</li><li class="crown">&#9813;</li></ol>
+      <button class="btn" data-auto id="start">Begin Tournament</button>
+    </div>
+    <div class="mode kingdoms">
+      <h4>Kingdom Conquest <span class="mode-tag">4 teams</span></h4>
+      <p>Defeat a king to inherit their empire. Conquer all three opponents or hold the most territory.</p>
+      <button class="btn kingdoms-start" id="start-kingdoms" data-tip="round:kingdoms">Start Kingdom Conquest</button>
+    </div>
+  </section>
+  <details class="panel rules controls"${TOUCH ? '' : ' open'}>
+    <summary>Customize matches</summary>
     <div class="setting level"><span class="setting-name" id="level-label">Difficulty</span>
       <div class="seg" role="group" aria-labelledby="level-label">${levelButtonsHtml()}</div>
       <p id="leveldesc">${LEVEL_DESC[level]}</p></div>
@@ -522,20 +597,7 @@ const menuHtml = () => `<div class="card menu">
       <div class="time-scale"><span>0 &middot; No limit</span><span>2 hours</span></div>
       <p id="time-limit-help">Minutes of game time. Applies to quick matches and all your tournament rounds. Wonder and relic countdowns still apply.</p>
     </div>
-  </section>
-  <section class="panel play" aria-labelledby="play-title"><h3 class="panel-title" id="play-title">Play</h3>
-    <div class="mode tournament">
-      <h4>Knockout Tournament</h4>
-      <p>Thirty-two rulers enter; you face one AI empire per round, each round a different game type. Lose once and you are out.</p>
-      <ol class="ladder" aria-hidden="true"><li>32</li><li>16</li><li>8</li><li>4</li><li>2</li><li class="crown">&#9813;</li></ol>
-      <button class="btn primary" data-auto id="start">Begin Tournament</button>
-    </div>
-    <div class="mode kingdoms">
-      <h4>Kingdom Conquest <span class="mode-tag">4 teams</span></h4>
-      <p>Slay kings to capture their civilizations. Conquer all three opponents or hold the most territory.</p>
-      <button class="btn kingdoms-start" id="start-kingdoms" data-tip="round:kingdoms">Start Kingdom Conquest</button>
-    </div>
-  </section>
+  </details>
   </div>
   <section class="quick-row" aria-labelledby="quick-title"><h3 class="panel-title" id="quick-title">Quick match <small>one game of a single round type</small></h3>
     <div class="quick-grid">${quickButtonsHtml()}</div></section>
@@ -568,6 +630,7 @@ function pressOnly(button) {
   }
 }
 function wireMenu() {
+  document.getElementById('start-challenge').onclick = startFeaturedChallenge;
   document.getElementById('start').onclick = startTournament;
   document.getElementById('start-kingdoms').onclick = () => startMatch({ roundId: KINGDOMS.id, seed: pickSeed(),
     oppDiff: params.get('opp') || ({ relaxed: 'relaxed', normal: 'medium', hard: 'hard' })[level] });
@@ -602,7 +665,9 @@ function menu() {
   wireMenu();
 }
 
-if (params.get('mode') === 'kingdoms') {
+if (params.get('challenge') === FEATURED_CHALLENGE.id) {
+  startFeaturedChallenge();
+} else if (params.get('mode') === 'kingdoms') {
   startMatch({ roundId: KINGDOMS.id, seed: pickSeed(),
     oppDiff: params.get('opp') || ({ relaxed: 'relaxed', normal: 'medium', hard: 'hard' })[level] });
 } else if (params.get('round')) {

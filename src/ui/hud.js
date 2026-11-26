@@ -206,7 +206,8 @@ export function createHud(ui) {
     tipEl.style.top = Math.max(8, Math.min(window.innerHeight - height - 8, above < 8 ? rect.bottom + 10 : above)) + 'px';
   };
   const showTip = (target, force) => {
-    const round = roundTips.get(target.dataset.tip);
+    const listed = roundTips.get(target.dataset.tip);
+    const round = listed && ui.game?.rules.id === listed.id ? ui.game.rules : listed;
     const html = round ? roundTipHtml(round, ui.roundCaps?.[round.id]) : tips.get(target.dataset.tip);
     if (!html || ui.touch) return hideTip();
     const wasShown = tipEl.classList.contains('show');

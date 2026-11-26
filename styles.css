@@ -174,7 +174,13 @@ body.touch #tip { display:none; }
 #delete-confirmation .btn { flex:1; min-height:44px; margin:0; padding:9px 12px; white-space:nowrap; }
 #delete-confirmation .danger { border-color:var(--red); background:linear-gradient(#79362c,#4b201a); }
 #delete-confirmation .btn:focus-visible { outline:2px solid var(--parch); outline-offset:3px; }
-/* Main menu: a header, the Rules and Play panels side by side, the quick-match tiles, then controls and footer. */
+.card.challenge-result { max-width:660px; }
+.challenge-actions { display:flex; flex-wrap:wrap; justify-content:center; }
+.challenge-actions .btn:focus-visible, .challenge-link input:focus-visible { outline:2px solid var(--parch); outline-offset:2px; }
+.challenge-link { margin-top:16px; }
+.challenge-link input { display:block; width:100%; margin-top:6px; padding:8px; border:1px solid var(--bronze); border-radius:4px; background:#21190e; color:var(--parch); font:inherit; }
+.card .challenge-status:empty { margin:0; }
+/* Main menu: the featured challenge, tournament and settings, quick matches, controls and footer. */
 .card.menu { max-width:1080px; padding:30px 36px 22px; text-align:left; border:1px solid var(--bronze); border-radius:10px;
   background:radial-gradient(ellipse 70% 40% at 50% 0, #6b4f2a40, transparent), var(--card); box-shadow:var(--edge), 0 0 0 5px rgb(18 13 8 / .6), 0 0 0 6px #c8a05259, 0 18px 60px #000; }
 .menu-head { text-align:center; margin-bottom:22px; }
@@ -183,7 +189,18 @@ body.touch #tip { display:none; }
 .card.menu .tagline { display:flex; align-items:center; gap:16px; max-width:820px; margin:6px auto 0; font-size:17px; font-style:italic; color:#d9c28e; }
 .tagline::before, .tagline::after { content:''; flex:1 1 30px; min-width:16px; height:1px; background:linear-gradient(90deg,transparent,var(--bronze)); }
 .tagline::after { background:linear-gradient(90deg,var(--bronze),transparent); }
-.menu-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:18px; }
+.featured-challenge { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); margin-bottom:18px; border:1px solid var(--bronze); border-radius:8px; overflow:hidden;
+  background:radial-gradient(ellipse at top left,#6b4f2a9c,transparent 85%), #231a10; }
+.featured-copy { align-self:center; padding:20px clamp(14px,3vw,30px); }
+.card.menu .featured-copy h2 { margin:2px 0; color:#f6dfab; font-size:clamp(26px,4vw,38px); }
+.card.menu .featured-copy p { margin:5px 0; }
+.card.menu .featured-label { margin:0; color:#dbb770; font-size:12px; letter-spacing:.14em; text-transform:uppercase; }
+.card.menu .featured-limit { font-size:13px; color:#c8b58f; }
+.featured-challenge img { display:block; width:100%; height:100%; max-height:250px; object-fit:cover; }
+.menu-grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:18px; }
+.menu-grid .rules { align-self:start; margin:0; }
+.menu-grid .rules summary { justify-content:flex-start; }
+.menu-grid .rules[open] summary { margin-bottom:10px; }
 .panel { padding:15px 18px 18px; border:1px solid #c8a05238; border-radius:6px; background:#00000030; }
 .panel-title { display:flex; align-items:center; gap:10px; margin:0 0 12px; font-size:13px; font-weight:normal; letter-spacing:.22em; text-transform:uppercase; color:var(--bronze); }
 .panel-title::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,#c8a05266,transparent); }
@@ -222,6 +239,7 @@ body.touch #tip { display:none; }
 .card.menu .btn.primary { display:block; width:100%; max-width:340px; margin:12px auto 0; padding:11px 24px; font-size:21px; letter-spacing:.04em; color:var(--ink); border:1px solid #f6e2a8; border-radius:4px;
   background:linear-gradient(#ecd08a,#c39645 55%,#a47a33); box-shadow:0 3px 12px #0009, inset 0 1px 0 #fff8; }
 .card.menu .btn.primary:hover { background:linear-gradient(#f6dc9a,#d4a754 55%,#b3873a); box-shadow:0 0 20px #e3ba3759, 0 3px 12px #0009, inset 0 1px 0 #fff8; }
+.card.menu .featured-copy .btn { width:auto; max-width:100%; margin:12px 0 0; padding:10px 18px; font-size:17px; letter-spacing:0; }
 .card.menu .kingdoms-start { margin:12px auto 0; padding:8px 22px; font-size:17px; border-radius:4px; }
 .quick-row { margin-top:18px; }
 .quick-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
@@ -245,6 +263,11 @@ body.touch #tip { display:none; }
   .quick-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .quick-grid .quick:last-child { grid-column:1 / -1; }
   .card.menu .tagline { display:block; text-align:center; } .tagline::before, .tagline::after { display:none; }
+}
+@media (max-width:620px) {
+  .featured-challenge { grid-template-columns:minmax(0,1fr); }
+  .featured-copy { padding:14px 16px; }
+  .featured-challenge img { height:auto; aspect-ratio:2.35; }
 }
 /* Main menu footer: repository link and contribution note. */
 .card .project { margin:20px auto 0; padding-top:14px; border-top:1px solid #6b5230; max-width:720px; }
@@ -407,7 +430,7 @@ body.touch .ladder li + li::before { width: 10px; }
 body.touch.placing #info { display: none; }
 body.touch #placebar .btn { min-width: 116px; }
 body:not(.ingame) #topbar, body:not(.ingame) #bottom, body:not(.ingame) #touchbar, body:not(.ingame) #objective, body:not(.ingame) #placebar { visibility: hidden; }
-/* Full screen and Install: the row under the main menu's title on phones. */
+/* Full screen and Install: the row under the featured challenge on phones. */
 .screen-row { display:flex; justify-content:center; margin:-8px 0 16px; }
 .card.menu .screen-btn { margin:0; min-height:44px; padding:6px 18px; font-size:16px; border-radius:6px; }
 /* Phone info panel: only for a selection, with a small x to let go of it. */

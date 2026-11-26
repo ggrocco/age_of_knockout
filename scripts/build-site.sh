@@ -12,6 +12,7 @@ v=$(find index.html buildings.html ages.html styles.css src -type f | LC_ALL=C s
 mkdir -p "$out/v/$v" "$out/node_modules/three/examples"
 cp index.html buildings.html ages.html favicon.svg manifest.webmanifest "$out/"
 cp -r icons "$out/"
+# src includes the featured challenge's menu image, resolved relative to its versioned module URL.
 cp -r styles.css src "$out/v/$v/"
 sed -i "s#href=\"styles.css\"#href=\"v/$v/styles.css\"#; s#src=\"src/#src=\"v/$v/src/#" \
   "$out/index.html" "$out/buildings.html" "$out/ages.html"

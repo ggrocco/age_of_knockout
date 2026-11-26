@@ -3,11 +3,12 @@
 // served under the /age_of_knockout/ sub-path, in Chromium, Firefox and WebKit (Safari's engine).
 //   bash scripts/build-site.sh _site
 //   node test/tools/browser-smoke.js [siteDir=_site] [browsers=chromium,firefox,webkit]
-// Each browser opens the menu and plays into a tournament round, resigns it so the bracket is simulated (the module
+// Each browser checks the featured challenge, then plays into a tournament round and wins it so the bracket is simulated (the module
 // Worker) to the Eliminated screen, starts a quick match, Kingdom Conquest, an islands map and the touch layout, and
 // opens buildings.html and ages.html. A check fails on any uncaught error, console error, failed request or HTTP
 // error, or a match whose sim or render loop does not move. Chromium also starts a match with WebGL disabled and
 // expects the "3D graphics are unavailable" message. Exits non-zero if anything failed.
+import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -21,7 +22,7 @@ const PREFIX = '/age_of_knockout/';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png',
-  '.svg': 'image/svg+xml',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp',
 };
 
 // A static server that, like Pages, serves the site only under its sub-path.
@@ -52,7 +53,67 @@ async function matchRuns(page) {
 
 const clickText = (page, text) => page.locator('#screen button', { hasText: text }).first().click({ timeout: 30000 });
 
+const challengeSetup = page => page.evaluate(() => {
+  const { game, diffs, autoplay } = window.__app.match;
+  return { seed: game.seed, map: game.map.type, starts: game.map.starts, cap: game.capTicks, diffs, autoplay };
+});
+
 const CHECKS = [
+  ['featured challenge, result, retry and shared link', '?map=islands&timeLimit=1&opp=hard', async page => {
+    await page.waitForFunction(() => document.querySelector('.featured-challenge img')?.naturalWidth > 0);
+    assert.equal(await page.locator('#viewport canvas').count(), 0);
+    await clickText(page, 'Play the Challenge');
+    await matchRuns(page);
+    const setup = await challengeSetup(page);
+    assert.equal(setup.seed, 42);
+    assert.equal(setup.map, 'rivers');
+    assert.equal(setup.cap, 15 * 1200);
+    assert.deepEqual(setup.diffs, [null, 'easy']);
+    await page.evaluate(() => {
+      const { game } = window.__app.match;
+      game.remove(game.entities.get(game.roundState.kings[1]));
+      Object.defineProperty(window.navigator, 'clipboard', { configurable: true, value: {
+        async writeText() { throw new Error('Clipboard unavailable'); },
+      } });
+    });
+    await page.getByRole('heading', { name: 'Challenge complete' }).waitFor();
+    await clickText(page, 'Copy challenge link');
+    await page.locator('#challenge-url').waitFor();
+    const link = await page.locator('#challenge-url').inputValue();
+    assert.equal(link, `${base}?challenge=river-regicide`);
+    await page.evaluate(() => {
+      window.navigator.clipboard.writeText = async value => { window.__copiedChallenge = value; };
+    });
+    await clickText(page, 'Copy challenge link');
+    await page.getByText('Challenge link copied.').waitFor();
+    assert.equal(await page.evaluate(() => window.__copiedChallenge), link);
+    await clickText(page, 'Retry same map');
+    await matchRuns(page);
+    assert.deepEqual(await challengeSetup(page), setup);
+    await page.evaluate(() => {
+      const { game } = window.__app.match;
+      game.players[0].kills = 10;
+      game.time = game.capTicks - 1;
+    });
+    await page.getByRole('heading', { name: 'Challenge failed' }).waitFor();
+    await page.getByText('Time ran out before you defeated the enemy king.').waitFor();
+    await clickText(page, 'Back to menu');
+    await page.getByRole('button', { name: 'Play the Challenge' }).waitFor();
+    await page.goto(`${link}&map=islands&timeLimit=1&opp=hard&autoplay=1`);
+    await matchRuns(page);
+    assert.deepEqual(await challengeSetup(page), setup);
+  }],
+  ['featured challenge phone menu', '?touch=1', async page => {
+    const button = page.getByRole('button', { name: 'Play the Challenge' });
+    const box = await button.boundingBox();
+    assert.ok(box && box.y >= 0 && box.y + box.height <= 874 && box.height >= 44);
+    assert.equal(await page.locator('.rules').getAttribute('open'), null);
+    await page.getByText('Customize matches').tap();
+    await page.getByRole('slider', { name: /Time limit/ }).waitFor();
+    await button.tap();
+    await matchRuns(page);
+    await page.locator('#objective', { hasText: 'River Regicide' }).waitFor();
+  }, { viewport: { width: 402, height: 874 }, hasTouch: true }],
   ['tournament round won, bracket simulated in the Worker', 'index.html', async page => {
     await clickText(page, 'Begin Tournament');
     await clickText(page, 'Begin Round');

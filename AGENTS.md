@@ -38,6 +38,7 @@ any difference is a behaviour change.
 
 | Param | Effect |
 | --- | --- |
+| `?challenge=river-regicide` | Featured Regicide challenge with a fixed Rivers seed, Easy opponent and 15-minute deadline. Complete it by defeating the enemy king while yours survives. |
 | `?mode=kingdoms` | Standalone four-team Kingdom Conquest; `opp` sets all three opponents |
 | `?round=1..5` | Skip the menus, start that round as a quick match |
 | `&opp=relaxed\|easy\|medium\|hard` | Opponent bot for `?round=` (default `medium`) |
